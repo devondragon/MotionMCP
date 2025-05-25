@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node src/index.js",
+    "mcp": "node src/mcp-server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy"
@@ -15,6 +16,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
     "axios": "^1.9.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",

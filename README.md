@@ -1,16 +1,16 @@
 # Motion MCP Server
 
-A Node.js server that provides RESTful API endpoints for integrating with the Motion API. This server acts as a proxy/wrapper around Motion's API with proper authentication, error handling, and logging.
+A Model Context Protocol (MCP) server that provides LLMs with direct access to the Motion API for task and project management. This server implements the MCP protocol to enable seamless integration between AI assistants and Motion's productivity platform.
 
 ## Features
 
-- Complete CRUD operations for Motion projects and tasks
-- API key authentication with Motion
-- Comprehensive error handling and logging
-- Input validation for all endpoints
-- Docker containerization support
-- Health check endpoint
-- CORS enabled for cross-origin requests
+- **MCP Protocol Implementation**: Full Model Context Protocol support for LLM integration
+- **Motion API Integration**: Complete CRUD operations for projects, tasks, workspaces, and users
+- **12 Built-in Tools**: Comprehensive set of tools for Motion management
+- **JSON Schema Validation**: Proper input validation and type safety
+- **Multiple Deployment Options**: MCP server, REST API, and Cloudflare Worker
+- **Error Handling**: Robust error handling with detailed feedback
+- **API Key Authentication**: Secure Motion API integration
 
 ## Prerequisites
 
@@ -39,8 +39,22 @@ A Node.js server that provides RESTful API endpoints for integrating with the Mo
 
 ## Usage
 
-### Development
+### MCP Server (Primary)
+The MCP server connects directly to LLMs via stdio transport:
+
 ```bash
+# Run the MCP server
+npm run mcp
+
+# Or run directly
+node src/mcp-server.js
+```
+
+### REST API Server (Alternative)
+Traditional REST API for web applications:
+
+```bash
+# Run the REST server
 npm start
 ```
 
@@ -49,11 +63,36 @@ npm start
 # Build the image
 docker build -t motion-mcp-server .
 
-# Run the container
+# Run the REST container
 docker run -p 3000:3000 --env-file .env motion-mcp-server
+
+# Run the MCP container
+docker run --env-file .env motion-mcp-server npm run mcp
 ```
 
-## API Endpoints
+## MCP Tools
+
+The MCP server provides 12 tools for Motion integration:
+
+### Project Management
+- `create_motion_project` - Create a new project
+- `list_motion_projects` - List all projects  
+- `get_motion_project` - Get project details by ID
+- `update_motion_project` - Update project properties
+- `delete_motion_project` - Delete a project
+
+### Task Management
+- `create_motion_task` - Create a new task
+- `list_motion_tasks` - List tasks with optional filters
+- `get_motion_task` - Get task details by ID
+- `update_motion_task` - Update task properties
+- `delete_motion_task` - Delete a task
+
+### Workspace & User Info
+- `list_motion_workspaces` - List all workspaces
+- `list_motion_users` - List all users
+
+## REST API Endpoints (Alternative)
 
 ### Health Check
 - `GET /health` - Returns server status
@@ -76,7 +115,46 @@ docker run -p 3000:3000 --env-file .env motion-mcp-server
 - `GET /api/motion/workspaces` - List all workspaces
 - `GET /api/motion/users` - List all users
 
-## Request/Response Examples
+## MCP Integration Examples
+
+### Using with Claude Desktop
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "motion": {
+      "command": "node",
+      "args": ["/path/to/MotionMCP/src/mcp-server.js"],
+      "env": {
+        "MOTION_API_KEY": "your_motion_api_key_here"
+      }
+    }
+  }
+}
+```
+
+### LLM Tool Usage Examples
+
+**Create a project:**
+```
+LLM: I'll create a new project for you.
+Tool: create_motion_project
+Args: {"name": "Website Redesign", "description": "Redesign company website", "color": "#FF5733"}
+Result: Successfully created project "Website Redesign" with ID: proj_123
+```
+
+**List tasks:**
+```
+LLM: Let me check your current tasks.
+Tool: list_motion_tasks  
+Args: {"status": "TODO"}
+Result: Found 5 tasks:
+- Fix login bug (ID: task_456) - Status: TODO
+- Update documentation (ID: task_789) - Status: TODO
+```
+
+## REST API Examples (Alternative)
 
 ### Create Project
 ```bash
@@ -100,11 +178,6 @@ curl -X POST http://localhost:3000/api/motion/tasks \
     "priority": "HIGH",
     "projectId": "project-id-here"
   }'
-```
-
-### Get Tasks with Filters
-```bash
-curl "http://localhost:3000/api/motion/tasks?projectId=123&status=TODO"
 ```
 
 ## Configuration
@@ -137,17 +210,49 @@ The server includes comprehensive error handling:
 - CORS is configured for cross-origin requests
 - Input validation on all endpoints
 
-## Development
+## Architecture
 
-The project structure:
+The project provides multiple integration methods:
+
 ```
 src/
-├── index.js          # Main server file
+├── mcp-server.js     # MCP protocol server (primary)
+├── index.js          # REST API server (alternative)
+├── worker.js         # Cloudflare Worker (alternative)
 ├── routes/
-│   └── motion.js     # API routes
+│   └── motion.js     # REST API routes
 ├── services/
-│   └── motionApi.js  # Motion API service
+│   └── motionApi.js  # Motion API service layer
 └── utils/            # Utility functions
+```
+
+### MCP vs REST vs Worker
+
+- **MCP Server**: Direct LLM integration via stdio transport
+- **REST API**: Traditional web API for browser/app integration  
+- **Cloudflare Worker**: Serverless edge deployment
+
+## How MCP Communication Works
+
+1. **LLM Discovery**: LLM calls `tools/list` to discover available tools
+2. **Tool Schema**: Server returns JSON schemas for each tool
+3. **Tool Execution**: LLM calls `tools/call` with tool name and arguments
+4. **Response**: Server executes Motion API call and returns structured result
+
+**Example Protocol Flow:**
+```json
+// LLM requests available tools
+{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+
+// Server responds with tool definitions
+{"jsonrpc": "2.0", "id": 1, "result": {"tools": [...]}}
+
+// LLM calls a tool
+{"jsonrpc": "2.0", "id": 2, "method": "tools/call", 
+ "params": {"name": "create_motion_task", "arguments": {...}}}
+
+// Server executes and responds
+{"jsonrpc": "2.0", "id": 2, "result": {"content": [...]}}
 ```
 
 ## License
