@@ -68,10 +68,19 @@ class MotionMCPServer {
           },
           {
             name: "list_motion_projects",
-            description: "List all projects in Motion",
+            description: "List all projects in Motion. If no workspace is specified, will use the default workspace. You can ask the user which workspace they prefer.",
             inputSchema: {
               type: "object",
-              properties: {},
+              properties: {
+                workspaceId: {
+                  type: "string",
+                  description: "Optional workspace ID to filter projects. If not provided, uses default workspace."
+                },
+                workspaceName: {
+                  type: "string",
+                  description: "Optional workspace name to filter projects (alternative to workspaceId)."
+                }
+              },
               additionalProperties: false
             }
           },
@@ -173,10 +182,18 @@ class MotionMCPServer {
           },
           {
             name: "list_motion_tasks",
-            description: "List tasks in Motion with optional filters",
+            description: "List tasks in Motion with optional filters. If no workspace is specified, will use the default workspace.",
             inputSchema: {
               type: "object",
               properties: {
+                workspaceId: {
+                  type: "string",
+                  description: "Optional workspace ID to filter tasks. If not provided, uses default workspace."
+                },
+                workspaceName: {
+                  type: "string",
+                  description: "Optional workspace name to filter tasks (alternative to workspaceId)."
+                },
                 projectId: {
                   type: "string",
                   description: "Filter tasks by project ID (optional)"
@@ -265,7 +282,7 @@ class MotionMCPServer {
           },
           {
             name: "list_motion_workspaces",
-            description: "List all workspaces in Motion",
+            description: "List all workspaces in Motion. Use this to show users available workspaces so they can choose which one to work with.",
             inputSchema: {
               type: "object",
               properties: {},
@@ -292,40 +309,40 @@ class MotionMCPServer {
         switch (name) {
           case "create_motion_project":
             return await this.handleCreateProject(args);
-          
+
           case "list_motion_projects":
-            return await this.handleListProjects();
-          
+            return await this.handleListProjects(args);
+
           case "get_motion_project":
             return await this.handleGetProject(args);
-          
+
           case "update_motion_project":
             return await this.handleUpdateProject(args);
-          
+
           case "delete_motion_project":
             return await this.handleDeleteProject(args);
-          
+
           case "create_motion_task":
             return await this.handleCreateTask(args);
-          
+
           case "list_motion_tasks":
             return await this.handleListTasks(args);
-          
+
           case "get_motion_task":
             return await this.handleGetTask(args);
-          
+
           case "update_motion_task":
             return await this.handleUpdateTask(args);
-          
+
           case "delete_motion_task":
             return await this.handleDeleteTask(args);
-          
+
           case "list_motion_workspaces":
             return await this.handleListWorkspaces();
-          
+
           case "list_motion_users":
             return await this.handleListUsers();
-          
+
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -355,14 +372,69 @@ class MotionMCPServer {
     };
   }
 
-  async handleListProjects() {
-    const projects = await this.motionService.getProjects();
+  async handleListProjects(args = {}) {
+    let workspaceId = args.workspaceId;
+    let workspaceName = null;
+
+    // If workspace name provided instead of ID, look it up
+    if (!workspaceId && args.workspaceName) {
+      try {
+        const workspace = await this.motionService.getWorkspaceByName(args.workspaceName);
+        workspaceId = workspace.id;
+        workspaceName = workspace.name;
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: Could not find workspace "${args.workspaceName}". Available workspaces can be listed with list_motion_workspaces.`
+            }
+          ],
+          isError: true
+        };
+      }
+    }
+
+    // Get projects for the specified or default workspace
+    const projects = await this.motionService.getProjects(workspaceId);
+
+    // Get workspace info for context
+    if (!workspaceName && workspaceId) {
+      try {
+        const workspaces = await this.motionService.getWorkspaces();
+        const workspace = workspaces.find(w => w.id === workspaceId);
+        workspaceName = workspace ? workspace.name : 'Unknown';
+      } catch (error) {
+        workspaceName = 'Unknown';
+      }
+    } else if (!workspaceName) {
+      try {
+        const defaultWorkspace = await this.motionService.getDefaultWorkspace();
+        workspaceName = defaultWorkspace.name;
+        workspaceId = defaultWorkspace.id;
+      } catch (error) {
+        workspaceName = 'Default';
+      }
+    }
+
     const projectList = projects.map(p => `- ${p.name} (ID: ${p.id})`).join('\n');
+
+    let responseText = `Found ${projects.length} projects in workspace "${workspaceName}"`;
+    if (workspaceId) {
+      responseText += ` (ID: ${workspaceId})`;
+    }
+    responseText += `:\n${projectList}`;
+
+    // If no workspace was specified and there are multiple workspaces, suggest the user can specify one
+    if (!args.workspaceId && !args.workspaceName) {
+      responseText += `\n\nNote: This shows projects from the default workspace. You can specify a different workspace using the workspaceId or workspaceName parameter, or use list_motion_workspaces to see all available workspaces.`;
+    }
+
     return {
       content: [
         {
           type: "text",
-          text: `Found ${projects.length} projects:\n${projectList}`
+          text: responseText
         }
       ]
     };
@@ -469,12 +541,18 @@ class MotionMCPServer {
 
   async handleListWorkspaces() {
     const workspaces = await this.motionService.getWorkspaces();
-    const workspaceList = workspaces.map(w => `- ${w.name} (ID: ${w.id})`).join('\n');
+    const defaultWorkspace = await this.motionService.getDefaultWorkspace();
+
+    const workspaceList = workspaces.map(w => {
+      const isDefault = w.id === defaultWorkspace.id ? ' (DEFAULT)' : '';
+      return `- ${w.name} (ID: ${w.id})${isDefault} - Type: ${w.type}`;
+    }).join('\n');
+
     return {
       content: [
         {
           type: "text",
-          text: `Found ${workspaces.length} workspaces:\n${workspaceList}`
+          text: `Found ${workspaces.length} workspaces:\n${workspaceList}\n\nYou can use either the workspace name or ID when specifying which workspace to work with in other commands.`
         }
       ]
     };
@@ -495,10 +573,10 @@ class MotionMCPServer {
 
   async run() {
     await this.initialize();
-    
+
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
+
     console.error("Motion MCP Server running on stdio");
   }
 }
