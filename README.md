@@ -2,6 +2,12 @@
 
 A Model Context Protocol (MCP) server that provides LLMs with direct access to the Motion API for task and project management. This server implements the MCP protocol to enable seamless integration between AI assistants and Motion's productivity platform.
 
+## Preview
+
+<a href="sample.png"><img src="sample.png" alt="Motion MCP Server Preview" width="400" /></a>
+
+*Click the image above to view full size*
+
 ## Features
 
 - **MCP Protocol Implementation**: Full Model Context Protocol support for LLM integration
