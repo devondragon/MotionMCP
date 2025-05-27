@@ -6,10 +6,17 @@ A Model Context Protocol (MCP) server that provides LLMs with direct access to t
 
 - **MCP Protocol Implementation**: Full Model Context Protocol support for LLM integration
 - **Motion API Integration**: Complete CRUD operations for projects, tasks, workspaces, and users
-- **12 Built-in Tools**: Comprehensive set of tools for Motion management
+- **18 Built-in Tools**: Comprehensive set of tools for Motion management with AI-powered intelligence
+- **Context Awareness**: Real-time workspace context, recent activity, and intelligent suggestions
+- **Smart Workspace Management**: Automatic workspace detection and selection
+- **Intelligent Search**: Semantic search across tasks and projects with relevance scoring
+- **Workload Analytics**: Comprehensive workload analysis with overdue tasks and deadline tracking
+- **Workflow Intelligence**: Smart scheduling, bulk operations, and next action suggestions
+- **Project Templates**: Pre-built project templates with intelligent task creation
+- **Enhanced Task Creation**: Supports all Motion API parameters with intelligent defaults
+- **MCP-Compliant Logging**: Structured JSON logging to stderr for debugging
 - **JSON Schema Validation**: Proper input validation and type safety
-- **Multiple Deployment Options**: MCP server, REST API, and Cloudflare Worker
-- **Error Handling**: Robust error handling with detailed feedback
+- **Robust Error Handling**: Detailed error messages and fallback mechanisms
 - **API Key Authentication**: Secure Motion API integration
 
 ## Prerequisites
@@ -33,14 +40,11 @@ A Model Context Protocol (MCP) server that provides LLMs with direct access to t
 4. Update the `.env` file with your Motion API key:
    ```
    MOTION_API_KEY=your_motion_api_key_here
-   PORT=3000
-   NODE_ENV=development
    ```
 
 ## Usage
 
-### MCP Server (Primary)
-The MCP server connects directly to LLMs via stdio transport:
+The Motion MCP Server runs as a Model Context Protocol server for direct LLM integration:
 
 ```bash
 # Run the MCP server
@@ -50,70 +54,222 @@ npm run mcp
 node src/mcp-server.js
 ```
 
-### REST API Server (Alternative)
-Traditional REST API for web applications:
-
-```bash
-# Run the REST server
-npm start
-```
-
-### Docker
-```bash
-# Build the image
-docker build -t motion-mcp-server .
-
-# Run the REST container
-docker run -p 3000:3000 --env-file .env motion-mcp-server
-
-# Run the MCP container
-docker run --env-file .env motion-mcp-server npm run mcp
-```
-
 ## MCP Tools
 
-The MCP server provides 12 tools for Motion integration:
+The MCP server provides 18 intelligent tools for Motion integration with enhanced AI capabilities:
+
+### Context & Intelligence
+- `get_motion_context` - Get comprehensive workspace context, recent activity, and smart suggestions
+- `search_motion_content` - Intelligent search across tasks and projects with semantic relevance
+- `analyze_motion_workload` - Analyze workload distribution, overdue tasks, and productivity insights
+- `suggest_next_actions` - AI-powered suggestions for next actions based on current state
 
 ### Project Management
-- `create_motion_project` - Create a new project
-- `list_motion_projects` - List all projects  
+- `create_motion_project` - Create a new project with workspace auto-detection
+- `create_project_template` - Create projects from intelligent templates (software dev, marketing, etc.)
+- `list_motion_projects` - List projects with workspace filtering support
 - `get_motion_project` - Get project details by ID
 - `update_motion_project` - Update project properties
 - `delete_motion_project` - Delete a project
 
 ### Task Management
-- `create_motion_task` - Create a new task
-- `list_motion_tasks` - List tasks with optional filters
+- `create_motion_task` - Create a new task with intelligent workspace/project resolution
+- `list_motion_tasks` - List tasks with workspace and project filtering
 - `get_motion_task` - Get task details by ID
 - `update_motion_task` - Update task properties
 - `delete_motion_task` - Delete a task
+- `bulk_update_tasks` - Update multiple tasks simultaneously
+- `smart_schedule_tasks` - AI-powered intelligent task scheduling
 
 ### Workspace & User Info
-- `list_motion_workspaces` - List all workspaces
+- `list_motion_workspaces` - List all workspaces with enhanced details
 - `list_motion_users` - List all users
 
-## REST API Endpoints (Alternative)
+## Enhanced Tool Features
 
-### Health Check
-- `GET /health` - Returns server status
+### Smart Workspace Management
+- **Auto-detection**: Automatically uses default workspace when none specified
+- **Name resolution**: Find workspaces by name instead of requiring IDs
+- **Intelligent defaults**: Prefers "Personal" workspaces as default
+- **Fallback handling**: Graceful handling when workspace resolution fails
 
-### Projects
-- `GET /api/motion/projects` - List all projects
-- `POST /api/motion/projects` - Create a new project
-- `GET /api/motion/projects/:id` - Get project by ID
-- `PATCH /api/motion/projects/:id` - Update project
-- `DELETE /api/motion/projects/:id` - Delete project
+### Advanced Task Creation
+The `create_motion_task` tool now supports all Motion API parameters:
 
-### Tasks
-- `GET /api/motion/tasks` - List all tasks (supports query params: projectId, status, assigneeId)
-- `POST /api/motion/tasks` - Create a new task
-- `GET /api/motion/tasks/:id` - Get task by ID
-- `PATCH /api/motion/tasks/:id` - Update task
-- `DELETE /api/motion/tasks/:id` - Delete task
+**Basic Parameters:**
+- `name` (required) - Task title
+- `description` - Markdown-supported task description
+- `workspaceId` / `workspaceName` - Workspace specification (auto-detects if omitted)
+- `projectId` / `projectName` - Project assignment (optional)
 
-### Workspaces & Users
-- `GET /api/motion/workspaces` - List all workspaces
-- `GET /api/motion/users` - List all users
+**Advanced Parameters:**
+- `status` - Task status (uses workspace default if omitted)
+- `priority` - ASAP, HIGH, MEDIUM, or LOW
+- `dueDate` - ISO 8601 date (required for scheduled tasks)
+- `duration` - Minutes (number), "NONE", or "REMINDER"
+- `assigneeId` - User ID for task assignment
+- `labels` - Array of label names
+- `autoScheduled` - Auto-scheduling configuration (object or null)
+
+### Intelligent Project Resolution
+- **Name lookup**: Find projects by partial or exact name match
+- **Workspace scoping**: Project searches are scoped to specific workspaces
+- **Fuzzy matching**: Supports partial name matching for easier use
+- **Error feedback**: Clear messages when projects aren't found
+
+## AI-Powered Intelligence Features
+
+### Context Awareness
+The `get_motion_context` tool provides LLMs with comprehensive situational awareness:
+
+**Real-time Context:**
+- Current default workspace and available workspaces
+- User information and permissions
+- Recent activity across tasks and projects
+- Current workload distribution and status
+
+**Intelligent Suggestions:**
+- Overdue tasks requiring immediate attention
+- High-priority items to focus on next
+- Upcoming deadlines and time-sensitive work
+- Project status insights and recommendations
+
+**Example Usage:**
+```
+LLM: Let me get your current Motion context to understand your situation.
+Tool: get_motion_context
+Result: You're in "Development" workspace with 15 active tasks. You have 3 overdue tasks and 5 high-priority items. Recent activity shows focus on "API Integration" project.
+Suggestions:
+- Address 3 overdue tasks (Task A, B, C)
+- Continue work on high-priority "Security Review"
+- Upcoming deadline: "Release Planning" due tomorrow
+```
+
+### Intelligent Search
+The `search_motion_content` tool provides semantic search capabilities:
+
+**Advanced Search Features:**
+- Content-aware search across task descriptions and project details
+- Relevance scoring based on exact matches, partial matches, and priority
+- Scoped search (tasks only, projects only, or both)
+- Priority boosting for urgent items
+
+**Example Usage:**
+```
+LLM: Let me search for anything related to "API security"
+Tool: search_motion_content
+Args: {"query": "API security", "searchScope": "both"}
+Result: Found 4 relevant items:
+- [task] API Security Review (ID: task_789) - Relevance: 95
+- [project] Security Audit (ID: proj_456) - Relevance: 70
+- [task] Update API documentation (ID: task_012) - Relevance: 45
+```
+
+### Workload Analytics
+The `analyze_motion_workload` tool provides comprehensive productivity insights:
+
+**Analytics Capabilities:**
+- Task distribution by status, priority, and project
+- Overdue task identification and counting
+- Upcoming deadline tracking and alerts
+- Project health and progress monitoring
+- Time-based analysis (today, this week, this month)
+
+**Example Usage:**
+```
+LLM: Let me analyze your current workload.
+Tool: analyze_motion_workload
+Args: {"timeframe": "this_week", "includeProjects": true}
+Result: Workload Analysis (this_week):
+- Total Tasks: 23
+- Overdue Tasks: 3
+- Upcoming Deadlines: 7
+- Task Distribution:
+  - In Progress: 8 tasks
+  - Todo: 12 tasks
+  - Completed: 3 tasks
+- Project Insights:
+  - 4 active projects
+  - 2 projects behind schedule
+```
+
+### Smart Scheduling
+The `smart_schedule_tasks` tool provides AI-powered task optimization:
+
+**Intelligent Scheduling Features:**
+- Priority-based task ordering (ASAP → HIGH → MEDIUM → LOW)
+- Deadline-aware scheduling with urgency detection
+- Workload balancing and buffer time inclusion
+- Conflict detection and resolution suggestions
+- Automatic unscheduled task discovery
+
+**Example Usage:**
+```
+LLM: Let me intelligently schedule your unscheduled tasks.
+Tool: smart_schedule_tasks
+Args: {"schedulingPreferences": {"prioritizeDeadlines": true}}
+Result: Scheduled 8 tasks optimally:
+- Task ID: task_456 -> 9:00 AM (ASAP priority)
+- Task ID: task_789 -> 10:30 AM (Due today)
+- Task ID: task_012 -> 2:00 PM (HIGH priority)
+```
+
+### Workflow Intelligence
+The `suggest_next_actions` tool provides proactive assistance:
+
+**Smart Suggestions Based On:**
+- Current task priorities and deadlines
+- Project status and momentum
+- Historical patterns and preferences
+- Workload balance and capacity
+- Context-aware recommendations (daily planning, project review, etc.)
+
+**Example Usage:**
+```
+LLM: What should I focus on next?
+Tool: suggest_next_actions
+Args: {"context": "daily planning", "maxSuggestions": 3}
+Result: Suggested Next Actions:
+✅ Complete "Security Review" (task_789) - ASAP priority, due today
+⏰ Start "Database Migration" (task_456) - Due in 2 days
+🔄 Review stalled project: "Mobile App" - No recent activity
+```
+
+## Quick Start for LLM Context
+
+**For optimal LLM assistance, start with these tools:**
+
+1. **`get_motion_context`** - Get comprehensive workspace overview and current state
+2. **`analyze_motion_workload`** - Understand current workload and priorities
+3. **`suggest_next_actions`** - Get AI-powered recommendations for what to focus on next
+
+**Example Intelligent Workflow:**
+```
+User: "Help me plan my day"
+
+LLM: I'll help you plan your day efficiently. Let me first understand your current situation.
+
+1. Getting your Motion context...
+Tool: get_motion_context
+Result: You're in "Work" workspace with 12 active tasks, 2 overdue items, and 4 high-priority tasks.
+
+2. Analyzing your current workload...
+Tool: analyze_motion_workload
+Args: {"timeframe": "today"}
+Result: Today you have 6 tasks, 2 are overdue, 3 due by end of day.
+
+3. Generating smart suggestions...
+Tool: suggest_next_actions
+Args: {"context": "daily planning"}
+Result: Recommended focus:
+- ✅ Complete overdue "Security Review" (ASAP priority)
+- ⏰ Finish "Database Migration" (due today)
+- 🚀 Start "Feature Testing" (high priority, good momentum)
+
+Based on this analysis, I recommend starting with the overdue Security Review task since it's marked ASAP priority, then moving to the Database Migration that's due today. This will clear your urgent items and give you momentum for the day.
+
+Would you like me to help schedule these tasks or create any new tasks for your day?
+```
 
 ## MCP Integration Examples
 
@@ -136,101 +292,189 @@ Add to your `claude_desktop_config.json`:
 
 ### LLM Tool Usage Examples
 
-**Create a project:**
+**Create a simple task:**
 ```
-LLM: I'll create a new project for you.
-Tool: create_motion_project
-Args: {"name": "Website Redesign", "description": "Redesign company website", "color": "#FF5733"}
-Result: Successfully created project "Website Redesign" with ID: proj_123
+LLM: I'll create a new task for you.
+Tool: create_motion_task
+Args: {"name": "Review quarterly reports"}
+Result: Successfully created task "Review quarterly reports" with ID: task_123 in workspace ws_456
 ```
 
-**List tasks:**
+**Create an advanced task with project assignment:**
+```
+LLM: I'll create a detailed task in your development project.
+Tool: create_motion_task
+Args: {
+  "name": "Complete API integration",
+  "description": "Integrate with Motion API and test all endpoints",
+  "workspaceName": "Development",
+  "projectName": "Feature Release",
+  "priority": "HIGH",
+  "dueDate": "2025-05-30T17:00:00.000Z",
+  "duration": 120,
+  "labels": ["api", "integration", "urgent"]
+}
+Result: Successfully created task "Complete API integration" with ID: task_789 in project proj_456 in workspace ws_123
+```
+
+**List projects with workspace filtering:**
+```
+LLM: Let me check your development projects.
+Tool: list_motion_projects
+Args: {"workspaceName": "Development"}
+Result: Found 3 projects in Development workspace:
+- Feature Release (ID: proj_456) - Status: In Progress
+- Bug Fixes (ID: proj_789) - Status: Todo
+- Documentation (ID: proj_012) - Status: Backlog
+```
+
+**List tasks with intelligent filtering:**
 ```
 LLM: Let me check your current tasks.
-Tool: list_motion_tasks  
-Args: {"status": "TODO"}
-Result: Found 5 tasks:
-- Fix login bug (ID: task_456) - Status: TODO
-- Update documentation (ID: task_789) - Status: TODO
-```
-
-## REST API Examples (Alternative)
-
-### Create Project
-```bash
-curl -X POST http://localhost:3000/api/motion/projects \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My New Project",
-    "description": "Project description",
-    "color": "#FF5733"
-  }'
-```
-
-### Create Task
-```bash
-curl -X POST http://localhost:3000/api/motion/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Complete API integration",
-    "description": "Integrate with Motion API",
-    "status": "TODO",
-    "priority": "HIGH",
-    "projectId": "project-id-here"
-  }'
+Tool: list_motion_tasks
+Args: {"workspaceName": "Personal", "projectName": "Website Redesign"}
+Result: Found 5 tasks in Website Redesign project:
+- Fix responsive layout (ID: task_456) - Status: In Progress
+- Update color scheme (ID: task_789) - Status: Todo
+- Optimize images (ID: task_012) - Status: Done
+- Test on mobile (ID: task_345) - Status: Todo
+- Deploy to staging (ID: task_678) - Status: Backlog
 ```
 
 ## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MOTION_API_KEY` | Your Motion API key (required) | - |
-| `PORT` | Server port | 3000 |
-| `NODE_ENV` | Environment (development/production) | development |
+| Variable         | Description                    | Default |
+| ---------------- | ------------------------------ | ------- |
+| `MOTION_API_KEY` | Your Motion API key (required) | -       |
 
 ## Motion API Documentation
 
 For detailed information about Motion's API, visit: https://docs.usemotion.com/
 
-## Error Handling
+## Error Handling & Logging
 
-The server includes comprehensive error handling:
-- API validation errors return 400 status
-- Missing resources return 404 status
-- Authentication errors return 401/403 status
-- Server errors return 500 status
-- All errors are logged with Winston
+The server includes comprehensive error handling and MCP-compliant logging:
+
+### MCP-Compliant Logging
+- **Structured JSON logs** to stderr for MCP compliance
+- **Detailed context** including method names, IDs, and API responses
+- **Error tracking** with API status codes and messages
+- **Performance monitoring** with request/response timing
+
+### Enhanced Error Handling
+- **Smart workspace resolution** with fallback to defaults
+- **Project lookup validation** with helpful error messages
+- **API response structure handling** for wrapped/unwrapped responses
+- **Input validation** with detailed parameter requirements
+- **Graceful degradation** when optional features fail
+
+### Error Response Examples
+```json
+// Missing workspace error
+{"error": "workspaceId is required and no default workspace could be found"}
+
+// Project not found error
+{"error": "Project 'Marketing Campaign' not found in workspace"}
+
+// Invalid parameter error
+{"error": "Task priority must be one of: ASAP, HIGH, MEDIUM, LOW"}
+```
 
 ## Security
 
-- API keys are never logged
+- API keys are never logged or exposed
 - All sensitive information is kept out of logs
-- CORS is configured for cross-origin requests
 - Input validation on all endpoints
+- MCP-compliant structured logging to stderr
+- Workspace-scoped operations for data isolation
 
 ## Architecture
 
-The project provides multiple integration methods:
+The Motion MCP Server is designed as a focused MCP implementation:
 
 ```
 src/
-├── mcp-server.js     # MCP protocol server (primary)
-├── index.js          # REST API server (alternative)
-├── worker.js         # Cloudflare Worker (alternative)
-├── routes/
-│   └── motion.js     # REST API routes
+├── mcp-server.js     # MCP protocol server implementation
 ├── services/
-│   └── motionApi.js  # Motion API service layer
+│   └── motionApi.js  # Enhanced Motion API service layer
 └── utils/            # Utility functions
 ```
 
-### MCP vs REST vs Worker
+### Key Components
 
-- **MCP Server**: Direct LLM integration via stdio transport
-- **REST API**: Traditional web API for browser/app integration  
-- **Cloudflare Worker**: Serverless edge deployment
+**MotionApiService (`motionApi.js`):**
+- **Smart workspace detection** with default workspace resolution
+- **Project lookup by name** with fuzzy matching capabilities
+- **Enhanced error handling** with detailed context and fallbacks
+- **MCP-compliant logging** with structured JSON output
+- **API response handling** for Motion's wrapped response formats
+
+**MCP Server (`mcp-server.js`):**
+- **Intelligent parameter resolution** for workspace and project names
+- **Enhanced tool definitions** with comprehensive parameter documentation
+- **Robust error handling** with user-friendly error messages
+- **Workspace-aware operations** for all project and task management
+
+## Recent Improvements
+
+### Version 2.0 Enhancements
+- ✅ **MCP-Compliant Logging**: Replaced Winston with structured JSON logging to stderr
+- ✅ **Smart Workspace Management**: Auto-detection and intelligent defaults for workspaces
+- ✅ **Enhanced Task Creation**: Support for all Motion API parameters with intelligent resolution
+- ✅ **Project Name Resolution**: Find projects by name with fuzzy matching
+- ✅ **Robust Error Handling**: Detailed error messages with context and fallback mechanisms
+- ✅ **API Response Handling**: Fixed handling of Motion's wrapped response formats (`{projects: [...]}`, `{workspaces: [...]}`)
+- ✅ **Workspace-Aware Operations**: All tools now support workspace filtering and auto-detection
+- ✅ **Improved Documentation**: Comprehensive parameter descriptions and usage examples
+
+### Version 2.1 Intelligence Enhancements
+- ✅ **Context Awareness**: Real-time workspace context with activity tracking and intelligent suggestions
+- ✅ **Intelligent Search**: Semantic search across tasks and projects with relevance scoring
+- ✅ **Workload Analytics**: Comprehensive workload analysis with overdue tasks and deadline tracking
+- ✅ **Smart Scheduling**: AI-powered task scheduling with priority and deadline optimization
+- ✅ **Workflow Intelligence**: Proactive next action suggestions based on current state
+- ✅ **Project Templates**: Pre-built intelligent templates for common project types
+- ✅ **Bulk Operations**: Efficient batch updates for multiple tasks simultaneously
+- ✅ **Enhanced Tool Count**: Expanded from 12 to 18 tools with AI-powered capabilities
+
+### Breaking Changes
+- **Logging Format**: Changed from Winston file logging to MCP-compliant JSON stderr logging
+- **Task Creation**: `workspaceId` is now auto-resolved if not provided (was previously required)
+- **Response Handling**: Fixed array method errors by properly handling wrapped API responses
+
+## Debugging & Troubleshooting
+
+### MCP Logging
+The server outputs structured JSON logs to stderr for debugging:
+```json
+{"level":"info","msg":"Successfully fetched projects","method":"getProjects","count":3,"workspaceId":"ws_123","time":"2025-05-26T22:30:45.123Z"}
+{"level":"error","msg":"Failed to create task","method":"createTask","error":"workspaceId is required","time":"2025-05-26T22:30:46.456Z"}
+```
+
+### Common Issues
+
+**Task Creation Fails:**
+- Ensure your Motion API key has task creation permissions
+- Check that the workspace exists and is accessible
+- Verify project names are spelled correctly (uses fuzzy matching)
+
+**Workspace Not Found:**
+- List workspaces first with `list_motion_workspaces`
+- Use exact workspace names or IDs
+- Check API key permissions for workspace access
+
+**Project Resolution Issues:**
+- Projects are searched within the specified workspace only
+- Use partial names for fuzzy matching: "Marketing" will find "Marketing Campaign"
+- Ensure the project exists in the target workspace
+
+### Debugging Tips
+1. **Check stderr output** for detailed MCP logs
+2. **Use `list_motion_workspaces`** to see available workspaces
+3. **Test with simple task creation** before using advanced parameters
+4. **Verify API key permissions** in Motion settings
 
 ## How MCP Communication Works
 
@@ -248,7 +492,7 @@ src/
 {"jsonrpc": "2.0", "id": 1, "result": {"tools": [...]}}
 
 // LLM calls a tool
-{"jsonrpc": "2.0", "id": 2, "method": "tools/call", 
+{"jsonrpc": "2.0", "id": 2, "method": "tools/call",
  "params": {"name": "create_motion_task", "arguments": {...}}}
 
 // Server executes and responds

@@ -1,9 +1,0 @@
-name = "motion-mcp-server"
-main = "src/worker.js"
-compatibility_date = "2024-01-01"
-
-[env.production.vars]
-MOTION_API_KEY = ""
-
-[env.development.vars]
-MOTION_API_KEY = ""
