@@ -2,9 +2,20 @@
 
 A Model Context Protocol (MCP) server that provides LLMs with direct access to the Motion API for task and project management. This server implements the MCP protocol to enable seamless integration between AI assistants and Motion's productivity platform.
 
-## Quick Start with `npx`
+## Deployment Options
 
-You can run the Motion MCP Server without installing it globally:
+This server supports **dual deployment modes**:
+
+- **🖥️ Local (stdio)**: Run locally for development and direct MCP integration
+- **☁️ Remote (Cloudflare Workers)**: Deploy as a serverless worker with HTTP Stream Transport
+
+Both modes provide identical MCP functionality with the same tool set and capabilities.
+
+## Quick Start
+
+### 🖥️ Local Deployment (stdio)
+
+Run the Motion MCP Server locally without installing it globally:
 
 ```bash
 npx motionmcp --api-key=your_motion_api_key
@@ -32,6 +43,31 @@ npx motionmcp
 ```
 
 > The `npx` command will always fetch and run the latest published version.
+
+### ☁️ Remote Deployment (Cloudflare Workers)
+
+Deploy as a serverless worker with HTTP Stream Transport:
+
+```bash
+# Install and deploy
+git clone <repository>
+cd MotionMCP
+npm install
+npm install -g wrangler
+
+# Login to Cloudflare
+wrangler auth login
+
+# Set your API key as a secret
+npm run worker:secret
+
+# Deploy to production
+npm run worker:deploy
+```
+
+Your worker will be available at: `https://motion-mcp-server.your-subdomain.workers.dev`
+
+📖 **For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
 
 ## Preview
 
@@ -178,6 +214,8 @@ Args: {
 
 ## LLM Integration
 
+### Local Integration (stdio)
+
 Add this config to your `claude_desktop_config.json`:
 
 ```json
@@ -188,6 +226,23 @@ Add this config to your `claude_desktop_config.json`:
       "args": ["motionmcp"],
       "env": {
         "MOTION_API_KEY": "your_api_key"
+      }
+    }
+  }
+}
+```
+
+### Remote Integration (HTTP Stream Transport)
+
+For remote Cloudflare Worker deployment:
+
+```json
+{
+  "mcpServers": {
+    "motion": {
+      "transport": {
+        "type": "http",
+        "url": "https://your-worker.your-subdomain.workers.dev/mcp"
       }
     }
   }

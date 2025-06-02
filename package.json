@@ -12,7 +12,10 @@
     "mcp": "node src/mcp-server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "worker:dev": "wrangler dev",
-    "worker:deploy": "wrangler deploy"
+    "worker:deploy": "wrangler deploy",
+    "worker:publish": "wrangler deploy --env production",
+    "worker:tail": "wrangler tail",
+    "worker:secret": "wrangler secret put MOTION_API_KEY"
   },
   "keywords": [],
   "author": "",
@@ -25,5 +28,8 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.78.12"
   }
 }
