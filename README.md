@@ -30,6 +30,44 @@ A Model Context Protocol (MCP) server that provides LLMs with direct access to t
 - Node.js 18 or higher
 - Motion API key (get from https://app.usemotion.com/settings/api)
 
+## Providing Your Motion API Key
+
+The Motion MCP Server supports multiple ways to provide your API key:
+
+### Environment Variable
+```bash
+MOTION_API_KEY=your-key npx motionmcp
+```
+
+### Command Line Arguments
+```bash
+# With API key only
+npx motionmcp --api-key=your-key
+
+# With API key and custom port
+npx motionmcp --api-key=your-key --port=4000
+```
+
+### Config File
+Create a config file in your home directory:
+```bash
+echo '{"apiKey": "your-key", "port": 4000}' > ~/.motionmcp.json
+npx motionmcp
+```
+
+### Interactive Prompt
+If no API key is provided through the above methods, the server will prompt you:
+```bash
+npx motionmcp
+# Will prompt: "Please enter your Motion API key: "
+```
+
+The server checks for the API key in this order:
+1. Environment variable (`MOTION_API_KEY`)
+2. Command line argument (`--api-key=`)
+3. Config file (`~/.motionmcp.json`)
+4. Interactive prompt
+
 ## Installation
 
 1. Clone the repository

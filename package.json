@@ -1,8 +1,11 @@
 {
   "name": "motionmcp",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "",
   "main": "index.js",
+  "bin": {
+    "motionmcp": "./src/index.js"
+  },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node src/index.js",
