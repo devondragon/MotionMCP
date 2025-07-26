@@ -93,10 +93,10 @@ Implement caching layer and optimize API calls to improve performance and preven
 
 2. **Cache Integration in MotionApiService**
    - [ ] Add cache instance to `MotionApiService` constructor
-   - [ ] Cache workspace data with 5-minute TTL
-   - [ ] Cache user data with 10-minute TTL
-   - [ ] Cache project lists with 2-minute TTL
-   - [ ] Cache task statuses and labels with 2-minute TTL
+   - [ ] Cache workspace data with 5-minute TTL (configurable)
+   - [ ] Cache user data with 10-minute TTL (configurable)
+   - [ ] Cache project lists with 2-minute TTL (configurable)
+   - [ ] Cache task statuses and labels with 2-minute TTL (configurable)
    - [ ] Implement cache invalidation on data updates
    - [ ] Add cache bypass option for development/debugging
 
