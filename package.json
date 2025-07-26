@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "bin": {
-    "motionmcp": "./src/mcp-server.js",
+    "motionmcp": "./src/mcp-server.js"
   },
   "scripts": {
     "start": "node src/index.js",
