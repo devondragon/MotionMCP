@@ -46,7 +46,7 @@ function formatProjectList(projects, workspaceName, workspaceId = null, options 
     return `- ${project.name}`;
   };
   
-  let responseText = `Found ${projects.length} projects in workspace "${workspaceName}"`;
+  let responseText = `Found ${projects.length} ${projects.length === 1 ? 'project' : 'projects'} in workspace "${workspaceName}"`;
   if (workspaceId) {
     responseText += ` (ID: ${workspaceId})`;
   }
@@ -85,7 +85,7 @@ function formatTaskList(tasks, context = {}) {
     return line;
   };
   
-  let title = `Found ${tasks.length} tasks`;
+  let title = `Found ${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`;
   if (workspaceName) title += ` in workspace "${workspaceName}"`;
   if (projectName) title += ` in project "${projectName}"`;
   if (status) title += ` with status "${status}"`;

@@ -123,7 +123,7 @@ async function runAllTests() {
     // Test formatTaskList
     const tasks = [{ name: 'Task 1', id: 't1', status: 'pending' }];
     const taskResponse = formatTaskList(tasks, { workspaceName: 'Test Workspace' });
-    if (!taskResponse.content || !taskResponse.content[0] || !taskResponse.content[0].text.includes('Found 1 tasks')) {
+    if (!taskResponse.content || !taskResponse.content[0] || !taskResponse.content[0].text.includes('Found 1 task')) {
       throw new Error('Task list response missing count');
     }
   }));
