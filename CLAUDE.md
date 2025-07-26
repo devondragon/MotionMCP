@@ -37,7 +37,14 @@ The codebase follows a modular service-based architecture:
    - All 18 Motion operations with enhanced intelligence features
    - MCP-compliant JSON logging to stderr
 
-3. **MCP Protocol Implementation**:
+3. **Utilities Layer** (`src/utils/`):
+   - **WorkspaceResolver**: Centralized workspace resolution logic
+   - **Error Handling**: Custom error classes and MCP-compliant formatters
+   - **Response Formatters**: Consistent response formatting for all handlers
+   - **Parameter Utils**: Parameter parsing and validation helpers
+   - **Constants**: Shared error codes, defaults, and configuration
+
+4. **MCP Protocol Implementation**:
    - 18 tools exposed for project/task management
    - Intelligent features: context retrieval, search, workload analysis
    - Smart scheduling and next action suggestions

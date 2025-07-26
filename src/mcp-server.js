@@ -7,6 +7,16 @@ const {
   CallToolRequestSchema,
 } = require("@modelcontextprotocol/sdk/types.js");
 const MotionApiService = require('./services/motionApi.js');
+const { 
+  WorkspaceResolver,
+  formatMcpError,
+  formatMcpSuccess,
+  formatProjectList,
+  formatTaskList,
+  formatDetailResponse,
+  parseWorkspaceArgs,
+  parseTaskArgs
+} = require('./utils');
 require('dotenv').config();
 
 class MotionMCPServer {
@@ -24,12 +34,14 @@ class MotionMCPServer {
     );
 
     this.motionService = null;
+    this.workspaceResolver = null;
     this.setupHandlers();
   }
 
   async initialize() {
     try {
       this.motionService = new MotionApiService();
+      this.workspaceResolver = new WorkspaceResolver(this.motionService);
     } catch (error) {
       console.error("Failed to initialize Motion API service:", error.message);
       process.exit(1);
@@ -621,83 +633,38 @@ class MotionMCPServer {
   }
 
   async handleListProjects(args = {}) {
-    let workspaceId = args.workspaceId;
-    let workspaceName = null;
-
-    // If workspace name provided instead of ID, look it up
-    if (!workspaceId && args.workspaceName) {
-      try {
-        const workspace = await this.motionService.getWorkspaceByName(args.workspaceName);
-        workspaceId = workspace.id;
-        workspaceName = workspace.name;
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error: Could not find workspace "${args.workspaceName}". Available workspaces can be listed with list_motion_workspaces.`
-            }
-          ],
-          isError: true
-        };
+    try {
+      // 1. Parse workspace parameters using utility
+      const workspaceParams = parseWorkspaceArgs(args);
+      
+      // 2. Resolve workspace using WorkspaceResolver
+      const workspace = await this.workspaceResolver.resolveWorkspace(workspaceParams);
+      
+      // 3. Get projects for the resolved workspace
+      const projects = await this.motionService.getProjects(workspace.id);
+      
+      // 4. Format response using utility
+      const includeWorkspaceNote = !args.workspaceId && !args.workspaceName;
+      return formatProjectList(projects, workspace.name, workspace.id, { 
+        includeWorkspaceNote 
+      });
+      
+    } catch (error) {
+      // 5. Format error response using utility
+      if (error.message.includes('not found')) {
+        return formatMcpError(new Error(`Could not find workspace "${args.workspaceName}". Available workspaces can be listed with list_motion_workspaces.`));
       }
+      return formatMcpError(error);
     }
-
-    // Get projects for the specified or default workspace
-    const projects = await this.motionService.getProjects(workspaceId);
-
-    // Get workspace info for context
-    if (!workspaceName && workspaceId) {
-      try {
-        const workspaces = await this.motionService.getWorkspaces();
-        const workspace = workspaces.find(w => w.id === workspaceId);
-        workspaceName = workspace ? workspace.name : 'Unknown';
-      } catch (error) {
-        workspaceName = 'Unknown';
-      }
-    } else if (!workspaceName) {
-      try {
-        const defaultWorkspace = await this.motionService.getDefaultWorkspace();
-        workspaceName = defaultWorkspace.name;
-        workspaceId = defaultWorkspace.id;
-      } catch (error) {
-        workspaceName = 'Default';
-      }
-    }
-
-    const projectList = projects.map(p => `- ${p.name} (ID: ${p.id})`).join('\n');
-
-    let responseText = `Found ${projects.length} projects in workspace "${workspaceName}"`;
-    if (workspaceId) {
-      responseText += ` (ID: ${workspaceId})`;
-    }
-    responseText += `:\n${projectList}`;
-
-    // If no workspace was specified and there are multiple workspaces, suggest the user can specify one
-    if (!args.workspaceId && !args.workspaceName) {
-      responseText += `\n\nNote: This shows projects from the default workspace. You can specify a different workspace using the workspaceId or workspaceName parameter, or use list_motion_workspaces to see all available workspaces.`;
-    }
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: responseText
-        }
-      ]
-    };
   }
 
   async handleGetProject(args) {
-    const project = await this.motionService.getProject(args.projectId);
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Project Details:\n- Name: ${project.name}\n- ID: ${project.id}\n- Description: ${project.description || 'N/A'}\n- Status: ${project.status || 'N/A'}`
-        }
-      ]
-    };
+    try {
+      const project = await this.motionService.getProject(args.projectId);
+      return formatDetailResponse(project, 'Project', ['name', 'id', 'description', 'status']);
+    } catch (error) {
+      return formatMcpError(error);
+    }
   }
 
   async handleUpdateProject(args) {
@@ -727,88 +694,67 @@ class MotionMCPServer {
 
   async handleCreateTask(args) {
     try {
-      // Resolve workspace ID if needed
-      let workspaceId = args.workspaceId;
-      if (!workspaceId && args.workspaceName) {
-        const workspace = await this.motionService.getWorkspaceByName(args.workspaceName);
-        workspaceId = workspace.id;
-      } else if (!workspaceId) {
-        const defaultWorkspace = await this.motionService.getDefaultWorkspace();
-        workspaceId = defaultWorkspace.id;
-      }
-
-      // Resolve project ID if needed
-      let projectId = args.projectId;
-      if (!projectId && args.projectName) {
+      // 1. Parse task parameters using utility
+      const taskParams = parseTaskArgs(args);
+      
+      // 2. Resolve workspace using WorkspaceResolver
+      const workspace = await this.workspaceResolver.resolveWorkspace(taskParams);
+      
+      // 3. Resolve project ID if needed
+      let projectId = taskParams.projectId;
+      if (!projectId && taskParams.projectName) {
         try {
-          const project = await this.motionService.getProjectByName(args.projectName, workspaceId);
+          const project = await this.motionService.getProjectByName(taskParams.projectName, workspace.id);
           projectId = project.id;
         } catch (projectError) {
-          throw new Error(`Project "${args.projectName}" not found in workspace`);
+          throw new Error(`Project "${taskParams.projectName}" not found in workspace`);
         }
       }
 
-      // Build task data with required workspaceId
+      // 4. Build task data with required workspaceId
       const taskData = {
-        name: args.name,
-        workspaceId, // Required by Motion API
-        ...(args.description && { description: args.description }),
+        name: taskParams.name,
+        workspaceId: workspace.id, // Required by Motion API
+        ...(taskParams.description && { description: taskParams.description }),
         ...(projectId && { projectId }),
-        ...(args.status && { status: args.status }),
-        ...(args.priority && { priority: args.priority }),
-        ...(args.dueDate && { dueDate: args.dueDate }),
-        ...(args.duration && { duration: args.duration }),
-        ...(args.assigneeId && { assigneeId: args.assigneeId }),
-        ...(args.labels && { labels: args.labels }),
-        ...(args.autoScheduled !== undefined && { autoScheduled: args.autoScheduled })
+        ...(taskParams.status && { status: taskParams.status }),
+        ...(taskParams.priority && { priority: taskParams.priority }),
+        ...(taskParams.dueDate && { dueDate: taskParams.dueDate }),
+        ...(taskParams.duration && { duration: taskParams.duration }),
+        ...(taskParams.assigneeId && { assigneeId: taskParams.assigneeId }),
+        ...(taskParams.labels && { labels: taskParams.labels }),
+        ...(taskParams.autoScheduled !== undefined && { autoScheduled: taskParams.autoScheduled })
       };
 
+      // 5. Create task
       const task = await this.motionService.createTask(taskData);
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Successfully created task "${task.name}" with ID: ${task.id}${projectId ? ` in project ${projectId}` : ''} in workspace ${workspaceId}`
-          }
-        ]
-      };
+      // 6. Format success response
+      const successMessage = `Successfully created task "${task.name}" with ID: ${task.id}${projectId ? ` in project ${projectId}` : ''} in workspace ${workspace.id}`;
+      return formatMcpSuccess(successMessage);
+      
     } catch (error) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Failed to create task: ${error.message}`
-          }
-        ],
-        isError: true
-      };
+      // 7. Format error response using utility
+      return formatMcpError(new Error(`Failed to create task: ${error.message}`));
     }
   }
 
   async handleListTasks(args = {}) {
-    const tasks = await this.motionService.getTasks(args);
-    const taskList = tasks.map(t => `- ${t.name} (ID: ${t.id}) - Status: ${t.status || 'N/A'}`).join('\n');
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Found ${tasks.length} tasks:\n${taskList}`
-        }
-      ]
-    };
+    try {
+      const tasks = await this.motionService.getTasks(args);
+      return formatTaskList(tasks, { limit: args.limit });
+    } catch (error) {
+      return formatMcpError(error);
+    }
   }
 
   async handleGetTask(args) {
-    const task = await this.motionService.getTask(args.taskId);
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Task Details:\n- Name: ${task.name}\n- ID: ${task.id}\n- Description: ${task.description || 'N/A'}\n- Status: ${task.status || 'N/A'}\n- Priority: ${task.priority || 'N/A'}`
-        }
-      ]
-    };
+    try {
+      const task = await this.motionService.getTask(args.taskId);
+      return formatDetailResponse(task, 'Task', ['name', 'id', 'description', 'status', 'priority']);
+    } catch (error) {
+      return formatMcpError(error);
+    }
   }
 
   async handleUpdateTask(args) {
