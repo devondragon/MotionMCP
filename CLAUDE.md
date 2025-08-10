@@ -2,19 +2,51 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Startup Sequence
+1. ALWAYS read:
+   - `context/project.md` (project overview)
+   - `context/conventions.md` (how we work)
+   - `context/working-state.md` (current state)
+
+2. Check working-state.md for "Current Active Task"
+   - If found: Load that specific task from `context/tasks/current/`
+   - If not found: Ask "Which task are you working on today?"
+
+3. Do NOT read:
+   - Other tasks (unless specifically needed for context)
+   - Files in `context/tasks/completed/`
+   - `context/backlog.md` (unless adding items to it)
+
+## Conventions
+All coding, git workflow, and team standards are in `context/conventions.md`.
+Follow these strictly, especially:
+- Git branching strategy (ALWAYS create feature branches)
+- Code style rules
+- Testing requirements
+
+## Task Management
+- When starting a task: Update "Current Active Task" in working-state.md
+- When completing a task: Move file to `context/tasks/completed/` and mark the task as completed in context/tasks-index.md
+- When switching tasks: Update working-state.md pointer
+
+## Token Optimization
+- Only load what's needed for current work
+- Don't read completed tasks or backlog unless required
+- If you need context from another task, ask first
+
+
 ## Motion MCP Server
 
-This is a Model Context Protocol (MCP) server that bridges Motion's task management API with LLMs. It provides both an Express HTTP server and an MCP protocol server for AI-assisted task management.
+This is a Model Context Protocol (MCP) server that bridges Motion's task management API with LLMs, enabling AI-assisted task management through the MCP protocol.
 
 ## Common Commands
 
 ```bash
 # Development
 npm install              # Install dependencies
-npm start               # Start Express HTTP server (port 3000)
-npm run mcp             # Start MCP protocol server
-npm run worker:dev      # Run Cloudflare Worker locally
-npm run worker:deploy   # Deploy to Cloudflare
+npm run mcp             # Start MCP protocol server (primary)
+npm run worker:dev      # Run Cloudflare Worker locally (optional)
+npm run worker:deploy   # Deploy to Cloudflare (optional)
 
 # Environment setup
 cp .env.example .env    # Create environment file
@@ -25,10 +57,9 @@ cp .env.example .env    # Create environment file
 
 The codebase follows a modular service-based architecture:
 
-1. **Dual Server Model**:
-   - `src/index.js`: Express HTTP server for REST API access
-   - `src/mcp-server.js`: MCP protocol server for LLM integration
-   - `src/worker.js`: Cloudflare Worker for edge deployment
+1. **Server Implementation**:
+   - `src/mcp-server.js`: MCP protocol server for LLM integration (primary)
+   - `src/worker.js`: Cloudflare Worker for edge deployment (optional)
 
 2. **Core Service Layer** (`src/services/motionApi.js`):
    - Centralized Motion API client with comprehensive error handling
