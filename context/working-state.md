@@ -1,7 +1,7 @@
 # Working State
 
 ## Current Active Task
-**ACTIVE**: [none - to be set when work begins]
+**ACTIVE**: Task 0.1 - Migrate to TypeScript (feature/task-0.1-typescript-migration)
 
 ## Task Dependencies
 - Task 1.1 (Tool Consolidation) blocks Tasks 2.x (new API features)

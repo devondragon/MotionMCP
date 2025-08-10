@@ -6,16 +6,42 @@
  * ensuring consistent parameter handling.
  */
 
-const { DEFAULTS } = require('./constants');
-const { ValidationError } = require('./errorHandling');
+import { DEFAULTS } from './constants';
+import { ValidationError } from './errorHandling';
+
+interface WorkspaceArgs {
+  workspaceId?: string | null;
+  workspaceName?: string | null;
+}
+
+interface SearchArgs extends WorkspaceArgs {
+  query?: string;
+  searchScope?: 'both' | 'tasks' | 'projects';
+  limit?: number;
+}
+
+interface TaskArgs extends WorkspaceArgs {
+  name?: string | null;
+  description?: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
+  status?: string | null;
+  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  dueDate?: string | null;
+  assigneeId?: string | null;
+}
+
+interface ProjectArgs extends WorkspaceArgs {
+  name?: string | null;
+  description?: string | null;
+  color?: string | null;
+  status?: string | null;
+}
 
 /**
  * Parse workspace-related arguments from MCP request
- * 
- * @param {Object} args - Arguments from MCP request
- * @returns {Object} Parsed workspace parameters
  */
-function parseWorkspaceArgs(args = {}) {
+export function parseWorkspaceArgs(args: any = {}): WorkspaceArgs {
   return {
     workspaceId: args.workspaceId || null,
     workspaceName: args.workspaceName || null
@@ -24,11 +50,8 @@ function parseWorkspaceArgs(args = {}) {
 
 /**
  * Parse search-related arguments from MCP request
- * 
- * @param {Object} args - Arguments from MCP request
- * @returns {Object} Parsed search parameters with defaults
  */
-function parseSearchArgs(args = {}) {
+export function parseSearchArgs(args: any = {}): SearchArgs {
   return {
     query: args.query || '',
     searchScope: args.searchScope || DEFAULTS.SEARCH_SCOPE,
@@ -39,11 +62,8 @@ function parseSearchArgs(args = {}) {
 
 /**
  * Parse task creation/update arguments from MCP request
- * 
- * @param {Object} args - Arguments from MCP request
- * @returns {Object} Parsed task parameters
  */
-function parseTaskArgs(args = {}) {
+export function parseTaskArgs(args: any = {}): TaskArgs {
   return {
     name: args.name || null,
     description: args.description || null,
@@ -59,11 +79,8 @@ function parseTaskArgs(args = {}) {
 
 /**
  * Parse project creation/update arguments from MCP request
- * 
- * @param {Object} args - Arguments from MCP request
- * @returns {Object} Parsed project parameters
  */
-function parseProjectArgs(args = {}) {
+export function parseProjectArgs(args: any = {}): ProjectArgs {
   return {
     name: args.name || null,
     description: args.description || null,
@@ -75,24 +92,23 @@ function parseProjectArgs(args = {}) {
 
 /**
  * Set default values for parameters
- * 
- * @param {Object} args - Current arguments
- * @param {Object} defaults - Default values to apply
- * @returns {Object} Arguments with defaults applied
  */
-function setDefaults(args = {}, defaults = {}) {
+export function setDefaults<T extends object, D extends Partial<T>>(
+  args: T = {} as T, 
+  defaults: D = {} as D
+): T & D {
   return { ...defaults, ...args };
 }
 
 /**
  * Validate that required parameters are present
- * 
- * @param {Object} args - Arguments to validate
- * @param {Array} required - Array of required parameter names
  * @throws {ValidationError} If required parameters are missing
  */
-function validateRequiredParams(args = {}, required = []) {
-  const missing = [];
+export function validateRequiredParams(
+  args: Record<string, any> = {}, 
+  required: string[] = []
+): void {
+  const missing: string[] = [];
   
   for (const param of required) {
     if (args[param] === null || args[param] === undefined || args[param] === '') {
@@ -111,13 +127,13 @@ function validateRequiredParams(args = {}, required = []) {
 
 /**
  * Validate parameter types
- * 
- * @param {Object} args - Arguments to validate
- * @param {Object} types - Object mapping parameter names to expected types
  * @throws {ValidationError} If parameters have wrong types
  */
-function validateParameterTypes(args = {}, types = {}) {
-  const errors = [];
+export function validateParameterTypes(
+  args: Record<string, any> = {}, 
+  types: Record<string, string> = {}
+): void {
+  const errors: string[] = [];
   
   for (const [param, expectedType] of Object.entries(types)) {
     if (args[param] !== null && args[param] !== undefined) {
@@ -139,20 +155,21 @@ function validateParameterTypes(args = {}, types = {}) {
 
 /**
  * Sanitize string parameters (trim whitespace, handle empty strings)
- * 
- * @param {Object} args - Arguments to sanitize
- * @param {Array} stringParams - Array of parameter names to sanitize
- * @returns {Object} Sanitized arguments
  */
-function sanitizeStringParams(args = {}, stringParams = []) {
+export function sanitizeStringParams<T extends Record<string, any>>(
+  args: T = {} as T, 
+  stringParams: string[] = []
+): T {
   const sanitized = { ...args };
   
   for (const param of stringParams) {
     if (typeof sanitized[param] === 'string') {
-      sanitized[param] = sanitized[param].trim();
+      const trimmed = sanitized[param].trim();
       // Convert empty strings to null
-      if (sanitized[param] === '') {
-        sanitized[param] = null;
+      if (trimmed === '') {
+        (sanitized as any)[param] = null;
+      } else {
+        (sanitized as any)[param] = trimmed;
       }
     }
   }
@@ -160,14 +177,17 @@ function sanitizeStringParams(args = {}, stringParams = []) {
   return sanitized;
 }
 
+interface ValidationOptions {
+  requireWorkspace?: boolean;
+}
+
 /**
  * Parse and validate workspace parameters with common validation
- * 
- * @param {Object} args - Arguments from MCP request
- * @param {Object} options - Validation options
- * @returns {Object} Parsed and validated workspace parameters
  */
-function parseAndValidateWorkspace(args = {}, options = {}) {
+export function parseAndValidateWorkspace(
+  args: any = {}, 
+  options: ValidationOptions = {}
+): WorkspaceArgs {
   const { requireWorkspace = false } = options;
   
   const workspaceParams = parseWorkspaceArgs(args);
@@ -183,14 +203,3 @@ function parseAndValidateWorkspace(args = {}, options = {}) {
   return workspaceParams;
 }
 
-module.exports = {
-  parseWorkspaceArgs,
-  parseSearchArgs,
-  parseTaskArgs,
-  parseProjectArgs,
-  setDefaults,
-  validateRequiredParams,
-  validateParameterTypes,
-  sanitizeStringParams,
-  parseAndValidateWorkspace
-};

@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:docs.usemotion.com)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "mcp__zen__thinkdeep",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(mv:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
