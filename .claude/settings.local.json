@@ -10,7 +10,13 @@
       "Bash(npm install:*)",
       "Bash(mv:*)",
       "Bash(npm run type-check:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "mcp__zen__refactor",
+      "Bash(npm run build:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(MOTION_API_KEY=test node dist/mcp-server.js)"
     ],
     "deny": []
   }

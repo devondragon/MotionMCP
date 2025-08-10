@@ -29,8 +29,8 @@ interface WorkspaceResolverOptions {
 }
 
 interface WorkspaceArgs {
-  workspaceId?: string | null;
-  workspaceName?: string | null;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
 export class WorkspaceResolver {

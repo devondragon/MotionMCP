@@ -10,8 +10,8 @@ import { DEFAULTS } from './constants';
 import { ValidationError } from './errorHandling';
 
 interface WorkspaceArgs {
-  workspaceId?: string | null;
-  workspaceName?: string | null;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
 interface SearchArgs extends WorkspaceArgs {
@@ -21,21 +21,21 @@ interface SearchArgs extends WorkspaceArgs {
 }
 
 interface TaskArgs extends WorkspaceArgs {
-  name?: string | null;
-  description?: string | null;
-  projectId?: string | null;
-  projectName?: string | null;
-  status?: string | null;
-  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW' | null;
-  dueDate?: string | null;
-  assigneeId?: string | null;
+  name?: string;
+  description?: string;
+  projectId?: string;
+  projectName?: string;
+  status?: string;
+  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
+  dueDate?: string;
+  assigneeId?: string;
 }
 
 interface ProjectArgs extends WorkspaceArgs {
-  name?: string | null;
-  description?: string | null;
-  color?: string | null;
-  status?: string | null;
+  name?: string;
+  description?: string;
+  color?: string;
+  status?: string;
 }
 
 /**
@@ -43,8 +43,8 @@ interface ProjectArgs extends WorkspaceArgs {
  */
 export function parseWorkspaceArgs(args: any = {}): WorkspaceArgs {
   return {
-    workspaceId: args.workspaceId || null,
-    workspaceName: args.workspaceName || null
+    workspaceId: args.workspaceId || undefined,
+    workspaceName: args.workspaceName || undefined
   };
 }
 
@@ -65,14 +65,14 @@ export function parseSearchArgs(args: any = {}): SearchArgs {
  */
 export function parseTaskArgs(args: any = {}): TaskArgs {
   return {
-    name: args.name || null,
-    description: args.description || null,
-    projectId: args.projectId || null,
-    projectName: args.projectName || null,
-    status: args.status || null,
-    priority: args.priority || null,
-    dueDate: args.dueDate || null,
-    assigneeId: args.assigneeId || null,
+    name: args.name || undefined,
+    description: args.description || undefined,
+    projectId: args.projectId || undefined,
+    projectName: args.projectName || undefined,
+    status: args.status || undefined,
+    priority: args.priority || undefined,
+    dueDate: args.dueDate || undefined,
+    assigneeId: args.assigneeId || undefined,
     ...parseWorkspaceArgs(args)
   };
 }
@@ -82,10 +82,10 @@ export function parseTaskArgs(args: any = {}): TaskArgs {
  */
 export function parseProjectArgs(args: any = {}): ProjectArgs {
   return {
-    name: args.name || null,
-    description: args.description || null,
-    color: args.color || null,
-    status: args.status || null,
+    name: args.name || undefined,
+    description: args.description || undefined,
+    color: args.color || undefined,
+    status: args.status || undefined,
     ...parseWorkspaceArgs(args)
   };
 }

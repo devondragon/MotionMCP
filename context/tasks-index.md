@@ -1,7 +1,6 @@
 # Tasks Index
 
 ## Current
-- task-0.1-migrate-to-typescript.md - Migrate to TypeScript
 - task-0.2-remove-express-server.md - Remove Express HTTP Server
 - task-1.1-hybrid-tool-consolidation.md - Implement Hybrid Tool Consolidation Strategy
 - task-2.1-implement-comments-api.md - Implement Comments API
@@ -19,4 +18,4 @@
 - testing-verification-checklist.md - Testing and Verification Checklist
 
 ## Completed
-(none yet - all tasks are currently active)
+- task-0.1-migrate-to-typescript.md - Migrate to TypeScript (Completed: 2025-08-10)
