@@ -71,7 +71,7 @@ cp .env.example .env
 ```bash
 npm run mcp
 # or
-node src/mcp-server.js
+node dist/mcp-server.js
 ```
 
 ## Providing Your Motion API Key

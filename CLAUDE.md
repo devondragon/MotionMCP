@@ -58,10 +58,10 @@ cp .env.example .env    # Create environment file
 The codebase follows a modular service-based architecture:
 
 1. **Server Implementation**:
-   - `src/mcp-server.js`: MCP protocol server for LLM integration (primary)
-   - `src/worker.js`: Cloudflare Worker for edge deployment (optional)
+   - `src/mcp-server.ts`: MCP protocol server for LLM integration (primary)
+   - `src/worker.ts`: Cloudflare Worker for edge deployment (optional)
 
-2. **Core Service Layer** (`src/services/motionApi.js`):
+2. **Core Service Layer** (`src/services/motionApi.ts`):
    - Centralized Motion API client with comprehensive error handling
    - Automatic workspace resolution (name to ID)
    - Project name resolution within workspaces
@@ -90,7 +90,7 @@ The codebase follows a modular service-based architecture:
 
 ## Motion API Integration
 
-The Motion API service (`motionApi.js`) handles all external API calls:
+The Motion API service (`motionApi.ts`) handles all external API calls:
 - Base URL: `https://api.usemotion.com/v1`
 - Authentication: X-API-Key header
 - Comprehensive error handling with retry logic
@@ -108,5 +108,5 @@ The Motion API service (`motionApi.js`) handles all external API calls:
 - Always check for workspace parameter in Motion operations
 - Use stderr for all logging (MCP compliance)
 - API responses should be validated before use
-- No TypeScript - pure JavaScript with CommonJS modules
+- TypeScript with CommonJS modules, compiles to dist/
 - Environment variables take precedence over other config methods
