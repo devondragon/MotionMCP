@@ -24,7 +24,8 @@
       "Bash(npx tsc:*)",
       "Bash(npm ls:*)",
       "Bash(gh pr view:*)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }

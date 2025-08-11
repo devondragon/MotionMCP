@@ -2,13 +2,12 @@
   "name": "motionmcp",
   "version": "1.0.2",
   "description": "",
-  "main": "dist/index.js",
+  "main": "dist/mcp-server.js",
   "bin": {
     "motionmcp": "./dist/mcp-server.js"
   },
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node src/index.ts",
     "mcp": "node dist/mcp-server.js",
     "mcp:dev": "ts-node src/mcp-server.ts",
     "watch": "tsc --watch",
@@ -25,15 +24,11 @@
     "@modelcontextprotocol/sdk": "^1.12.0",
     "ajv": "^8.17.1",
     "axios": "^1.9.0",
-    "cors": "^2.8.5",
     "dotenv": "^16.5.0",
-    "express": "^5.1.0",
     "winston": "^3.17.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
     "@types/node": "^24.2.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"

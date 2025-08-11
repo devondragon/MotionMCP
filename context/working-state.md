@@ -1,7 +1,9 @@
 # Working State
 
 ## Current Active Task
-**COMPLETED**: Task 0.1 - Migrate to TypeScript (Completed: 2025-08-10)
+**COMPLETED**: Task 0.2 - Remove Express HTTP Server (Completed: 2025-08-11)
+- Branch: feature/task-0.2-remove-express-server
+- Removed Express dependencies and related configuration
 **READY TO START**: Select next task from current/ folder
 
 ## Task Dependencies
