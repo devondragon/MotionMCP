@@ -189,7 +189,7 @@ class MotionMCPServer {
             },
             projectId: {
               type: "string",
-              description: "Project ID (required for get/update/delete)"
+              description: "Project ID (required for get operation)"
             },
             workspaceId: {
               type: "string",
