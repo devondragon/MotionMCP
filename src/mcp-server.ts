@@ -57,6 +57,9 @@ class MotionMCPServer {
 
   async initialize(): Promise<void> {
     try {
+      // Validate tools configuration
+      this.validateToolsConfig();
+      
       this.motionService = new MotionApiService();
       this.workspaceResolver = new WorkspaceResolver(this.motionService);
       
@@ -67,6 +70,43 @@ class MotionMCPServer {
       mcpLog(LOG_LEVELS.ERROR, "Failed to initialize Motion API service", { error: errorMessage });
       process.exit(1);
     }
+  }
+
+  private validateToolsConfig(): void {
+    const validConfigs = ['minimal', 'essential', 'all'];
+    
+    // Check if it's a valid preset or custom configuration
+    if (!validConfigs.includes(this.toolsConfig) && !this.toolsConfig.startsWith('custom:')) {
+      mcpLog(LOG_LEVELS.ERROR, `Invalid MOTION_MCP_TOOLS configuration: "${this.toolsConfig}"`, {
+        validOptions: [...validConfigs, 'custom:tool1,tool2,...'],
+        defaulting: 'essential'
+      });
+      
+      // Still default to essential, but log it prominently
+      mcpLog(LOG_LEVELS.WARN, 'Defaulting to "essential" configuration');
+      this.toolsConfig = 'essential';
+    }
+    
+    // For custom configurations, validate tool names exist
+    if (this.toolsConfig.startsWith('custom:')) {
+      const customTools = this.toolsConfig.substring(7).split(',').map(s => s.trim());
+      const allToolNames = this.getAllToolDefinitions().map(t => t.name);
+      const invalidTools = customTools.filter(name => !allToolNames.includes(name));
+      
+      if (invalidTools.length > 0) {
+        mcpLog(LOG_LEVELS.ERROR, 'Invalid tool names in custom configuration', {
+          invalidTools,
+          availableTools: allToolNames
+        });
+        throw new Error(`Invalid tool names in custom configuration: ${invalidTools.join(', ')}`);
+      }
+      
+      if (customTools.length === 0) {
+        throw new Error('Custom configuration must specify at least one tool');
+      }
+    }
+    
+    mcpLog(LOG_LEVELS.INFO, `Tool configuration validated: ${this.toolsConfig}`);
   }
 
   setupHandlers(): void {
@@ -771,24 +811,16 @@ class MotionMCPServer {
         return allTools;
       
       default:
-        // Check for custom configuration
+        // Handle custom configuration (already validated in validateToolsConfig)
         if (this.toolsConfig.startsWith('custom:')) {
           const customTools = this.toolsConfig.substring(7).split(',').map(s => s.trim());
           return customTools
             .map(name => toolsMap.get(name))
             .filter(Boolean) as McpToolDefinition[];
         }
-        // Default to essential if invalid config
-        mcpLog(LOG_LEVELS.WARN, `Invalid MOTION_MCP_TOOLS config: ${this.toolsConfig}, defaulting to essential`);
-        // Return essential tools
-        return [
-          toolsMap.get('motion_tasks')!,
-          toolsMap.get('motion_projects')!,
-          toolsMap.get('list_motion_workspaces')!,
-          toolsMap.get('list_motion_users')!,
-          toolsMap.get('search_motion_content')!,
-          toolsMap.get('get_motion_context')!
-        ].filter(Boolean);
+        // This should never happen since we validate in initialize()
+        // But if it does, throw an error instead of silently defaulting
+        throw new Error(`Unexpected tools configuration: ${this.toolsConfig}`);
     }
   }
 
