@@ -3,6 +3,7 @@
 ## Current
 - task-0.2-remove-express-server.md - Remove Express HTTP Server
 - task-1.1-hybrid-tool-consolidation.md - Implement Hybrid Tool Consolidation Strategy
+- task-1.3-fix-get-handlers.md - Fix Incomplete Get Handlers (handleGetProject/handleGetTask)
 - task-2.1-implement-comments-api.md - Implement Comments API
 - task-2.2-implement-custom-fields-api.md - Implement Custom Fields API
 - task-2.3-implement-recurring-tasks-api.md - Implement Recurring Tasks API

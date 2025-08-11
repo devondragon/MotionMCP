@@ -20,7 +20,9 @@
       "mcp__zen__codereview",
       "Bash(grep:*)",
       "Bash(sed:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": []
   }
