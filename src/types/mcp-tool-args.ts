@@ -129,6 +129,48 @@ export interface CreateProjectTemplateArgs {
   }>;
 }
 
+// Consolidated tool types
+export type ProjectOperation = 'create' | 'list' | 'get' | 'update' | 'delete';
+export type TaskOperation = 'create' | 'list' | 'get' | 'update' | 'delete' | 'move' | 'unassign';
+
+export interface MotionProjectsArgs {
+  operation: ProjectOperation;
+  // Common params
+  projectId?: string;
+  workspaceId?: string;
+  workspaceName?: string;
+  // Create/Update params
+  name?: string;
+  description?: string;
+  color?: string;
+  status?: string;
+}
+
+export interface MotionTasksArgs {
+  operation: TaskOperation;
+  // Common params
+  taskId?: string;
+  workspaceId?: string;
+  workspaceName?: string;
+  // List params
+  projectId?: string;
+  projectName?: string;
+  assigneeId?: string;
+  limit?: number;
+  // Create/Update params
+  name?: string;
+  description?: string;
+  status?: string;
+  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
+  dueDate?: string;
+  duration?: string | number;
+  labels?: string[];
+  autoScheduled?: object | null;
+  // Move params
+  targetProjectId?: string;
+  targetWorkspaceId?: string;
+}
+
 // Union type of all tool arguments for type safety
 export type AllToolArgs = 
   | CreateProjectArgs
@@ -148,4 +190,6 @@ export type AllToolArgs =
   | SuggestNextActionArgs
   | AnalyzeWorkloadArgs
   | SmartScheduleTasksArgs
-  | CreateProjectTemplateArgs;
+  | CreateProjectTemplateArgs
+  | MotionProjectsArgs
+  | MotionTasksArgs;
