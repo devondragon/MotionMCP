@@ -39,6 +39,20 @@ Follow these strictly, especially:
 
 This is a Model Context Protocol (MCP) server that bridges Motion's task management API with LLMs, enabling AI-assisted task management through the MCP protocol.
 
+## Tool Configuration
+
+The server now supports consolidated tools to reduce tool count. Configure via `MOTION_MCP_TOOLS` environment variable:
+
+- `minimal`: Only consolidated tools (motion_tasks, motion_projects, workspaces) - 3 tools
+- `essential` (default): Consolidated tools + search, context, users - 6 tools  
+- `all`: All tools including legacy individual tools - 20 tools
+- `custom:tool1,tool2`: Specify exact tools needed
+
+### Consolidated Tools
+
+- **motion_projects**: Single tool for all project operations (create, list, get, update, delete)
+- **motion_tasks**: Single tool for all task operations (create, list, get, update, delete, move, unassign)
+
 ## Common Commands
 
 ```bash
@@ -51,6 +65,7 @@ npm run worker:deploy   # Deploy to Cloudflare (optional)
 # Environment setup
 cp .env.example .env    # Create environment file
 # Add MOTION_API_KEY to .env
+# Optional: Set MOTION_MCP_TOOLS=minimal/essential/all/custom:...
 ```
 
 ## Architecture Overview

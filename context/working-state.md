@@ -1,10 +1,12 @@
 # Working State
 
 ## Current Active Task
-**COMPLETED**: Task 0.3 - TypeScript Refinements (Completed: 2025-08-11)
-- Branch: feature/task-0.3-typescript-refinements
-- Successfully addressed all type safety improvements from GitHub Copilot PR review
-- All refinements complete and tested
+**COMPLETED**: Task 1.1 - Hybrid Tool Consolidation (Completed: 2025-08-11)
+- Branch: feature/task-1.1-hybrid-tool-consolidation
+- Successfully implemented tool consolidation strategy
+- Created motion_tasks and motion_projects consolidated tools
+- Added MOTION_MCP_TOOLS configuration support (minimal/essential/all/custom)
+- Reduced tool count from 18 to configurable sets (3-20 tools)
 **READY TO START**: Select next task from current/ folder
 
 ## Task Dependencies
@@ -18,6 +20,12 @@
 - See `tasks-index.md` for complete task list
 
 ## Recent Work
+- Completed Task 1.1: Hybrid Tool Consolidation
+  - Created consolidated motion_tasks and motion_projects tools
+  - Implemented MOTION_MCP_TOOLS environment variable configuration
+  - Reduced tool count from 18 to configurable sets (3/6/20 tools)
+  - Maintained backward compatibility with legacy tools
+  - Updated documentation and configuration files
 - Completed Task 0.3: TypeScript Refinements
   - Added WORKSPACE_TYPES constants to replace hardcoded strings
   - Improved placeholder names for clarity
