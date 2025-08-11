@@ -48,6 +48,7 @@ npx motionmcp
 * Project templates, smart scheduling, workload analytics, and more
 * API key authentication with multiple configuration options
 * MCP-compliant structured JSON logging
+* **TypeScript** implementation with full type safety
 * Robust error handling and input validation
 
 ## Prerequisites
@@ -70,7 +71,7 @@ cp .env.example .env
 ```bash
 npm run mcp
 # or
-node src/mcp-server.js
+node dist/mcp-server.js
 ```
 
 ## Providing Your Motion API Key

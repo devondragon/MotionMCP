@@ -2,7 +2,29 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:docs.usemotion.com)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "mcp__zen__thinkdeep",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(mv:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(git add:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "mcp__zen__refactor",
+      "Bash(npm run build:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(MOTION_API_KEY=test node dist/mcp-server.js)",
+      "mcp__zen__codereview",
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(cat:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm ls:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh api:*)"
     ],
     "deny": []
   }

@@ -6,17 +6,18 @@
  * uniform response structures.
  */
 
-const { formatMcpSuccess } = require('./errorHandling');
+import { formatMcpSuccess } from './errorHandling';
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { MotionProject, MotionTask, MotionWorkspace } from '../types/motion';
 
 /**
  * Format a list of items for MCP response
- * 
- * @param {Array} items - Array of items to format
- * @param {string} title - Title for the list
- * @param {Function} formatter - Function to format each item
- * @returns {Object} MCP-compliant response
  */
-function formatListResponse(items, title, formatter) {
+export function formatListResponse<T>(
+  items: T[], 
+  title: string, 
+  formatter: (item: T) => string
+): CallToolResult {
   if (!Array.isArray(items)) {
     throw new Error('Items must be an array');
   }
@@ -27,19 +28,23 @@ function formatListResponse(items, title, formatter) {
   return formatMcpSuccess(responseText);
 }
 
+interface ProjectListOptions {
+  includeWorkspaceNote?: boolean;
+  showIds?: boolean;
+}
+
 /**
  * Format project list response with workspace context
- * 
- * @param {Array} projects - Array of project objects
- * @param {string} workspaceName - Name of the workspace
- * @param {string} workspaceId - ID of the workspace (optional)
- * @param {Object} options - Additional formatting options
- * @returns {Object} MCP-compliant response
  */
-function formatProjectList(projects, workspaceName, workspaceId = null, options = {}) {
+export function formatProjectList(
+  projects: MotionProject[], 
+  workspaceName: string, 
+  workspaceId: string | null = null, 
+  options: ProjectListOptions = {}
+): CallToolResult {
   const { includeWorkspaceNote = false, showIds = true } = options;
   
-  const projectFormatter = (project) => {
+  const projectFormatter = (project: MotionProject) => {
     if (showIds) {
       return `- ${project.name} (ID: ${project.id})`;
     }
@@ -63,17 +68,23 @@ function formatProjectList(projects, workspaceName, workspaceId = null, options 
   return formatMcpSuccess(responseText);
 }
 
+interface TaskListContext {
+  workspaceName?: string;
+  projectName?: string;
+  status?: string;
+  limit?: number;
+}
+
 /**
  * Format task list response
- * 
- * @param {Array} tasks - Array of task objects
- * @param {Object} context - Context information (workspace, filters, etc.)
- * @returns {Object} MCP-compliant response
  */
-function formatTaskList(tasks, context = {}) {
+export function formatTaskList(
+  tasks: MotionTask[], 
+  context: TaskListContext = {}
+): CallToolResult {
   const { workspaceName, projectName, status, limit } = context;
   
-  const taskFormatter = (task) => {
+  const taskFormatter = (task: MotionTask) => {
     let line = `- ${task.name}`;
     if (task.id) line += ` (ID: ${task.id})`;
     if (task.status) line += ` [${task.status}]`;
@@ -96,12 +107,9 @@ function formatTaskList(tasks, context = {}) {
 
 /**
  * Format workspace list response
- * 
- * @param {Array} workspaces - Array of workspace objects
- * @returns {Object} MCP-compliant response
  */
-function formatWorkspaceList(workspaces) {
-  const workspaceFormatter = (workspace) => {
+export function formatWorkspaceList(workspaces: MotionWorkspace[]): CallToolResult {
+  const workspaceFormatter = (workspace: MotionWorkspace) => {
     let line = `- ${workspace.name} (ID: ${workspace.id})`;
     if (workspace.type) line += ` [${workspace.type}]`;
     return line;
@@ -112,18 +120,18 @@ function formatWorkspaceList(workspaces) {
 
 /**
  * Format detailed item response (project, task, etc.)
- * 
- * @param {Object} item - Item object with details
- * @param {string} itemType - Type of item (e.g., 'Project', 'Task')
- * @param {Array} fields - Array of field names to include
- * @returns {Object} MCP-compliant response
  */
-function formatDetailResponse(item, itemType, fields = []) {
+export function formatDetailResponse<T extends Record<string, any>>(
+  item: T, 
+  itemType: string, 
+  fields: (keyof T)[] = []
+): CallToolResult {
   let responseText = `${itemType} Details:\n`;
   
   fields.forEach(field => {
     const value = item[field];
-    const displayName = field.charAt(0).toUpperCase() + field.slice(1);
+    const fieldStr = String(field);
+    const displayName = fieldStr.charAt(0).toUpperCase() + fieldStr.slice(1);
     const displayValue = value || 'N/A';
     responseText += `- ${displayName}: ${displayValue}\n`;
   });
@@ -131,18 +139,28 @@ function formatDetailResponse(item, itemType, fields = []) {
   return formatMcpSuccess(responseText);
 }
 
+interface SearchOptions {
+  limit?: number;
+  searchScope?: string;
+}
+
+interface SearchResult {
+  id: string;
+  name: string;
+  projectId?: string;
+}
+
 /**
  * Format search results response
- * 
- * @param {Array} results - Array of search result objects
- * @param {string} query - Original search query
- * @param {Object} options - Search options used
- * @returns {Object} MCP-compliant response
  */
-function formatSearchResults(results, query, options = {}) {
+export function formatSearchResults(
+  results: SearchResult[], 
+  query: string, 
+  options: SearchOptions = {}
+): CallToolResult {
   const { limit, searchScope } = options;
   
-  const resultFormatter = (result) => {
+  const resultFormatter = (result: SearchResult) => {
     const type = result.projectId ? "task" : "project";
     return `- [${type}] ${result.name} (ID: ${result.id})`;
   };
@@ -154,11 +172,3 @@ function formatSearchResults(results, query, options = {}) {
   return formatListResponse(results, title, resultFormatter);
 }
 
-module.exports = {
-  formatListResponse,
-  formatProjectList,
-  formatTaskList,
-  formatWorkspaceList,
-  formatDetailResponse,
-  formatSearchResults
-};
