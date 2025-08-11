@@ -25,7 +25,8 @@
       "Bash(npm ls:*)",
       "Bash(gh pr view:*)",
       "Bash(gh api:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(MOTION_API_KEY=test node dist/mcp-server.js --version)"
     ],
     "deny": []
   }
