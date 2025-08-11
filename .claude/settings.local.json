@@ -22,7 +22,9 @@
       "Bash(sed:*)",
       "Bash(cat:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh api:*)"
     ],
     "deny": []
   }
