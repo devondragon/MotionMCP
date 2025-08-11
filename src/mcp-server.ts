@@ -850,14 +850,14 @@ class MotionMCPServer {
         if (!params.taskId || !params.targetProjectId) {
           return formatMcpError(new Error("Task ID and target project ID are required for move operation"));
         }
-        // TODO: Implement move task handler
-        return formatMcpSuccess(`Moving task ${params.taskId} to project ${params.targetProjectId}`);
+        // TODO: Implement move task handler (see task-2.4)
+        return formatMcpError(new Error("Move operation is not yet implemented. This will be added in a future update."));
       case 'unassign':
         if (!params.taskId) {
           return formatMcpError(new Error("Task ID is required for unassign operation"));
         }
-        // TODO: Implement unassign task handler
-        return formatMcpSuccess(`Unassigning task ${params.taskId}`);
+        // TODO: Implement unassign task handler (see task-2.4)
+        return formatMcpError(new Error("Unassign operation is not yet implemented. This will be added in a future update."));
       default:
         return formatMcpError(new Error(`Unknown operation: ${operation}`));
     }
@@ -906,9 +906,9 @@ class MotionMCPServer {
       return formatMcpError(new Error("Project ID is required"));
     }
 
-    // Note: Motion API doesn't have a get single project endpoint, so we'd need to list and filter
-    // For now, return a placeholder
-    return formatMcpSuccess(`Project details for ID: ${projectId}`);
+    // TODO: Motion API doesn't have a get single project endpoint (see task-1.3)
+    // This requires implementing a list-and-filter workaround
+    return formatMcpError(new Error(`Get single project is not yet implemented. Please use list_motion_projects and filter client-side for now.`));
   }
 
   private async handleUpdateProject(args: ToolArgs.UpdateProjectArgs) {
@@ -1003,8 +1003,9 @@ class MotionMCPServer {
       return formatMcpError(new Error("Task ID is required"));
     }
 
-    // Note: Motion API doesn't have a get single task endpoint
-    return formatMcpSuccess(`Task details for ID: ${taskId}`);
+    // TODO: Motion API doesn't have a get single task endpoint (see task-1.3)
+    // This requires implementing a list-and-filter workaround
+    return formatMcpError(new Error(`Get single task is not yet implemented. Please use list_motion_tasks and filter client-side for now.`));
   }
 
   private async handleUpdateTask(args: ToolArgs.UpdateTaskArgs) {
