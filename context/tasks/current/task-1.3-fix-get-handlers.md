@@ -18,18 +18,16 @@ return formatMcpSuccess(`Task details for ID: ${taskId}`);
 This doesn't return actual data, making these tools non-functional.
 
 ## Root Cause
-The Motion API v1 lacks dedicated endpoints for fetching individual items:
-- No `GET /projects/{id}` endpoint
-- No `GET /tasks/{id}` endpoint
+The Motion API v1 DOES have dedicated endpoints for fetching individual items:
+- `GET /projects/{id}` endpoint - Gets a single project
+- `GET /tasks/{id}` endpoint - Gets a single task
 
-Only list endpoints are available:
-- `GET /projects?workspaceId={id}` - Returns all projects
-- `GET /tasks?workspaceId={id}` - Returns all tasks
+These need to be properly implemented in the motionApi.ts service layer.
 
 ## Solution Approach
 
-### Option 1: List and Filter (Recommended Short-term)
-Implement the "fetch all then filter" pattern as a temporary solution:
+### Implement the GET endpoints properly
+Add the missing methods to motionApi.ts:
 
 ```typescript
 private async handleGetProject(args: ToolArgs.GetProjectArgs) {

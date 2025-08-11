@@ -1,7 +1,6 @@
 # Tasks Index
 
 ## Current
-- task-1.1-hybrid-tool-consolidation.md - Implement Hybrid Tool Consolidation Strategy
 - task-1.3-fix-get-handlers.md - Fix Incomplete Get Handlers (handleGetProject/handleGetTask)
 - task-2.1-implement-comments-api.md - Implement Comments API
 - task-2.2-implement-custom-fields-api.md - Implement Custom Fields API
@@ -21,3 +20,4 @@
 - task-0.1-migrate-to-typescript.md - Migrate to TypeScript (Completed: 2025-08-10)
 - task-0.2-remove-express-server.md - Remove Express HTTP Server (Completed: 2025-08-11)
 - task-0.3-typescript-refinements.md - TypeScript Refinements from Copilot Review (Completed: 2025-08-11)
+- task-1.1-hybrid-tool-consolidation.md - Implement Hybrid Tool Consolidation Strategy (Completed: 2025-08-11)

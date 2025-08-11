@@ -21,17 +21,6 @@ export interface GetProjectArgs {
   projectId: string;
 }
 
-export interface UpdateProjectArgs {
-  projectId: string;
-  name?: string;
-  description?: string;
-  color?: string;
-  status?: string;
-}
-
-export interface DeleteProjectArgs {
-  projectId: string;
-}
 
 export interface CreateTaskArgs {
   name: string;
@@ -95,42 +84,9 @@ export interface GetContextArgs {
   includeRelated?: boolean;
 }
 
-export interface SuggestNextActionArgs {
-  workspaceId?: string;
-  workspaceName?: string;
-  userId?: string;
-  context?: string;
-}
-
-export interface AnalyzeWorkloadArgs {
-  workspaceId?: string;
-  workspaceName?: string;
-  userId?: string;
-  timeframe?: string;
-}
-
-export interface SmartScheduleTasksArgs {
-  taskIds: string[];
-  strategy?: 'balanced' | 'urgent_first' | 'easy_first';
-}
-
-export interface CreateProjectTemplateArgs {
-  templateName: string;
-  templateDescription?: string;
-  projectName: string;
-  projectDescription?: string;
-  workspaceId?: string;
-  workspaceName?: string;
-  tasks?: Array<{
-    name: string;
-    description?: string;
-    priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
-    assigneeId?: string;
-  }>;
-}
 
 // Consolidated tool types
-export type ProjectOperation = 'create' | 'list' | 'get' | 'update' | 'delete';
+export type ProjectOperation = 'create' | 'list' | 'get';
 export type TaskOperation = 'create' | 'list' | 'get' | 'update' | 'delete' | 'move' | 'unassign';
 
 export interface MotionProjectsArgs {
@@ -176,8 +132,6 @@ export type AllToolArgs =
   | CreateProjectArgs
   | ListProjectsArgs
   | GetProjectArgs
-  | UpdateProjectArgs
-  | DeleteProjectArgs
   | CreateTaskArgs
   | ListTasksArgs
   | GetTaskArgs
@@ -187,9 +141,5 @@ export type AllToolArgs =
   | ListUsersArgs
   | SearchContentArgs
   | GetContextArgs
-  | SuggestNextActionArgs
-  | AnalyzeWorkloadArgs
-  | SmartScheduleTasksArgs
-  | CreateProjectTemplateArgs
   | MotionProjectsArgs
   | MotionTasksArgs;
