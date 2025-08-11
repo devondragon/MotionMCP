@@ -21,7 +21,7 @@ import {
   LOG_LEVELS
 } from './utils';
 import { InputValidator } from './utils/validator';
-import { McpToolResponse } from './types/mcp';
+import { McpToolResponse, McpToolDefinition } from './types/mcp';
 import * as ToolArgs from './types/mcp-tool-args';
 import * as dotenv from 'dotenv';
 
@@ -135,7 +135,7 @@ class MotionMCPServer {
     });
   }
 
-  private getToolDefinitions(): any[] {
+  private getToolDefinitions(): McpToolDefinition[] {
     return [
       {
         name: "create_motion_project",

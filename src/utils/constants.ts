@@ -23,6 +23,15 @@ export const ERROR_CODES = {
 
 export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES];
 
+// Workspace types
+export const WORKSPACE_TYPES = {
+  PERSONAL: 'personal',
+  TEAM: 'team',
+  UNKNOWN: 'unknown'
+} as const;
+
+export type WorkspaceType = typeof WORKSPACE_TYPES[keyof typeof WORKSPACE_TYPES];
+
 // MCP response types
 export const MCP_RESPONSE_TYPES = {
   TEXT: 'text',

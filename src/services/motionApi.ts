@@ -102,7 +102,7 @@ export class MotionApiService {
     this.client = axios.create({
       baseURL: this.baseUrl,
       headers: {
-        'X-API-Key': `${this.apiKey}`,
+        'X-API-Key': this.apiKey,
         'Content-Type': 'application/json'
       }
     });

@@ -168,9 +168,9 @@ export function sanitizeStringParams<T extends Record<string, any>>(
       const trimmed = sanitized[param].trim();
       // Delete empty strings (makes them undefined) per policy
       if (trimmed === '') {
-        delete (sanitized as any)[param];
+        delete sanitized[param as keyof T];
       } else {
-        (sanitized as any)[param] = trimmed;
+        sanitized[param as keyof T] = trimmed as T[keyof T];
       }
     }
   }
