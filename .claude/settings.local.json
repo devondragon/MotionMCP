@@ -16,7 +16,11 @@
       "mcp__zen__refactor",
       "Bash(npm run build:*)",
       "Bash(npm uninstall:*)",
-      "Bash(MOTION_API_KEY=test node dist/mcp-server.js)"
+      "Bash(MOTION_API_KEY=test node dist/mcp-server.js)",
+      "mcp__zen__codereview",
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }

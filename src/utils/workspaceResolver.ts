@@ -6,21 +6,11 @@
  * fallback to default workspace behavior.
  */
 
-import { ERROR_CODES, DEFAULTS, LOG_LEVELS, LogLevel } from './constants';
+import { ERROR_CODES, DEFAULTS, LOG_LEVELS } from './constants';
 import { MotionWorkspace } from '../types/motion';
 import { WorkspaceError } from './errorHandling';
-
-// MCP-compliant logger helper (will be refactored later)
-const mcpLog = (level: LogLevel, message: string, extra: Record<string, any> = {}): void => {
-  const logEntry = {
-    level,
-    msg: message,
-    time: new Date().toISOString(),
-    component: 'WorkspaceResolver',
-    ...extra
-  };
-  console.error(JSON.stringify(logEntry));
-};
+import { MotionApiService } from '../services/motionApi';
+import { mcpLog } from './logger';
 
 interface WorkspaceResolverOptions {
   fallbackToDefault?: boolean;
@@ -34,9 +24,9 @@ interface WorkspaceArgs {
 }
 
 export class WorkspaceResolver {
-  private motionService: any; // Will be properly typed when motionApi is converted
+  private motionService: MotionApiService;
 
-  constructor(motionApiService: any) {
+  constructor(motionApiService: MotionApiService) {
     if (!motionApiService) {
       throw new Error('MotionApiService is required for WorkspaceResolver');
     }

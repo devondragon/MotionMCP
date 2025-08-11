@@ -1,17 +1,13 @@
-export interface McpToolResponse {
-  content: Array<{
-    type: 'text';
-    text: string;
-  }>;
-  isError?: boolean;
-}
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+
+export type McpToolResponse = CallToolResult;
 
 export interface McpToolDefinition {
   name: string;
   description: string;
   inputSchema: {
     type: 'object';
-    properties: Record<string, any>;
+    properties: Record<string, unknown>;
     required?: string[];
     additionalProperties?: boolean;
   };
@@ -21,16 +17,16 @@ export interface McpLogEntry {
   level: 'debug' | 'info' | 'warn' | 'error';
   msg: string;
   time: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface McpRequest {
   method: string;
-  params?: any;
+  params?: Record<string, unknown>;
 }
 
 export interface McpToolHandler {
-  (args: any): Promise<McpToolResponse>;
+  (args: unknown): Promise<McpToolResponse>;
 }
 
 export interface McpToolRegistry {

@@ -7,7 +7,7 @@
  */
 
 import { formatMcpSuccess } from './errorHandling';
-import { McpToolResponse } from '../types/mcp';
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { MotionProject, MotionTask, MotionWorkspace } from '../types/motion';
 
 /**
@@ -17,7 +17,7 @@ export function formatListResponse<T>(
   items: T[], 
   title: string, 
   formatter: (item: T) => string
-): McpToolResponse {
+): CallToolResult {
   if (!Array.isArray(items)) {
     throw new Error('Items must be an array');
   }
@@ -41,7 +41,7 @@ export function formatProjectList(
   workspaceName: string, 
   workspaceId: string | null = null, 
   options: ProjectListOptions = {}
-): McpToolResponse {
+): CallToolResult {
   const { includeWorkspaceNote = false, showIds = true } = options;
   
   const projectFormatter = (project: MotionProject) => {
@@ -81,7 +81,7 @@ interface TaskListContext {
 export function formatTaskList(
   tasks: MotionTask[], 
   context: TaskListContext = {}
-): McpToolResponse {
+): CallToolResult {
   const { workspaceName, projectName, status, limit } = context;
   
   const taskFormatter = (task: MotionTask) => {
@@ -108,7 +108,7 @@ export function formatTaskList(
 /**
  * Format workspace list response
  */
-export function formatWorkspaceList(workspaces: MotionWorkspace[]): McpToolResponse {
+export function formatWorkspaceList(workspaces: MotionWorkspace[]): CallToolResult {
   const workspaceFormatter = (workspace: MotionWorkspace) => {
     let line = `- ${workspace.name} (ID: ${workspace.id})`;
     if (workspace.type) line += ` [${workspace.type}]`;
@@ -125,7 +125,7 @@ export function formatDetailResponse<T extends Record<string, any>>(
   item: T, 
   itemType: string, 
   fields: (keyof T)[] = []
-): McpToolResponse {
+): CallToolResult {
   let responseText = `${itemType} Details:\n`;
   
   fields.forEach(field => {
@@ -157,7 +157,7 @@ export function formatSearchResults(
   results: SearchResult[], 
   query: string, 
   options: SearchOptions = {}
-): McpToolResponse {
+): CallToolResult {
   const { limit, searchScope } = options;
   
   const resultFormatter = (result: SearchResult) => {

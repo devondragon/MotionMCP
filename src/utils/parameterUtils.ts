@@ -41,21 +41,21 @@ interface ProjectArgs extends WorkspaceArgs {
 /**
  * Parse workspace-related arguments from MCP request
  */
-export function parseWorkspaceArgs(args: any = {}): WorkspaceArgs {
+export function parseWorkspaceArgs(args: Record<string, unknown> = {}): WorkspaceArgs {
   return {
-    workspaceId: args.workspaceId || undefined,
-    workspaceName: args.workspaceName || undefined
+    workspaceId: (args.workspaceId as string) || undefined,
+    workspaceName: (args.workspaceName as string) || undefined
   };
 }
 
 /**
  * Parse search-related arguments from MCP request
  */
-export function parseSearchArgs(args: any = {}): SearchArgs {
+export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs {
   return {
-    query: args.query || '',
-    searchScope: args.searchScope || DEFAULTS.SEARCH_SCOPE,
-    limit: args.limit || DEFAULTS.SEARCH_LIMIT,
+    query: (args.query as string) || '',
+    searchScope: (args.searchScope as 'both' | 'tasks' | 'projects') || DEFAULTS.SEARCH_SCOPE,
+    limit: (args.limit as number) || DEFAULTS.SEARCH_LIMIT,
     ...parseWorkspaceArgs(args)
   };
 }
@@ -63,16 +63,16 @@ export function parseSearchArgs(args: any = {}): SearchArgs {
 /**
  * Parse task creation/update arguments from MCP request
  */
-export function parseTaskArgs(args: any = {}): TaskArgs {
+export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
   return {
-    name: args.name || undefined,
-    description: args.description || undefined,
-    projectId: args.projectId || undefined,
-    projectName: args.projectName || undefined,
-    status: args.status || undefined,
-    priority: args.priority || undefined,
-    dueDate: args.dueDate || undefined,
-    assigneeId: args.assigneeId || undefined,
+    name: (args.name as string) || undefined,
+    description: (args.description as string) || undefined,
+    projectId: (args.projectId as string) || undefined,
+    projectName: (args.projectName as string) || undefined,
+    status: (args.status as string) || undefined,
+    priority: (args.priority as 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW') || undefined,
+    dueDate: (args.dueDate as string) || undefined,
+    assigneeId: (args.assigneeId as string) || undefined,
     ...parseWorkspaceArgs(args)
   };
 }
@@ -80,12 +80,12 @@ export function parseTaskArgs(args: any = {}): TaskArgs {
 /**
  * Parse project creation/update arguments from MCP request
  */
-export function parseProjectArgs(args: any = {}): ProjectArgs {
+export function parseProjectArgs(args: Record<string, unknown> = {}): ProjectArgs {
   return {
-    name: args.name || undefined,
-    description: args.description || undefined,
-    color: args.color || undefined,
-    status: args.status || undefined,
+    name: (args.name as string) || undefined,
+    description: (args.description as string) || undefined,
+    color: (args.color as string) || undefined,
+    status: (args.status as string) || undefined,
     ...parseWorkspaceArgs(args)
   };
 }
@@ -105,7 +105,7 @@ export function setDefaults<T extends object, D extends Partial<T>>(
  * @throws {ValidationError} If required parameters are missing
  */
 export function validateRequiredParams(
-  args: Record<string, any> = {}, 
+  args: Record<string, unknown> = {}, 
   required: string[] = []
 ): void {
   const missing: string[] = [];
@@ -130,7 +130,7 @@ export function validateRequiredParams(
  * @throws {ValidationError} If parameters have wrong types
  */
 export function validateParameterTypes(
-  args: Record<string, any> = {}, 
+  args: Record<string, unknown> = {}, 
   types: Record<string, string> = {}
 ): void {
   const errors: string[] = [];
@@ -155,6 +155,7 @@ export function validateParameterTypes(
 
 /**
  * Sanitize string parameters (trim whitespace, handle empty strings)
+ * Following NULL_UNDEFINED_POLICY: empty strings become undefined (deleted)
  */
 export function sanitizeStringParams<T extends Record<string, any>>(
   args: T = {} as T, 
@@ -165,9 +166,9 @@ export function sanitizeStringParams<T extends Record<string, any>>(
   for (const param of stringParams) {
     if (typeof sanitized[param] === 'string') {
       const trimmed = sanitized[param].trim();
-      // Convert empty strings to null
+      // Delete empty strings (makes them undefined) per policy
       if (trimmed === '') {
-        (sanitized as any)[param] = null;
+        delete (sanitized as any)[param];
       } else {
         (sanitized as any)[param] = trimmed;
       }
@@ -185,7 +186,7 @@ interface ValidationOptions {
  * Parse and validate workspace parameters with common validation
  */
 export function parseAndValidateWorkspace(
-  args: any = {}, 
+  args: Record<string, unknown> = {}, 
   options: ValidationOptions = {}
 ): WorkspaceArgs {
   const { requireWorkspace = false } = options;

@@ -58,3 +58,40 @@ export const LOG_LEVELS = {
 } as const;
 
 export type LogLevel = typeof LOG_LEVELS[keyof typeof LOG_LEVELS];
+
+// Null vs Undefined Policy
+export const NULL_UNDEFINED_POLICY = {
+  // Use undefined for:
+  // - Optional parameters that weren't provided
+  // - Missing object properties
+  // - Function returns when item not found
+  // - Uninitialized values
+  
+  // Use null for:
+  // - Explicit absence of value from API
+  // - Database null values
+  // - Cleared/reset state (e.g., cache reset)
+  // - Values that need to be explicitly sent as null to external APIs
+} as const;
+
+// Helper to convert undefined to null for API compatibility
+export function convertUndefinedToNull<T extends Record<string, any>>(obj: T): T {
+  const result = { ...obj };
+  for (const key in result) {
+    if (result[key] === undefined) {
+      (result as any)[key] = null;
+    }
+  }
+  return result;
+}
+
+// Helper to convert null to undefined for internal consistency
+export function convertNullToUndefined<T extends Record<string, any>>(obj: T): T {
+  const result = { ...obj };
+  for (const key in result) {
+    if (result[key] === null) {
+      delete result[key]; // This makes it undefined
+    }
+  }
+  return result;
+}

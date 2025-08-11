@@ -6,7 +6,7 @@
  */
 
 import { ERROR_CODES, MCP_RESPONSE_TYPES, ErrorCode } from './constants';
-import { McpToolResponse } from '../types/mcp';
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 interface ErrorContext {
   [key: string]: any;
@@ -62,7 +62,7 @@ export class WorkspaceError extends Error {
 /**
  * Format an error for MCP protocol response
  */
-export function formatMcpError(error: Error | MotionApiError, _context: ErrorContext = {}): McpToolResponse {
+export function formatMcpError(error: Error | MotionApiError, _context: ErrorContext = {}): CallToolResult {
   const errorMessage = error.message || 'An unknown error occurred';
   
   return {
@@ -79,7 +79,7 @@ export function formatMcpError(error: Error | MotionApiError, _context: ErrorCon
 /**
  * Format a success response for MCP protocol
  */
-export function formatMcpSuccess(text: string): McpToolResponse {
+export function formatMcpSuccess(text: string): CallToolResult {
   return {
     content: [
       {
@@ -97,7 +97,7 @@ export function createErrorResponse(
   message: string, 
   code: ErrorCode = ERROR_CODES.INTERNAL_ERROR, 
   context: ErrorContext = {}
-): McpToolResponse {
+): CallToolResult {
   const error = new MotionApiError(message, code, context);
   return formatMcpError(error, context);
 }

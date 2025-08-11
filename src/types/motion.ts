@@ -64,10 +64,33 @@ export interface MotionStatus {
   isCompleted: boolean;
 }
 
+export interface MotionScheduleDetails {
+  startDate: string;
+  endDate: string;
+  recurrence?: {
+    pattern: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval: number;
+    daysOfWeek?: number[];  // 0-6, Sunday to Saturday
+    dayOfMonth?: number;
+    endDate?: string;
+  };
+  blockedTimes?: Array<{
+    start: string;
+    end: string;
+    reason?: string;
+  }>;
+  workingHours?: {
+    start: string;  // e.g., "09:00"
+    end: string;    // e.g., "17:00"
+    timezone: string;
+    daysOfWeek?: number[];
+  };
+}
+
 export interface MotionSchedule {
   id: string;
   userId: string;
-  schedule: any;
+  schedule: MotionScheduleDetails;
 }
 
 export interface ApiResponse<T> {
@@ -82,4 +105,19 @@ export interface ListResponse<T> {
   tasks?: T[];
   workspaces?: T[];
   users?: T[];
+}
+
+export interface MotionApiErrorResponse {
+  message: string;
+  code?: string;
+  details?: Record<string, unknown>;
+  statusCode?: number;
+}
+
+export interface MotionApiError extends Error {
+  response?: {
+    status: number;
+    statusText: string;
+    data?: MotionApiErrorResponse;
+  };
 }

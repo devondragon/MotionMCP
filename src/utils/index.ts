@@ -19,3 +19,6 @@ export * from './parameterUtils';
 
 // Export WorkspaceResolver
 export { WorkspaceResolver } from './workspaceResolver';
+
+// Export logger
+export { mcpLog } from './logger';
