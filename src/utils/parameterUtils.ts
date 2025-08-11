@@ -159,18 +159,22 @@ export function validateParameterTypes(
  */
 export function sanitizeStringParams<T extends Record<string, any>>(
   args: T = {} as T, 
-  stringParams: string[] = []
+  stringParams: (keyof T)[] = []
 ): T {
   const sanitized = { ...args };
   
   for (const param of stringParams) {
-    if (typeof sanitized[param] === 'string') {
-      const trimmed = sanitized[param].trim();
+    const value = sanitized[param];
+    
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
       // Delete empty strings (makes them undefined) per policy
       if (trimmed === '') {
-        delete (sanitized as any)[param];
+        delete sanitized[param];
       } else {
-        (sanitized as any)[param] = trimmed;
+        // Type-safe assignment: we've verified it's a string at runtime
+        // and we're only processing declared string parameters
+        Object.assign(sanitized, { [param]: trimmed });
       }
     }
   }

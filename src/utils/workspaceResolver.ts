@@ -6,7 +6,7 @@
  * fallback to default workspace behavior.
  */
 
-import { ERROR_CODES, DEFAULTS, LOG_LEVELS } from './constants';
+import { ERROR_CODES, DEFAULTS, LOG_LEVELS, WORKSPACE_TYPES } from './constants';
 import { MotionWorkspace } from '../types/motion';
 import { WorkspaceError } from './errorHandling';
 import { MotionApiService } from '../services/motionApi';
@@ -71,8 +71,8 @@ export class WorkspaceResolver {
           // When not validating, just return the ID as-is
           resolvedWorkspace = { 
             id: workspaceId, 
-            name: workspaceId,
-            type: 'unknown'
+            name: 'Unknown Workspace',
+            type: WORKSPACE_TYPES.UNKNOWN
           };
         }
       }
