@@ -188,6 +188,34 @@ export class MotionApiService {
     }
   }
 
+  async getProject(projectId: string): Promise<MotionProject> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching single project from Motion API', {
+        method: 'getProject',
+        projectId
+      });
+
+      const response: AxiosResponse<MotionProject> = await this.client.get(`/projects/${projectId}`);
+
+      mcpLog(LOG_LEVELS.INFO, 'Successfully fetched project', {
+        method: 'getProject',
+        projectId,
+        projectName: response.data.name
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch project', {
+        method: 'getProject',
+        projectId,
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+      });
+      throw new Error(`Failed to fetch project: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+    }
+  }
+
   async createProject(projectData: Partial<MotionProject>): Promise<MotionProject> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Creating project in Motion API', {
@@ -317,6 +345,34 @@ export class MotionApiService {
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
       throw new Error(`Failed to fetch tasks: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+    }
+  }
+
+  async getTask(taskId: string): Promise<MotionTask> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching single task from Motion API', {
+        method: 'getTask',
+        taskId
+      });
+
+      const response: AxiosResponse<MotionTask> = await this.client.get(`/tasks/${taskId}`);
+
+      mcpLog(LOG_LEVELS.INFO, 'Successfully fetched task', {
+        method: 'getTask',
+        taskId,
+        taskName: response.data.name
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch task', {
+        method: 'getTask',
+        taskId,
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+      });
+      throw new Error(`Failed to fetch task: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
     }
   }
 

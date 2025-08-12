@@ -13,6 +13,7 @@ import {
   formatMcpSuccess,
   formatProjectList,
   formatTaskList,
+  formatDetailResponse,
   parseTaskArgs,
   parseProjectArgs,
   formatWorkspaceList,
@@ -764,9 +765,16 @@ class MotionMCPServer {
       return formatMcpError(new Error("Project ID is required"));
     }
 
-    // TODO: Motion API doesn't have a get single project endpoint (see task-1.3)
-    // This requires implementing a list-and-filter workaround
-    return formatMcpError(new Error(`Get single project is not yet implemented. Please use list_motion_projects and filter client-side for now.`));
+    try {
+      const project = await this.motionService.getProject(projectId);
+      
+      return formatDetailResponse(project, 'Project', [
+        'id', 'name', 'description', 'status', 'color', 
+        'workspaceId', 'createdTime', 'updatedTime'
+      ]);
+    } catch (error) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
 
@@ -834,9 +842,18 @@ class MotionMCPServer {
       return formatMcpError(new Error("Task ID is required"));
     }
 
-    // TODO: Motion API doesn't have a get single task endpoint (see task-1.3)
-    // This requires implementing a list-and-filter workaround
-    return formatMcpError(new Error(`Get single task is not yet implemented. Please use list_motion_tasks and filter client-side for now.`));
+    try {
+      const task = await this.motionService.getTask(taskId);
+      
+      return formatDetailResponse(task, 'Task', [
+        'id', 'name', 'description', 'status', 'priority', 
+        'dueDate', 'assigneeId', 'projectId', 'workspaceId',
+        'completed', 'createdTime', 'updatedTime', 'scheduledStart', 
+        'scheduledEnd', 'labels'
+      ]);
+    } catch (error) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
   private async handleUpdateTask(args: ToolArgs.UpdateTaskArgs) {

@@ -10,7 +10,14 @@ export interface MotionProject {
   description?: string;
   workspaceId: string;
   color?: string;
-  status?: string;
+  status?: string | {
+    name: string;
+    isDefaultStatus?: boolean;
+    isResolvedStatus?: boolean;
+  };
+  createdTime?: string;
+  updatedTime?: string;
+  customFieldValues?: any;
 }
 
 export interface MotionTask {
@@ -26,6 +33,27 @@ export interface MotionTask {
   assigneeId?: string;
   labels?: string[];
   autoScheduled?: object | null;
+  completed?: boolean;
+  completedTime?: string;
+  createdTime?: string;
+  updatedTime?: string;
+  startOn?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  deadlineType?: string;
+  parentRecurringTaskId?: string;
+  creator?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+  project?: any;
+  workspace?: any;
+  assignees?: any[];
+  schedulingIssue?: boolean;
+  lastInteractedTime?: string;
+  customFieldValues?: any;
+  chunks?: any[];
 }
 
 export interface MotionUser {
