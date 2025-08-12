@@ -11,6 +11,9 @@
 - task-4.1-enhanced-error-handling.md - Enhanced Error Handling with Retry Logic
 - task-4.2-input-validation-improvements.md - Input Validation Improvements
 - task-4.3-implement-caching-layer.md - Implement Caching Layer
+- task-4.4-improve-type-safety.md - Improve Type Safety by Replacing `any` Types
+- task-4.5-centralize-error-formatting.md - Centralize Error Formatting in Motion API Service
+- task-4.6-remove-redundant-checks.md - Remove Redundant Service Initialization Checks
 - task-5.1-update-documentation.md - Update Documentation
 - task-5.2-add-query-parameter-support.md - Add Query Parameter Support
 - testing-verification-checklist.md - Testing and Verification Checklist
