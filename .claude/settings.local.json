@@ -26,8 +26,12 @@
       "Bash(gh pr view:*)",
       "Bash(gh api:*)",
       "Bash(git commit:*)",
-      "Bash(MOTION_API_KEY=test node dist/mcp-server.js --version)"
+      "Bash(MOTION_API_KEY=test node dist/mcp-server.js --version)",
+      "Bash(gh pr list:*)",
+      "Bash(gh issue:*)",
+      "Bash(tree:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }

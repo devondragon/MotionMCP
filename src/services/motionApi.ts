@@ -8,7 +8,7 @@ import {
   MotionApiErrorResponse,
   MotionApiError
 } from '../types/motion';
-import { LOG_LEVELS, convertUndefinedToNull } from '../utils/constants';
+import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { z } from 'zod';
 import { 
@@ -143,6 +143,69 @@ export class MotionApiService {
     );
   }
 
+  /**
+   * Wraps an axios request with a retry mechanism featuring exponential backoff.
+   * Only retries on 5xx server errors or 429 rate-limiting errors.
+   */
+  private async requestWithRetry<T>(request: () => Promise<AxiosResponse<T>>): Promise<AxiosResponse<T>> {
+    for (let attempt = 1; attempt <= RETRY_CONFIG.MAX_RETRIES; attempt++) {
+      try {
+        return await request();
+      } catch (error) {
+        if (!axios.isAxiosError(error)) {
+          throw error; // Not a network error, re-throw immediately
+        }
+
+        const status = error.response?.status;
+        const isRetryable = (status && status >= 500) || status === 429;
+
+        if (!isRetryable || attempt === RETRY_CONFIG.MAX_RETRIES) {
+          mcpLog(LOG_LEVELS.WARN, `Request failed and will not be retried`, {
+            status,
+            attempt,
+            maxRetries: RETRY_CONFIG.MAX_RETRIES,
+            isRetryable,
+            component: 'MotionApiService',
+            method: 'requestWithRetry'
+          });
+          throw error; // Final attempt failed or error is not retryable
+        }
+
+        // Handle Retry-After header for 429
+        const retryAfterHeader = error.response?.headers['retry-after'];
+        let delay = 0;
+        if (status === 429 && retryAfterHeader) {
+          const retryAfterSeconds = parseInt(retryAfterHeader, 10);
+          if (!isNaN(retryAfterSeconds)) {
+            delay = retryAfterSeconds * 1000;
+          }
+        }
+
+        // If no Retry-After header, use exponential backoff with jitter
+        if (delay === 0) {
+          const backoff = RETRY_CONFIG.INITIAL_BACKOFF_MS * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt - 1);
+          const jitter = backoff * RETRY_CONFIG.JITTER_FACTOR * Math.random();
+          delay = Math.min(backoff + jitter, RETRY_CONFIG.MAX_BACKOFF_MS);
+        }
+        
+        mcpLog(LOG_LEVELS.INFO, `Request failed, retrying`, {
+          attempt,
+          maxRetries: RETRY_CONFIG.MAX_RETRIES,
+          delayMs: Math.round(delay),
+          error: error.message,
+          status,
+          component: 'MotionApiService',
+          method: 'requestWithRetry'
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    // Should never reach here, but TypeScript requires a return or throw
+    throw new Error('Max retries exceeded');
+  }
+
   async getProjects(workspaceId: string): Promise<MotionProject[]> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from Motion API', {
@@ -156,7 +219,7 @@ export class MotionApiService {
       const queryString = params.toString();
       const url = `/projects?${queryString}`;
       
-      const response: AxiosResponse = await this.client.get(url);
+      const response: AxiosResponse = await this.requestWithRetry(() => this.client.get(url));
       
       // Validate the response structure
       const validatedResponse = this.validateResponse(
@@ -195,7 +258,7 @@ export class MotionApiService {
         projectId
       });
 
-      const response: AxiosResponse<MotionProject> = await this.client.get(`/projects/${projectId}`);
+      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.get(`/projects/${projectId}`));
 
       mcpLog(LOG_LEVELS.INFO, 'Successfully fetched project', {
         method: 'getProject',
@@ -230,7 +293,7 @@ export class MotionApiService {
 
       // Convert undefined to null for API compatibility
       const apiData = convertUndefinedToNull(projectData);
-      const response: AxiosResponse<MotionProject> = await this.client.post('/projects', apiData);
+      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.post('/projects', apiData));
       
       mcpLog(LOG_LEVELS.INFO, 'Project created successfully', {
         method: 'createProject',
@@ -260,7 +323,7 @@ export class MotionApiService {
 
       // Convert undefined to null for API compatibility
       const apiUpdates = convertUndefinedToNull(updates);
-      const response: AxiosResponse<MotionProject> = await this.client.patch(`/projects/${projectId}`, apiUpdates);
+      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.patch(`/projects/${projectId}`, apiUpdates));
       
       mcpLog(LOG_LEVELS.INFO, 'Project updated successfully', {
         method: 'updateProject',
@@ -288,7 +351,7 @@ export class MotionApiService {
         projectId
       });
 
-      await this.client.delete(`/projects/${projectId}`);
+      await this.requestWithRetry(() => this.client.delete(`/projects/${projectId}`));
       
       mcpLog(LOG_LEVELS.INFO, 'Project deleted successfully', {
         method: 'deleteProject',
@@ -323,7 +386,7 @@ export class MotionApiService {
       const queryString = params.toString();
       const url = queryString ? `/tasks?${queryString}` : '/tasks';
       
-      const response: AxiosResponse<ListResponse<MotionTask>> = await this.client.get(url);
+      const response: AxiosResponse<ListResponse<MotionTask>> = await this.requestWithRetry(() => this.client.get(url));
       
       // The Motion API might wrap the tasks in a 'tasks' array
       const tasksData = response.data?.tasks || response.data || [];
@@ -355,7 +418,7 @@ export class MotionApiService {
         taskId
       });
 
-      const response: AxiosResponse<MotionTask> = await this.client.get(`/tasks/${taskId}`);
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.get(`/tasks/${taskId}`));
 
       mcpLog(LOG_LEVELS.INFO, 'Successfully fetched task', {
         method: 'getTask',
@@ -391,7 +454,7 @@ export class MotionApiService {
 
       // Convert undefined to null for API compatibility
       const apiData = convertUndefinedToNull(taskData);
-      const response: AxiosResponse<MotionTask> = await this.client.post('/tasks', apiData);
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.post('/tasks', apiData));
       
       mcpLog(LOG_LEVELS.INFO, 'Task created successfully', {
         method: 'createTask',
@@ -421,7 +484,7 @@ export class MotionApiService {
 
       // Convert undefined to null for API compatibility
       const apiUpdates = convertUndefinedToNull(updates);
-      const response: AxiosResponse<MotionTask> = await this.client.patch(`/tasks/${taskId}`, apiUpdates);
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.patch(`/tasks/${taskId}`, apiUpdates));
       
       mcpLog(LOG_LEVELS.INFO, 'Task updated successfully', {
         method: 'updateTask',
@@ -449,7 +512,7 @@ export class MotionApiService {
         taskId
       });
 
-      await this.client.delete(`/tasks/${taskId}`);
+      await this.requestWithRetry(() => this.client.delete(`/tasks/${taskId}`));
       
       mcpLog(LOG_LEVELS.INFO, 'Task deleted successfully', {
         method: 'deleteTask',
@@ -495,7 +558,7 @@ export class MotionApiService {
         method: 'getWorkspaces'
       });
 
-      const response: AxiosResponse = await this.client.get('/workspaces');
+      const response: AxiosResponse = await this.requestWithRetry(() => this.client.get('/workspaces'));
       
       // Validate the response structure
       const validatedResponse = this.validateResponse(
@@ -546,7 +609,7 @@ export class MotionApiService {
       const queryString = params.toString();
       const url = queryString ? `/users?${queryString}` : '/users';
       
-      const response: AxiosResponse<ListResponse<MotionUser>> = await this.client.get(url);
+      const response: AxiosResponse<ListResponse<MotionUser>> = await this.requestWithRetry(() => this.client.get(url));
       
       // The Motion API might wrap the users in a 'users' array
       const usersData = response.data?.users || response.data || [];
