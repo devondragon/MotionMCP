@@ -202,8 +202,8 @@ export class MotionApiService {
       }
     }
     
-    // This line is theoretically unreachable but required by TypeScript's control flow analysis
-    throw new Error('Exited retry loop unexpectedly');
+    // Should never reach here, but TypeScript requires a return or throw
+    throw new Error('Max retries exceeded');
   }
 
   async getProjects(workspaceId: string): Promise<MotionProject[]> {
