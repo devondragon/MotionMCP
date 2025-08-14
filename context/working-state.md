@@ -1,23 +1,28 @@
 # Working State
 
 ## Current Active Task
-**COMPLETED**: Task 1.3 - Fix Incomplete Get Handlers (Completed: 2025-08-11)
-- Branch: feature/task-1.3-fix-get-handlers
-- Successfully implemented GET /projects/{id} and GET /tasks/{id} endpoints
-- Added getProject and getTask methods to motionApi.ts
-- Updated type definitions with correct field names from API docs
-- Fixed handlers to return actual data with proper fields
-**READY TO START**: Select next task from current/ folder
+**Task-001: Enhanced Error Handling** - Priority: HIGH
+- Path: `context/features/epic-001-f01-error-handling/tasks/current/task-001-enhanced-error-handling.md`
+- Branch: `feature/task-001-enhanced-error-handling`
+- Started: 2025-08-14
+- Status: In Progress
 
-## Task Dependencies
-- Task 1.1 (Tool Consolidation) blocks Tasks 2.x (new API features)
-- Task 0.1 (TypeScript) should complete before major refactoring
-- Task 4.1 (Error Handling) enhances all API tasks
+## Current Feature
+**Error Handling & Stability** - See `current-feature.md`
+- High priority due to Issue #4
+- 6 tasks in feature
+- Ready to start with Task 4.1
+
+## Active EPIC
+**Improvements** - `context/epics/improvements/`
+- 3 Features defined
+- 15 tasks organized
 
 ## Project Status
 - Motion MCP Server implementation
-- Tasks have been reorganized into individual files
-- See `tasks-index.md` for complete task list
+- Foundation complete (TypeScript, Tool Consolidation)
+- Ready for feature development
+- Using ccmagic directory structure
 
 ## Recent Work
 - Completed Task 1.3: Fix Incomplete Get Handlers

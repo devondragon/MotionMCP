@@ -16,6 +16,8 @@ export const ERROR_CODES = {
   // API related errors
   MOTION_API_ERROR: 'MOTION_API_ERROR',
   NETWORK_ERROR: 'NETWORK_ERROR',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  RETRY_EXHAUSTED: 'RETRY_EXHAUSTED',
   
   // General errors
   INTERNAL_ERROR: 'INTERNAL_ERROR'
@@ -56,6 +58,15 @@ export const DEFAULTS = {
   // Workload analysis defaults
   TIMEFRAME: 'this_week' as 'today' | 'this_week' | 'this_month',
   INCLUDE_PROJECTS: true
+} as const;
+
+// Retry configuration
+export const RETRY_CONFIG = {
+  MAX_RETRIES: 3,
+  INITIAL_BACKOFF_MS: 250,
+  MAX_BACKOFF_MS: 30000, // 30 seconds max
+  JITTER_FACTOR: 0.2, // 20% jitter
+  BACKOFF_MULTIPLIER: 2
 } as const;
 
 // Logging levels for MCP compliance
