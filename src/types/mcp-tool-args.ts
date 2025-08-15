@@ -148,6 +148,22 @@ export interface MotionCustomFieldsArgs {
   value?: string | number | boolean | string[] | null;
 }
 
+export interface MotionRecurringTasksArgs {
+  operation: 'list' | 'create' | 'delete';
+  recurringTaskId?: string;
+  workspaceId?: string;
+  name?: string;
+  description?: string;
+  projectId?: string;
+  recurrence?: {
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval?: number;
+    daysOfWeek?: number[];
+    dayOfMonth?: number;
+    endDate?: string;
+  };
+}
+
 // Union type of all tool arguments for type safety
 export type AllToolArgs = 
   | CreateProjectArgs
@@ -165,4 +181,5 @@ export type AllToolArgs =
   | MotionProjectsArgs
   | MotionTasksArgs
   | MotionCommentsArgs
-  | MotionCustomFieldsArgs;
+  | MotionCustomFieldsArgs
+  | MotionRecurringTasksArgs;

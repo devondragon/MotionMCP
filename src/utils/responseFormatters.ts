@@ -8,7 +8,7 @@
 
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField } from '../types/motion';
+import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask } from '../types/motion';
 import { LIMITS } from './constants';
 
 /**
@@ -263,5 +263,37 @@ export function formatCustomFieldSuccess(operation: string, entityType?: string,
     message += ` for ${entityType} ${entityId}`;
   }
   return formatMcpSuccess(message);
+}
+
+/**
+ * Format recurring task list response
+ */
+export function formatRecurringTaskList(tasks: MotionRecurringTask[]): CallToolResult {
+  if (tasks.length === 0) {
+    return formatMcpSuccess("No recurring tasks found.");
+  }
+  
+  const taskFormatter = (task: MotionRecurringTask) => {
+    return `- ${task.name} (ID: ${task.id}) [${task.recurrence.frequency}]${task.nextOccurrence ? ` Next: ${task.nextOccurrence}` : ''}`;
+  };
+  
+  return formatListResponse(tasks, `Found ${tasks.length} recurring task${tasks.length === 1 ? '' : 's'}`, taskFormatter);
+}
+
+/**
+ * Format single recurring task response
+ */
+export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolResult {
+  const details = [
+    `Recurring task created successfully:`,
+    `- ID: ${task.id}`,
+    `- Name: ${task.name}`,
+    `- Frequency: ${task.recurrence.frequency}`,
+    `- Workspace: ${task.workspaceId}`,
+    task.projectId ? `- Project: ${task.projectId}` : null,
+    task.nextOccurrence ? `- Next occurrence: ${task.nextOccurrence}` : null
+  ].filter(Boolean).join('\n');
+  
+  return formatMcpSuccess(details);
 }
 

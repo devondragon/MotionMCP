@@ -4,6 +4,16 @@
 None - Ready to select next task
 
 ## Recently Completed
+**Task-003: Recurring Tasks API** - Completed: 2025-08-15
+- Added complete Recurring Tasks API implementation to motionApi.ts
+- Implemented motion_recurring_tasks consolidated tool for MCP server
+- Supports list, create, and delete operations for recurring tasks
+- Enhanced MotionRecurringTask interface with comprehensive recurrence fields
+- Added caching support with 5-minute TTL and proper cache invalidation
+- Added to 'essential' tool configuration for default availability
+- Branch: feature/task-003-recurring-tasks-api (ready for PR)
+
+## Recently Completed
 **Task-002: Custom Fields API** - Completed: 2025-08-15
 - Added complete Custom Fields API implementation to motionApi.ts
 - Implemented motion_custom_fields consolidated tool for MCP server
