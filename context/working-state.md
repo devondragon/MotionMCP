@@ -1,7 +1,10 @@
 # Working State
 
 ## Current Active Task
-None - Ready to select next task
+**Task-005: Centralize Error Formatting** - Started: 2025-08-15
+- Branch: feature/task-005-error-formatting
+- Path: context/features/epic-001-f01-error-handling/tasks/current/task-005-error-formatting.md
+- Focus: Reduce code duplication in MotionApiService error handling
 
 ## Recently Completed
 **Task-004: Type Safety Improvements** - Completed: 2025-08-15

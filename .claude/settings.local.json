@@ -35,7 +35,9 @@
       "Bash(MOTION_API_KEY=test timeout 1 node dist/mcp-server.js)",
       "Bash(MOTION_API_KEY=test timeout 1 node dist/mcp-server.js --version)",
       "Bash(node:*)",
-      "Bash(MOTION_API_KEY=test gtimeout 1 node dist/mcp-server.js --version)"
+      "Bash(MOTION_API_KEY=test gtimeout 1 node dist/mcp-server.js --version)",
+      "Bash(MOTION_API_KEY=test timeout 2 node dist/mcp-server.js --version)",
+      "Bash(MOTION_API_KEY=test gtimeout 2 node dist/mcp-server.js --version)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
