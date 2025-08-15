@@ -10,6 +10,12 @@
 ## Problem Statement
 The Project API has schema issues including missing pagination metadata, incorrect customFieldValues structure, and response wrapper handling problems.
 
+## API Documentation URL
+Reference the API documenation here - https://docs.usemotion.com/api-reference/projects/get/
+https://docs.usemotion.com/api-reference/projects/list/
+https://docs.usemotion.com/api-reference/projects/post/
+
+
 ## Current Issues
 1. **Missing Pagination Meta**
    - No handling for meta object
@@ -39,23 +45,23 @@ export interface MotionProject {
   name: string;
   description: string; // Required per API
   workspaceId: string;
-  
+
   // Status can be object or string
   status?: string | {
     name: string;
     isDefaultStatus: boolean;
     isResolvedStatus: boolean;
   };
-  
+
   createdTime?: string;
   updatedTime?: string;
-  
+
   // Fix custom field values structure
   customFieldValues?: Record<string, {
     type: string;
     value: any; // Varies by type
   }>;
-  
+
   // Note: color field exists in our code but not in API docs
   color?: string; // Keep for backward compatibility?
 }
@@ -78,10 +84,10 @@ async getProjects(workspaceId?: string, cursor?: string) {
   const params = new URLSearchParams();
   if (workspaceId) params.append('workspaceId', workspaceId);
   if (cursor) params.append('cursor', cursor);
-  
+
   const response = await this.client.get(`/projects?${params}`);
   const { meta, projects } = response.data;
-  
+
   return {
     projects: projects || [],
     nextCursor: meta?.nextCursor,

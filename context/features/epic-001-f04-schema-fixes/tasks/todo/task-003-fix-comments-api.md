@@ -10,6 +10,10 @@
 ## Problem Statement
 The Comments API is missing the `creator` field and has incorrect response wrapper handling. Comments are wrapped in `{meta: {...}, comments: [...]}` with pagination support.
 
+## API Documentation URL
+Reference the API documenation here - https://docs.usemotion.com/api-reference/comments/get/
+https://docs.usemotion.com/api-reference/comments/post/
+
 ## Current Issues
 1. **Missing Creator Field**
    - API returns creator object with id, name, email
@@ -64,10 +68,10 @@ export interface MotionComment {
 async getComments(taskId: string, cursor?: string) {
   const params = new URLSearchParams({ taskId });
   if (cursor) params.append('cursor', cursor);
-  
+
   const response = await this.client.get(`/comments?${params}`);
   const { meta, comments } = response.data;
-  
+
   return {
     comments,
     nextCursor: meta?.nextCursor,

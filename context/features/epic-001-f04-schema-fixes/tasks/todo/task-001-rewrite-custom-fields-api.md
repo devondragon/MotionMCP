@@ -10,6 +10,9 @@
 ## Problem Statement
 The Custom Fields API implementation is completely wrong. Our interface expects `{id, name, type, options, required, workspaceId}` but the API actually returns `{id, field}`. Additionally, we're calling the wrong endpoint path.
 
+## API Documentation URL
+Reference the API documenation here - https://docs.usemotion.com/api-reference/custom-fields/get/
+
 ## Current Issues
 1. **Wrong Interface Structure**
    - Expected: `{id, name, type, options, required, workspaceId}`
@@ -46,8 +49,8 @@ export interface MotionCustomField {
 // NEW (Correct)
 export interface MotionCustomField {
   id: string;
-  field: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 
-         'phone' | 'select' | 'multiSelect' | 'number' | 
+  field: 'text' | 'url' | 'date' | 'person' | 'multiPerson' |
+         'phone' | 'select' | 'multiSelect' | 'number' |
          'email' | 'checkbox' | 'relatedTo';
 }
 ```
@@ -59,7 +62,7 @@ export interface MotionCustomField {
 
 ### 3. Update Methods
 - `getCustomFields(workspaceId: string)` - Make workspaceId required
-- `createCustomField(workspaceId: string, fieldData)` 
+- `createCustomField(workspaceId: string, fieldData)`
 - `deleteCustomField(workspaceId: string, fieldId: string)`
 
 ## Testing Checklist

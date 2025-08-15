@@ -10,6 +10,11 @@
 ## Problem Statement
 The Workspace API is missing the required `teamId` field in our interface. This is a required field per the API documentation.
 
+
+## API Documentation URL
+Reference the API documenation here - https://docs.usemotion.com/api-reference/workspaces/get/
+
+
 ## Current Issues
 1. **Missing teamId Field**
    - API returns teamId (required)

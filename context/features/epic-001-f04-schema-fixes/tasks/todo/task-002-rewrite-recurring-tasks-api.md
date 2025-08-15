@@ -10,6 +10,12 @@
 ## Problem Statement
 The Recurring Tasks API returns full task objects with nested creator, assignee, project, and workspace data - NOT recurrence configuration as we expected. The response is also wrapped with `{meta: {...}, tasks: [...]}` not `recurringTasks`.
 
+## API Documentation URL
+Reference the API documenation here - https://docs.usemotion.com/api-reference/recurring-tasks/get/
+https://docs.usemotion.com/api-reference/recurring-tasks/post/
+https://docs.usemotion.com/api-reference/recurring-tasks/delete/
+
+
 ## Current Issues
 1. **Wrong Conceptual Model**
    - Expected: Recurrence configuration objects

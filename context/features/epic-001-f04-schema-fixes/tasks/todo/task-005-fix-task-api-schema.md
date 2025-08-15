@@ -10,6 +10,14 @@
 ## Problem Statement
 The Task API has multiple schema mismatches including wrong label types, missing fields in nested objects, incorrect duration types, and missing pagination handling.
 
+## API Documentation URL
+Reference the API documenation here - https://docs.usemotion.com/api-reference/tasks/get/
+https://docs.usemotion.com/api-reference/tasks/list/
+https://docs.usemotion.com/api-reference/tasks/post/
+https://docs.usemotion.com/api-reference/tasks/patch/
+etc...
+
+
 ## Current Issues
 1. **Labels Type Mismatch**
    - Expected: `string[]`
@@ -52,14 +60,14 @@ export interface MotionTask {
   updatedTime?: string;
   createdTime: string;
   startOn?: string;
-  
+
   // Fixed nested objects
   creator?: {
     id: string;
     name: string;
     email: string;
   };
-  
+
   project?: {
     id: string;
     name: string;
@@ -71,42 +79,42 @@ export interface MotionTask {
       isResolvedStatus: boolean;
     };
   };
-  
+
   workspace: {
     id: string;
     name: string;
     teamId: string; // ADD THIS
     type: string;
   };
-  
+
   status?: {
     name: string;
     isDefaultStatus: boolean;
     isResolvedStatus: boolean;
   };
-  
+
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
-  
+
   // Fix labels type
   labels?: Array<{name: string}>;
-  
+
   assignees?: Array<{
     id: string;
     name: string;
     email: string;
   }>;
-  
+
   scheduledStart?: string;
   scheduledEnd?: string;
   schedulingIssue?: boolean;
   lastInteractedTime?: string;
-  
+
   // Fix custom fields
   customFieldValues?: Record<string, {
     type: string;
     value: any;
   }>;
-  
+
   // Fix chunks
   chunks?: Array<{
     id: string;

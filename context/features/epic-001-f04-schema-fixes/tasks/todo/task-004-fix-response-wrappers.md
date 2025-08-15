@@ -10,6 +10,11 @@
 ## Problem Statement
 Response wrapper handling is inconsistent across APIs. Some endpoints return wrapped responses with `{meta: {...}, [resource]: [...]}` while others return direct arrays. Our current handling doesn't properly account for this.
 
+## API Documentation URL
+Reference the API documenation here - https://docs.usemotion.com/cookbooks/getting-started/
+
+
+
 ## Current Issues
 1. **Inconsistent Wrapper Pattern**
    - Wrapped: Tasks, Projects, Comments, Recurring Tasks
@@ -100,17 +105,17 @@ async getTasks(workspaceId?: string, cursor?: string) {
 ```
 
 ## API Wrapper Mapping
-| API | Wrapped | Resource Key | Has Pagination |
-|-----|---------|--------------|----------------|
-| Tasks | ✅ | tasks | ✅ |
-| Projects | ✅ | projects | ✅ |
-| Comments | ✅ | comments | ✅ |
-| Recurring Tasks | ✅ | tasks | ✅ |
-| Custom Fields | ❓ | TBD | ❓ |
-| Workspaces | ❌ | - | ❌ |
-| Users | ❓ | users | ❓ |
-| Schedules | ❌ | - | ❌ |
-| Statuses | ❌ | - | ❌ |
+| API             | Wrapped | Resource Key | Has Pagination |
+| --------------- | ------- | ------------ | -------------- |
+| Tasks           | ✅       | tasks        | ✅              |
+| Projects        | ✅       | projects     | ✅              |
+| Comments        | ✅       | comments     | ✅              |
+| Recurring Tasks | ✅       | tasks        | ✅              |
+| Custom Fields   | ❓       | TBD          | ❓              |
+| Workspaces      | ❌       | -            | ❌              |
+| Users           | ❓       | users        | ❓              |
+| Schedules       | ❌       | -            | ❌              |
+| Statuses        | ❌       | -            | ❌              |
 
 ## Testing Checklist
 - [ ] Test each API's response handling
