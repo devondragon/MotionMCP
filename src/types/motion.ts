@@ -4,6 +4,32 @@ export interface MotionWorkspace {
   type: string;
 }
 
+// Minimal interfaces for nested object references
+export interface ProjectReference {
+  id: string;
+  name: string;
+  workspaceId?: string;
+}
+
+export interface WorkspaceReference {
+  id: string;
+  name: string;
+  type?: string;
+}
+
+export interface AssigneeReference {
+  id: string;
+  name: string;
+  email?: string;
+}
+
+export interface ChunkReference {
+  id: string;
+  start: string;
+  end: string;
+  [key: string]: unknown;
+}
+
 export interface MotionProject {
   id: string;
   name: string;
@@ -17,7 +43,7 @@ export interface MotionProject {
   };
   createdTime?: string;
   updatedTime?: string;
-  customFieldValues?: any;
+  customFieldValues?: Record<string, unknown>;
 }
 
 export interface MotionTask {
@@ -47,13 +73,13 @@ export interface MotionTask {
     name: string;
     email?: string;
   };
-  project?: any;
-  workspace?: any;
-  assignees?: any[];
+  project?: ProjectReference;
+  workspace?: WorkspaceReference;
+  assignees?: AssigneeReference[];
   schedulingIssue?: boolean;
   lastInteractedTime?: string;
-  customFieldValues?: any;
-  chunks?: any[];
+  customFieldValues?: Record<string, unknown>;
+  chunks?: ChunkReference[];
 }
 
 export interface MotionUser {
