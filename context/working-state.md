@@ -1,7 +1,10 @@
 # Working State
 
 ## Current Active Task
-None - Ready to select next task
+**Task-006: Remove Redundant Service Initialization Checks** - Started: 2025-08-15
+- Location: `src/mcp-server.ts`
+- Priority: Low (code cleanliness)
+- Branch: feature/task-006-redundant-checks
 
 ## Recently Completed
 **Task-005: Centralize Error Formatting** - Completed: 2025-08-15
