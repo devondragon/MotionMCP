@@ -24,6 +24,7 @@ import {
   ProjectsListResponseSchema,
   WorkspacesListResponseSchema,
   SchedulesListResponseSchema,
+  StatusesListResponseSchema,
   VALIDATION_CONFIG
 } from '../schemas/motion';
 
@@ -1454,6 +1455,12 @@ export class MotionApiService {
     });
   }
 
+  /**
+   * Retrieves available workflow statuses from Motion
+   * @param workspaceId - Optional workspace ID to filter statuses
+   * @returns Promise resolving to array of Motion statuses
+   * @throws {Error} If the API request fails
+   */
   async getStatuses(workspaceId?: string): Promise<MotionStatus[]> {
     // Use workspace ID for cache key, or 'all' if not specified
     const cacheKey = workspaceId ? `statuses:workspace:${workspaceId}` : 'statuses:all';
@@ -1471,22 +1478,29 @@ export class MotionApiService {
         const queryString = params.toString();
         const url = queryString ? `/statuses?${queryString}` : '/statuses';
         
-        const response: AxiosResponse<MotionStatus[] | { statuses: MotionStatus[] }> = await this.requestWithRetry(() => this.client.get(url));
+        const response = await this.requestWithRetry(() => this.client.get(url));
         
-        // Handle both wrapped and unwrapped responses
-        // API returns direct array according to docs
-        const statuses = Array.isArray(response.data) 
-          ? response.data 
-          : (response.data as any).statuses || [];
-        const statusesArray = Array.isArray(statuses) ? statuses : [];
+        // Validate response against schema
+        const validatedResponse = this.validateResponse(
+          response.data,
+          StatusesListResponseSchema,
+          'statuses'
+        );
+        
+        // Extract statuses from validated response
+        const statuses = Array.isArray(validatedResponse) 
+          ? validatedResponse 
+          : ('statuses' in validatedResponse && Array.isArray(validatedResponse.statuses))
+            ? validatedResponse.statuses
+            : [];
         
         mcpLog(LOG_LEVELS.INFO, 'Statuses fetched successfully', {
           method: 'getStatuses',
-          count: statusesArray.length,
+          count: statuses.length,
           workspaceId
         });
 
-        return statusesArray;
+        return statuses;
       } catch (error: unknown) {
         mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch statuses', {
           method: 'getStatuses',
