@@ -1,0 +1,34 @@
+{
+  "id": "MotionMCP-feature-task-002-input-validation-20250814T223218Z",
+  "timestamp": "2025-08-14T22:32:18Z",
+  "project": {
+    "name": "MotionMCP",
+    "path": "/Users/devon/git/MotionMCP",
+    "type": "typescript-mcp-server"
+  },
+  "git": {
+    "branch": "feature/task-002-input-validation",
+    "commit": "76ab1be8c6f016a8f4e883f969f7c68bb3ca58fe",
+    "hasUncommitted": true
+  },
+  "task": {
+    "id": "task-002",
+    "title": "Input Validation Improvements",
+    "feature": "Error Handling & Stability",
+    "epic": "Improvements",
+    "progress": 10,
+    "path": "context/features/epic-001-f01-error-handling/tasks/current/task-002-input-validation.md"
+  },
+  "session": {
+    "model": "claude-opus-4-1",
+    "startTime": "2025-08-14T22:00:00Z",
+    "tokenCount": "~75000",
+    "messageCount": 42
+  },
+  "previousWork": {
+    "completedTasks": [
+      "task-001: Enhanced Error Handling with retry logic"
+    ],
+    "prCreated": "#13 - Enhanced error handling (merged)"
+  }
+}

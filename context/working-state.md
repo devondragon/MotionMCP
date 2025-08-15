@@ -1,7 +1,9 @@
 # Working State
 
 ## Current Active Task
-**None Selected** - Task-001 completed successfully
+**Task-002: Input Validation Improvements** - Started: 2025-08-14
+- Branch: `feature/task-002-input-validation`
+- Path: `context/features/epic-001-f01-error-handling/tasks/current/task-002-input-validation.md`
 
 ## Recently Completed
 **Task-001: Enhanced Error Handling** - Completed: 2025-08-14
