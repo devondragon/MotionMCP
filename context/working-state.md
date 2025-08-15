@@ -4,6 +4,12 @@
 None - Ready to select next task
 
 ## Recently Completed
+**Task-005: Centralize Error Formatting** - Completed: 2025-08-15
+- Added formatApiError helper method to reduce code duplication
+- Updated all 12 API methods to use centralized error formatting
+- Improved maintainability while maintaining identical error messages
+- Branch: feature/task-005-error-formatting (ready for PR)
+
 **Task-004: Type Safety Improvements** - Completed: 2025-08-15
 - Replaced 6 `any` types with specific interfaces in motion.ts
 - Created 4 minimal interfaces: ProjectReference, WorkspaceReference, AssigneeReference, ChunkReference

@@ -150,6 +150,19 @@ export class MotionApiService {
   }
 
   /**
+   * Formats API errors consistently across all methods
+   * @param error - The error that occurred
+   * @param action - Description of the action that failed (e.g., 'fetch projects')
+   * @returns Formatted Error object
+   */
+  private formatApiError(error: unknown, action: string): Error {
+    const baseMessage = `Failed to ${action}`;
+    const apiMessage = isAxiosError(error) ? error.response?.data?.message : undefined;
+    const errorMessage = getErrorMessage(error);
+    return new Error(`${baseMessage}: ${apiMessage || errorMessage}`);
+  }
+
+  /**
    * Wraps an axios request with a retry mechanism featuring exponential backoff.
    * Only retries on 5xx server errors or 429 rate-limiting errors.
    */
@@ -256,7 +269,7 @@ export class MotionApiService {
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
-        throw new Error(`Failed to fetch projects: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+        throw this.formatApiError(error, 'fetch projects');
       }
     });
   }
@@ -285,7 +298,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to fetch project: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'fetch project');
     }
   }
 
@@ -322,7 +335,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to create project: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'create project');
     }
   }
 
@@ -356,7 +369,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to update project: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'update project');
     }
   }
 
@@ -384,7 +397,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to delete project: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'delete project');
     }
   }
 
@@ -426,7 +439,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to fetch tasks: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'fetch tasks');
     }
   }
 
@@ -454,7 +467,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to fetch task: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'fetch task');
     }
   }
 
@@ -492,7 +505,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to create task: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'create task');
     }
   }
 
@@ -523,7 +536,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to update task: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'update task');
     }
   }
 
@@ -548,7 +561,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw new Error(`Failed to delete task: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      throw this.formatApiError(error, 'delete task');
     }
   }
 
@@ -587,7 +600,7 @@ export class MotionApiService {
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
-        throw new Error(`Failed to fetch workspaces: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+        throw this.formatApiError(error, 'fetch workspaces');
       }
     });
   }
@@ -630,7 +643,7 @@ export class MotionApiService {
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
-        throw new Error(`Failed to fetch users: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+        throw this.formatApiError(error, 'fetch users');
       }
     });
   }
