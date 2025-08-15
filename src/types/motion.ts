@@ -216,6 +216,7 @@ export interface ListResponse<T> {
   comments?: T[];
   customFields?: T[];
   recurringTasks?: T[];
+  schedules?: T[];
 }
 
 export interface MotionApiErrorResponse {

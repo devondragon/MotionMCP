@@ -8,7 +8,7 @@
 
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask } from '../types/motion';
+import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask, MotionSchedule } from '../types/motion';
 import { LIMITS } from './constants';
 
 /**
@@ -295,5 +295,23 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
   ].filter(Boolean).join('\n');
   
   return formatMcpSuccess(details);
+}
+
+/**
+ * Format schedule list response
+ */
+export function formatScheduleList(schedules: MotionSchedule[]): CallToolResult {
+  if (schedules.length === 0) {
+    return formatMcpSuccess("No schedules found.");
+  }
+  
+  const scheduleFormatter = (schedule: MotionSchedule) => {
+    const startDate = schedule.schedule.startDate;
+    const endDate = schedule.schedule.endDate;
+    const dateRange = startDate && endDate ? ` (${startDate} to ${endDate})` : '';
+    return `- Schedule ID: ${schedule.id} | User: ${schedule.userId}${dateRange}`;
+  };
+  
+  return formatListResponse(schedules, `Found ${schedules.length} schedule${schedules.length === 1 ? '' : 's'}`, scheduleFormatter);
 }
 

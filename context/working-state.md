@@ -1,7 +1,11 @@
 # Working State
 
 ## Current Active Task
-None - Ready to select next task
+**Task-005: Implement Schedules API** - Started: 2025-08-15
+- Adding GET /schedules endpoint to Motion API integration
+- Implementing motion_schedules tool for MCP server
+- Branch: feature/task-005-schedules-api
+- Task Path: context/features/epic-001-f02-api-completeness/tasks/current/
 
 ## Recently Completed
 **Task-001: Update Documentation** - Completed: 2025-01-15

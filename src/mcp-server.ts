@@ -26,6 +26,7 @@ import {
   formatCustomFieldSuccess,
   formatRecurringTaskList,
   formatRecurringTaskDetail,
+  formatScheduleList,
   mcpLog,
   LOG_LEVELS,
   LIMITS
@@ -33,7 +34,7 @@ import {
 import { InputValidator } from './utils/validator';
 import { McpToolResponse, McpToolDefinition } from './types/mcp';
 import * as ToolArgs from './types/mcp-tool-args';
-import { MotionProjectsArgs, MotionTasksArgs } from './types/mcp-tool-args';
+import { MotionProjectsArgs, MotionTasksArgs, MotionSchedulesArgs } from './types/mcp-tool-args';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -180,6 +181,8 @@ class MotionMCPServer {
             return await this.handleMotionCustomFields(args as unknown as ToolArgs.MotionCustomFieldsArgs);
           case "motion_recurring_tasks":
             return await this.handleMotionRecurringTasks(args as unknown as ToolArgs.MotionRecurringTasksArgs);
+          case "motion_schedules":
+            return await this.handleMotionSchedules(args as unknown as MotionSchedulesArgs);
           default:
             return formatMcpError(new Error(`Unknown tool: ${name}`));
         }
@@ -782,6 +785,27 @@ class MotionMCPServer {
           },
           required: ["operation"]
         }
+      },
+      {
+        name: "motion_schedules",
+        description: "Get user schedules and calendar view",
+        inputSchema: {
+          type: "object",
+          properties: {
+            userId: {
+              type: "string",
+              description: "User ID to get schedule for"
+            },
+            startDate: {
+              type: "string",
+              description: "Start date (ISO 8601)"
+            },
+            endDate: {
+              type: "string",
+              description: "End date (ISO 8601)"
+            }
+          }
+        }
       }
     ];
   }
@@ -807,6 +831,7 @@ class MotionMCPServer {
           toolsMap.get('motion_comments'),
           toolsMap.get('motion_custom_fields'),
           toolsMap.get('motion_recurring_tasks'),
+          toolsMap.get('motion_schedules'),
           toolsMap.get('list_motion_workspaces'),
           toolsMap.get('list_motion_users'),
           toolsMap.get('search_motion_content'),
@@ -1412,6 +1437,22 @@ class MotionMCPServer {
         default:
           return formatMcpError(new Error(`Unknown operation: ${operation}`));
       }
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private async handleMotionSchedules(args: MotionSchedulesArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
+    const { userId, startDate, endDate } = args;
+    
+    try {
+      const schedules = await motionService.getSchedules(userId, startDate, endDate);
+      return formatScheduleList(schedules);
     } catch (error: unknown) {
       return formatMcpError(error instanceof Error ? error : new Error(String(error)));
     }
