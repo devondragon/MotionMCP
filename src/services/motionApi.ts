@@ -11,6 +11,7 @@ import {
   MotionRecurringTask,
   CreateRecurringTaskData,
   MotionSchedule,
+  MotionStatus,
   ListResponse,
   MotionApiErrorResponse,
   MotionApiError
@@ -23,6 +24,7 @@ import {
   ProjectsListResponseSchema,
   WorkspacesListResponseSchema,
   SchedulesListResponseSchema,
+  StatusesListResponseSchema,
   VALIDATION_CONFIG
 } from '../schemas/motion';
 
@@ -54,6 +56,7 @@ export class MotionApiService {
   private customFieldCache: SimpleCache<MotionCustomField[]>;
   private recurringTaskCache: SimpleCache<MotionRecurringTask[]>;
   private scheduleCache: SimpleCache<MotionSchedule[]>;
+  private statusCache: SimpleCache<MotionStatus[]>;
 
   /**
    * Validate API response against schema
@@ -128,6 +131,7 @@ export class MotionApiService {
     this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * CACHE_TTL_MS_MULTIPLIER);
     this.recurringTaskCache = new SimpleCache(CACHE_TTL.RECURRING_TASKS * CACHE_TTL_MS_MULTIPLIER);
     this.scheduleCache = new SimpleCache(CACHE_TTL.SCHEDULES * CACHE_TTL_MS_MULTIPLIER);
+    this.statusCache = new SimpleCache(CACHE_TTL.WORKSPACES * CACHE_TTL_MS_MULTIPLIER); // 10 minutes, like workspaces
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -1447,6 +1451,65 @@ export class MotionApiService {
           endDate
         });
         throw this.formatApiError(error, 'fetch schedules');
+      }
+    });
+  }
+
+  /**
+   * Retrieves available workflow statuses from Motion
+   * @param workspaceId - Optional workspace ID to filter statuses
+   * @returns Promise resolving to array of Motion statuses
+   * @throws {Error} If the API request fails
+   */
+  async getStatuses(workspaceId?: string): Promise<MotionStatus[]> {
+    // Use workspace ID for cache key, or 'all' if not specified
+    const cacheKey = workspaceId ? `statuses:workspace:${workspaceId}` : 'statuses:all';
+    
+    return this.statusCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching statuses from Motion API', {
+          method: 'getStatuses',
+          workspaceId
+        });
+
+        const params = new URLSearchParams();
+        if (workspaceId) params.append('workspaceId', workspaceId);
+        
+        const queryString = params.toString();
+        const url = queryString ? `/statuses?${queryString}` : '/statuses';
+        
+        const response = await this.requestWithRetry(() => this.client.get(url));
+        
+        // Validate response against schema
+        const validatedResponse = this.validateResponse(
+          response.data,
+          StatusesListResponseSchema,
+          'statuses'
+        );
+        
+        // Extract statuses from validated response
+        const statuses = Array.isArray(validatedResponse) 
+          ? validatedResponse 
+          : ('statuses' in validatedResponse && Array.isArray(validatedResponse.statuses))
+            ? validatedResponse.statuses
+            : [];
+        
+        mcpLog(LOG_LEVELS.INFO, 'Statuses fetched successfully', {
+          method: 'getStatuses',
+          count: statuses.length,
+          workspaceId
+        });
+
+        return statuses;
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch statuses', {
+          method: 'getStatuses',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+          workspaceId
+        });
+        throw this.formatApiError(error, 'fetch statuses');
       }
     });
   }

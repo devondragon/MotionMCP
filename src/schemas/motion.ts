@@ -67,10 +67,9 @@ export const MotionCommentSchema = z.object({
 
 // Motion Status schema
 export const MotionStatusSchema = z.object({
-  id: z.string(),
   name: z.string(),
-  color: z.string().optional(),
-  isCompleted: z.boolean()
+  isDefaultStatus: z.boolean(),
+  isResolvedStatus: z.boolean()
 });
 
 // Time slot schema
@@ -132,6 +131,14 @@ export const SchedulesListResponseSchema = z.union([
     schedules: z.array(MotionScheduleSchema)
   }),
   z.array(MotionScheduleSchema)
+]);
+
+// Statuses list response schema (handles both wrapped and unwrapped responses)
+export const StatusesListResponseSchema = z.union([
+  z.object({
+    statuses: z.array(MotionStatusSchema)
+  }),
+  z.array(MotionStatusSchema)
 ]);
 
 // Type inference from schemas

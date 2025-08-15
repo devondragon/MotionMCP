@@ -8,7 +8,7 @@
 
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask, MotionSchedule, MotionScheduleDetails } from '../types/motion';
+import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask, MotionSchedule, MotionScheduleDetails, MotionStatus } from '../types/motion';
 import { LIMITS } from './constants';
 
 /**
@@ -334,5 +334,30 @@ export function formatScheduleList(schedules: MotionSchedule[]): CallToolResult 
   };
   
   return formatListResponse(schedules, `Found ${schedules.length} schedule${schedules.length === 1 ? '' : 's'}`, scheduleFormatter);
+}
+
+export function formatStatusList(statuses: MotionStatus[]): CallToolResult {
+  const statusFormatter = (status: MotionStatus): string => {
+    // Defensive programming for status object
+    if (!status) {
+      return '- Invalid status entry';
+    }
+    
+    const name = status.name || 'Unnamed';
+    const flags: string[] = [];
+    
+    if (status.isDefaultStatus) {
+      flags.push('Default');
+    }
+    if (status.isResolvedStatus) {
+      flags.push('Resolved');
+    }
+    
+    const flagsStr = flags.length > 0 ? ` [${flags.join(', ')}]` : '';
+    
+    return `- ${name}${flagsStr}`;
+  };
+  
+  return formatListResponse(statuses, `Found ${statuses.length} status${statuses.length === 1 ? '' : 'es'}`, statusFormatter);
 }
 

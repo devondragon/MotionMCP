@@ -4,6 +4,14 @@
 None - Ready to select next task
 
 ## Recently Completed
+**Task-006: Implement Statuses API** - Completed: 2025-08-15
+- Added getStatuses method to MotionApiService with caching support
+- Implemented motion_statuses tool for MCP server status access
+- Fixed MotionStatus interface to match actual API response
+- Supports optional workspaceId parameter
+- Added to 'essential' tool configuration for default availability
+- Branch: feature/task-006-statuses-api (ready for PR)
+
 **Task-005: Implement Schedules API** - Completed: 2025-08-15
 - Added getSchedules method to MotionApiService with caching support
 - Implemented motion_schedules tool for MCP server calendar access

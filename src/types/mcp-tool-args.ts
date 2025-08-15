@@ -170,6 +170,10 @@ export interface MotionSchedulesArgs {
   endDate?: string;
 }
 
+export interface MotionStatusesArgs {
+  workspaceId?: string;
+}
+
 // Union type of all tool arguments for type safety
 export type AllToolArgs = 
   | CreateProjectArgs
@@ -189,4 +193,5 @@ export type AllToolArgs =
   | MotionCommentsArgs
   | MotionCustomFieldsArgs
   | MotionRecurringTasksArgs
-  | MotionSchedulesArgs;
+  | MotionSchedulesArgs
+  | MotionStatusesArgs;
