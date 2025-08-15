@@ -6,6 +6,8 @@ import {
   MotionUser,
   MotionComment,
   CreateCommentData,
+  MotionCustomField,
+  CreateCustomFieldData,
   ListResponse,
   MotionApiErrorResponse,
   MotionApiError
@@ -45,6 +47,7 @@ export class MotionApiService {
   private userCache: SimpleCache<MotionUser[]>;
   private projectCache: SimpleCache<MotionProject[]>;
   private commentCache: SimpleCache<MotionComment[]>;
+  private customFieldCache: SimpleCache<MotionCustomField[]>;
 
   /**
    * Validate API response against schema
@@ -111,11 +114,12 @@ export class MotionApiService {
       }
     });
 
-    // Initialize cache instances with TTL from constants
-    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES);
-    this.userCache = new SimpleCache(CACHE_TTL.USERS);
-    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS);
-    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS);
+    // Initialize cache instances with TTL from constants (converted to ms)
+    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES * 1000);
+    this.userCache = new SimpleCache(CACHE_TTL.USERS * 1000);
+    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS * 1000);
+    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS * 1000);
+    this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * 1000);
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -853,6 +857,302 @@ export class MotionApiService {
         projectId: commentData?.projectId
       });
       throw this.formatApiError(error, 'create comment');
+    }
+  }
+
+  /**
+   * Fetch custom fields from Motion API
+   * @param workspaceId - Optional workspace ID to filter custom fields
+   * @returns Array of custom fields
+   */
+  async getCustomFields(workspaceId?: string): Promise<MotionCustomField[]> {
+    const cacheKey = workspaceId ? `custom-fields:${workspaceId}` : 'custom-fields:all';
+    
+    return this.customFieldCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching custom fields from Motion API', {
+          method: 'getCustomFields',
+          workspaceId
+        });
+
+        const params = new URLSearchParams();
+        if (workspaceId) params.append('workspaceId', workspaceId);
+        
+        const queryString = params.toString();
+        const url = queryString ? `/custom-fields?${queryString}` : '/custom-fields';
+        
+        const response: AxiosResponse<any> = await this.requestWithRetry(() => this.client.get(url));
+        
+        // Handle both wrapped and unwrapped responses
+        const customFields = response.data?.customFields || response.data || [];
+        const fieldsArray = Array.isArray(customFields) ? customFields : [];
+        
+        mcpLog(LOG_LEVELS.INFO, 'Custom fields fetched successfully', {
+          method: 'getCustomFields',
+          count: fieldsArray.length,
+          workspaceId
+        });
+
+        return fieldsArray;
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch custom fields', {
+          method: 'getCustomFields',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+          workspaceId
+        });
+        throw this.formatApiError(error, 'fetch custom fields');
+      }
+    });
+  }
+
+  /**
+   * Create a new custom field
+   * @param fieldData - Data for creating the custom field
+   * @returns The created custom field
+   */
+  async createCustomField(fieldData: CreateCustomFieldData): Promise<MotionCustomField> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Creating custom field in Motion API', {
+        method: 'createCustomField',
+        name: fieldData.name,
+        type: fieldData.type,
+        workspaceId: fieldData.workspaceId
+      });
+
+      const response: AxiosResponse<MotionCustomField> = await this.requestWithRetry(() => 
+        this.client.post('/custom-fields', fieldData)
+      );
+      
+      // Invalidate cache after successful creation
+      this.customFieldCache.invalidate('custom-fields:');
+      
+      mcpLog(LOG_LEVELS.INFO, 'Custom field created successfully', {
+        method: 'createCustomField',
+        fieldId: response.data?.id,
+        name: fieldData.name
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to create custom field', {
+        method: 'createCustomField',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        fieldName: fieldData?.name
+      });
+      throw this.formatApiError(error, 'create custom field');
+    }
+  }
+
+  /**
+   * Delete a custom field
+   * @param fieldId - ID of the custom field to delete
+   * @returns Success indicator
+   */
+  async deleteCustomField(fieldId: string): Promise<{ success: boolean }> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Deleting custom field from Motion API', {
+        method: 'deleteCustomField',
+        fieldId
+      });
+
+      await this.requestWithRetry(() => 
+        this.client.delete(`/custom-fields/${fieldId}`)
+      );
+      
+      // Invalidate cache after successful deletion
+      this.customFieldCache.invalidate('custom-fields:');
+      
+      mcpLog(LOG_LEVELS.INFO, 'Custom field deleted successfully', {
+        method: 'deleteCustomField',
+        fieldId
+      });
+
+      return { success: true };
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to delete custom field', {
+        method: 'deleteCustomField',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        fieldId
+      });
+      throw this.formatApiError(error, 'delete custom field');
+    }
+  }
+
+  /**
+   * Add a custom field to a project
+   * @param projectId - ID of the project
+   * @param fieldId - ID of the custom field
+   * @param value - Optional value for the field
+   * @returns Updated project data
+   */
+  async addCustomFieldToProject(projectId: string, fieldId: string, value?: any): Promise<any> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Adding custom field to project', {
+        method: 'addCustomFieldToProject',
+        projectId,
+        fieldId,
+        hasValue: value !== undefined
+      });
+
+      const requestData = {
+        fieldId,
+        ...(value !== undefined && { value })
+      };
+
+      const response: AxiosResponse = await this.requestWithRetry(() => 
+        this.client.post(`/projects/${projectId}/custom-fields`, requestData)
+      );
+      
+      // Invalidate project cache
+      this.projectCache.invalidate(`projects:`);
+      
+      mcpLog(LOG_LEVELS.INFO, 'Custom field added to project successfully', {
+        method: 'addCustomFieldToProject',
+        projectId,
+        fieldId
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to add custom field to project', {
+        method: 'addCustomFieldToProject',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        projectId,
+        fieldId
+      });
+      throw this.formatApiError(error, 'add custom field to project');
+    }
+  }
+
+  /**
+   * Remove a custom field from a project
+   * @param projectId - ID of the project
+   * @param fieldId - ID of the custom field
+   * @returns Success indicator
+   */
+  async removeCustomFieldFromProject(projectId: string, fieldId: string): Promise<{ success: boolean }> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Removing custom field from project', {
+        method: 'removeCustomFieldFromProject',
+        projectId,
+        fieldId
+      });
+
+      await this.requestWithRetry(() => 
+        this.client.delete(`/projects/${projectId}/custom-fields/${fieldId}`)
+      );
+      
+      // Invalidate project cache
+      this.projectCache.invalidate(`projects:`);
+      
+      mcpLog(LOG_LEVELS.INFO, 'Custom field removed from project successfully', {
+        method: 'removeCustomFieldFromProject',
+        projectId,
+        fieldId
+      });
+
+      return { success: true };
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to remove custom field from project', {
+        method: 'removeCustomFieldFromProject',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        projectId,
+        fieldId
+      });
+      throw this.formatApiError(error, 'remove custom field from project');
+    }
+  }
+
+  /**
+   * Add a custom field to a task
+   * @param taskId - ID of the task
+   * @param fieldId - ID of the custom field
+   * @param value - Optional value for the field
+   * @returns Updated task data
+   */
+  async addCustomFieldToTask(taskId: string, fieldId: string, value?: any): Promise<any> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Adding custom field to task', {
+        method: 'addCustomFieldToTask',
+        taskId,
+        fieldId,
+        hasValue: value !== undefined
+      });
+
+      const requestData = {
+        fieldId,
+        ...(value !== undefined && { value })
+      };
+
+      const response: AxiosResponse = await this.requestWithRetry(() => 
+        this.client.post(`/tasks/${taskId}/custom-fields`, requestData)
+      );
+      
+      mcpLog(LOG_LEVELS.INFO, 'Custom field added to task successfully', {
+        method: 'addCustomFieldToTask',
+        taskId,
+        fieldId
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to add custom field to task', {
+        method: 'addCustomFieldToTask',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        taskId,
+        fieldId
+      });
+      throw this.formatApiError(error, 'add custom field to task');
+    }
+  }
+
+  /**
+   * Remove a custom field from a task
+   * @param taskId - ID of the task
+   * @param fieldId - ID of the custom field
+   * @returns Success indicator
+   */
+  async removeCustomFieldFromTask(taskId: string, fieldId: string): Promise<{ success: boolean }> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Removing custom field from task', {
+        method: 'removeCustomFieldFromTask',
+        taskId,
+        fieldId
+      });
+
+      await this.requestWithRetry(() => 
+        this.client.delete(`/tasks/${taskId}/custom-fields/${fieldId}`)
+      );
+      
+      mcpLog(LOG_LEVELS.INFO, 'Custom field removed from task successfully', {
+        method: 'removeCustomFieldFromTask',
+        taskId,
+        fieldId
+      });
+
+      return { success: true };
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to remove custom field from task', {
+        method: 'removeCustomFieldFromTask',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        taskId,
+        fieldId
+      });
+      throw this.formatApiError(error, 'remove custom field from task');
     }
   }
 }

@@ -8,7 +8,7 @@
 
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MotionProject, MotionTask, MotionWorkspace, MotionComment } from '../types/motion';
+import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField } from '../types/motion';
 import { LIMITS } from './constants';
 
 /**
@@ -216,5 +216,52 @@ export function formatCommentDetail(comment: MotionComment): CallToolResult {
   ].join('\n');
   
   return formatMcpSuccess(details);
+}
+
+/**
+ * Format custom field list response
+ */
+export function formatCustomFieldList(fields: MotionCustomField[]): CallToolResult {
+  if (fields.length === 0) {
+    return formatMcpSuccess("No custom fields found.");
+  }
+  
+  const fieldFormatter = (field: MotionCustomField) => {
+    let line = `- ${field.name} (ID: ${field.id}) [${field.type}]`;
+    if (field.required) line += ' *Required*';
+    if (field.options && field.options.length > 0) {
+      line += ` Options: ${field.options.join(', ')}`;
+    }
+    return line;
+  };
+  
+  return formatListResponse(fields, `Found ${fields.length} custom field${fields.length === 1 ? '' : 's'}`, fieldFormatter);
+}
+
+/**
+ * Format single custom field response
+ */
+export function formatCustomFieldDetail(field: MotionCustomField): CallToolResult {
+  const details = [
+    `Custom field created successfully:`,
+    `- ID: ${field.id}`,
+    `- Name: ${field.name}`,
+    `- Type: ${field.type}`,
+    `- Required: ${field.required ? 'Yes' : 'No'}`,
+    field.options && field.options.length > 0 ? `- Options: ${field.options.join(', ')}` : null
+  ].filter(Boolean).join('\n');
+  
+  return formatMcpSuccess(details);
+}
+
+/**
+ * Format success message for custom field operations
+ */
+export function formatCustomFieldSuccess(operation: string, entityType?: string, entityId?: string): CallToolResult {
+  let message = `Custom field ${operation} successfully`;
+  if (entityType && entityId) {
+    message += ` for ${entityType} ${entityId}`;
+  }
+  return formatMcpSuccess(message);
 }
 

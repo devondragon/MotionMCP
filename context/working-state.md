@@ -4,6 +4,14 @@
 None - Ready to select next task
 
 ## Recently Completed
+**Task-002: Custom Fields API** - Completed: 2025-08-15
+- Added complete Custom Fields API implementation to motionApi.ts
+- Implemented motion_custom_fields consolidated tool for MCP server
+- Supports all CRUD operations for custom fields
+- Supports adding/removing custom fields to/from projects and tasks
+- Added to 'essential' tool configuration for default availability
+- Branch: feature/task-002-custom-fields-api (ready for PR)
+
 **Task-001: Implement Comments API** - Completed: 2025-08-15
 - Added getComments and createComment methods to motionApi.ts
 - Implemented motion_comments consolidated tool for MCP server

@@ -71,10 +71,11 @@ export const RETRY_CONFIG = {
 
 // Cache TTL configuration (in seconds)
 export const CACHE_TTL = {
-  WORKSPACES: 600,  // 10 minutes
-  USERS: 600,       // 10 minutes
-  PROJECTS: 300,    // 5 minutes
-  COMMENTS: 60      // 1 minute
+  WORKSPACES: 600,    // 10 minutes
+  USERS: 600,         // 10 minutes
+  PROJECTS: 300,      // 5 minutes
+  COMMENTS: 60,       // 1 minute
+  CUSTOM_FIELDS: 600  // 10 minutes
 } as const;
 
 // Content limits and validation

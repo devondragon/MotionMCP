@@ -135,6 +135,19 @@ export interface MotionCommentsArgs {
   authorId?: string;
 }
 
+export interface MotionCustomFieldsArgs {
+  operation: 'list' | 'create' | 'delete' | 'add_to_project' | 'remove_from_project' | 'add_to_task' | 'remove_from_task';
+  fieldId?: string;
+  workspaceId?: string;
+  name?: string;
+  type?: 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox';
+  options?: string[];
+  required?: boolean;
+  projectId?: string;
+  taskId?: string;
+  value?: string | number | boolean | string[] | null;
+}
+
 // Union type of all tool arguments for type safety
 export type AllToolArgs = 
   | CreateProjectArgs
@@ -151,4 +164,5 @@ export type AllToolArgs =
   | GetContextArgs
   | MotionProjectsArgs
   | MotionTasksArgs
-  | MotionCommentsArgs;
+  | MotionCommentsArgs
+  | MotionCustomFieldsArgs;

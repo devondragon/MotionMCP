@@ -7,7 +7,7 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { MotionApiService } from './services/motionApi';
-import { CreateCommentData } from './types/motion';
+import { CreateCommentData, CreateCustomFieldData } from './types/motion';
 import { 
   WorkspaceResolver,
   formatMcpError,
@@ -21,6 +21,9 @@ import {
   formatSearchResults,
   formatCommentList,
   formatCommentDetail,
+  formatCustomFieldList,
+  formatCustomFieldDetail,
+  formatCustomFieldSuccess,
   mcpLog,
   LOG_LEVELS,
   LIMITS
@@ -171,6 +174,8 @@ class MotionMCPServer {
             return await this.handleGetContext(args as unknown as ToolArgs.GetContextArgs);
           case "motion_comments":
             return await this.handleMotionComments(args as unknown as ToolArgs.MotionCommentsArgs);
+          case "motion_custom_fields":
+            return await this.handleMotionCustomFields(args as unknown as ToolArgs.MotionCustomFieldsArgs);
           default:
             return formatMcpError(new Error(`Unknown tool: ${name}`));
         }
@@ -658,6 +663,59 @@ class MotionMCPServer {
           },
           required: ["operation"]
         }
+      },
+      {
+        name: "motion_custom_fields",
+        description: "Manage custom fields for tasks and projects",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: {
+              type: "string",
+              enum: ["list", "create", "delete", "add_to_project", "remove_from_project", "add_to_task", "remove_from_task"],
+              description: "Operation to perform"
+            },
+            fieldId: {
+              type: "string",
+              description: "Custom field ID"
+            },
+            workspaceId: {
+              type: "string",
+              description: "Workspace ID"
+            },
+            name: {
+              type: "string",
+              description: "Field name (for create)"
+            },
+            type: {
+              type: "string",
+              enum: ["text", "number", "date", "select", "multiselect", "checkbox"],
+              description: "Field type (for create)"
+            },
+            options: {
+              type: "array",
+              items: { type: "string" },
+              description: "Options for select/multiselect fields"
+            },
+            required: {
+              type: "boolean",
+              description: "Whether field is required"
+            },
+            projectId: {
+              type: "string",
+              description: "Project ID (for add/remove operations)"
+            },
+            taskId: {
+              type: "string",
+              description: "Task ID (for add/remove operations)"
+            },
+            value: {
+              type: ["string", "number", "boolean", "array", "null"],
+              description: "Field value"
+            }
+          },
+          required: ["operation"]
+        }
       }
     ];
   }
@@ -681,6 +739,7 @@ class MotionMCPServer {
           toolsMap.get('motion_tasks'),
           toolsMap.get('motion_projects'),
           toolsMap.get('motion_comments'),
+          toolsMap.get('motion_custom_fields'),
           toolsMap.get('list_motion_workspaces'),
           toolsMap.get('list_motion_users'),
           toolsMap.get('search_motion_content'),
@@ -1055,6 +1114,84 @@ class MotionMCPServer {
           
           const newComment = await motionService.createComment(commentData);
           return formatCommentDetail(newComment);
+          
+        default:
+          return formatMcpError(new Error(`Unknown operation: ${operation}`));
+      }
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private async handleMotionCustomFields(args: ToolArgs.MotionCustomFieldsArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service is not available"));
+    }
+
+    const { operation, fieldId, workspaceId, name, type, options, required, projectId, taskId, value } = args;
+    
+    try {
+      switch (operation) {
+        case 'list':
+          const fields = await motionService.getCustomFields(workspaceId);
+          return formatCustomFieldList(fields);
+          
+        case 'create':
+          if (!name || !type) {
+            return formatMcpError(new Error('Name and type are required for create operation'));
+          }
+          
+          const fieldData: CreateCustomFieldData = {
+            name,
+            type,
+            ...(workspaceId && { workspaceId }),
+            ...(options && { options }),
+            ...(required !== undefined && { required })
+          };
+          
+          const newField = await motionService.createCustomField(fieldData);
+          return formatCustomFieldDetail(newField);
+          
+        case 'delete':
+          if (!fieldId) {
+            return formatMcpError(new Error('Field ID is required for delete operation'));
+          }
+          
+          await motionService.deleteCustomField(fieldId);
+          return formatCustomFieldSuccess('deleted');
+          
+        case 'add_to_project':
+          if (!projectId || !fieldId) {
+            return formatMcpError(new Error('Project ID and field ID are required for add_to_project operation'));
+          }
+          
+          await motionService.addCustomFieldToProject(projectId, fieldId, value);
+          return formatCustomFieldSuccess('added', 'project', projectId);
+          
+        case 'remove_from_project':
+          if (!projectId || !fieldId) {
+            return formatMcpError(new Error('Project ID and field ID are required for remove_from_project operation'));
+          }
+          
+          await motionService.removeCustomFieldFromProject(projectId, fieldId);
+          return formatCustomFieldSuccess('removed', 'project', projectId);
+          
+        case 'add_to_task':
+          if (!taskId || !fieldId) {
+            return formatMcpError(new Error('Task ID and field ID are required for add_to_task operation'));
+          }
+          
+          await motionService.addCustomFieldToTask(taskId, fieldId, value);
+          return formatCustomFieldSuccess('added', 'task', taskId);
+          
+        case 'remove_from_task':
+          if (!taskId || !fieldId) {
+            return formatMcpError(new Error('Task ID and field ID are required for remove_from_task operation'));
+          }
+          
+          await motionService.removeCustomFieldFromTask(taskId, fieldId);
+          return formatCustomFieldSuccess('removed', 'task', taskId);
           
         default:
           return formatMcpError(new Error(`Unknown operation: ${operation}`));

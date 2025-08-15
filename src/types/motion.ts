@@ -119,8 +119,23 @@ export interface MotionUser {
 export interface MotionCustomField {
   id: string;
   name: string;
-  type: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox';
   options?: string[];
+  required?: boolean;
+  workspaceId?: string;
+}
+
+export interface CreateCustomFieldData {
+  name: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox';
+  workspaceId?: string;
+  options?: string[];
+  required?: boolean;
+}
+
+export interface CustomFieldValue {
+  fieldId: string;
+  value: string | number | boolean | string[] | null;
 }
 
 export interface MotionRecurringTask {
