@@ -4,6 +4,13 @@
 None - Ready to select next task
 
 ## Recently Completed
+**Task-001: Implement Comments API** - Completed: 2025-08-15
+- Added getComments and createComment methods to motionApi.ts
+- Implemented motion_comments consolidated tool for MCP server
+- Supports list and create operations for task and project comments
+- Added to 'essential' tool configuration for default availability
+- Branch: feature/task-001-comments-api (ready for PR)
+
 **Task-006: Remove Redundant Service Initialization Checks** - Completed: 2025-08-15
 - Removed 12 redundant initialization checks from individual handlers
 - Added non-null assertions where TypeScript requires them

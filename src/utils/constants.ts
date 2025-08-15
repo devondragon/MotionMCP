@@ -69,6 +69,20 @@ export const RETRY_CONFIG = {
   BACKOFF_MULTIPLIER: 2
 } as const;
 
+// Cache TTL configuration (in seconds)
+export const CACHE_TTL = {
+  WORKSPACES: 600,  // 10 minutes
+  USERS: 600,       // 10 minutes
+  PROJECTS: 300,    // 5 minutes
+  COMMENTS: 60      // 1 minute
+} as const;
+
+// Content limits and validation
+export const LIMITS = {
+  COMMENT_MAX_LENGTH: 5000,      // Maximum comment length in characters
+  COMMENT_DISPLAY_LENGTH: 120    // Maximum length for display before truncation
+} as const;
+
 // Logging levels for MCP compliance
 export const LOG_LEVELS = {
   DEBUG: 'debug',

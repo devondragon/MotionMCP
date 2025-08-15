@@ -4,11 +4,13 @@ import {
   MotionProject, 
   MotionTask, 
   MotionUser,
+  MotionComment,
+  CreateCommentData,
   ListResponse,
   MotionApiErrorResponse,
   MotionApiError
 } from '../types/motion';
-import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG } from '../utils/constants';
+import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { z } from 'zod';
@@ -42,6 +44,7 @@ export class MotionApiService {
   private workspaceCache: SimpleCache<MotionWorkspace[]>;
   private userCache: SimpleCache<MotionUser[]>;
   private projectCache: SimpleCache<MotionProject[]>;
+  private commentCache: SimpleCache<MotionComment[]>;
 
   /**
    * Validate API response against schema
@@ -108,10 +111,11 @@ export class MotionApiService {
       }
     });
 
-    // Initialize cache instances with different TTL values
-    this.workspaceCache = new SimpleCache(600); // 10 minutes for workspaces
-    this.userCache = new SimpleCache(600); // 10 minutes for users
-    this.projectCache = new SimpleCache(300); // 5 minutes for projects
+    // Initialize cache instances with TTL from constants
+    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES);
+    this.userCache = new SimpleCache(CACHE_TTL.USERS);
+    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS);
+    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS);
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -749,6 +753,106 @@ export class MotionApiService {
         error: getErrorMessage(error)
       });
       throw error;
+    }
+  }
+
+  async getComments(taskId?: string, projectId?: string): Promise<MotionComment[]> {
+    // Require at least one parameter to prevent ambiguous 'all' queries
+    if (!taskId && !projectId) {
+      throw new Error('Either taskId or projectId must be provided to fetch comments');
+    }
+    
+    const cacheKey = `comments:${taskId ? `task:${taskId}` : `project:${projectId}`}`;
+    
+    return this.commentCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching comments from Motion API', {
+          method: 'getComments',
+          taskId,
+          projectId
+        });
+
+        const params = new URLSearchParams();
+        if (taskId) params.append('taskId', taskId);
+        if (projectId) params.append('projectId', projectId);
+        
+        const queryString = params.toString();
+        const url = queryString ? `/comments?${queryString}` : '/comments';
+        
+        const response: AxiosResponse<ListResponse<MotionComment>> = await this.requestWithRetry(() => this.client.get(url));
+        
+        // Handle both wrapped and unwrapped responses
+        const comments = response.data?.comments || response.data || [];
+        const commentsArray = Array.isArray(comments) ? comments : [];
+        
+        mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully', {
+          method: 'getComments',
+          count: commentsArray.length,
+          taskId,
+          projectId
+        });
+
+        return commentsArray;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch comments', {
+        method: 'getComments',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        taskId,
+        projectId
+      });
+        throw this.formatApiError(error, 'fetch comments');
+      }
+    });
+  }
+
+  async createComment(commentData: CreateCommentData): Promise<MotionComment> {
+    try {
+      // Validate that at least one target ID is provided
+      if (!commentData.taskId && !commentData.projectId) {
+        throw new Error('Either taskId or projectId must be supplied for comment creation');
+      }
+
+      mcpLog(LOG_LEVELS.DEBUG, 'Creating comment in Motion API', {
+        method: 'createComment',
+        taskId: commentData.taskId,
+        projectId: commentData.projectId,
+        contentLength: commentData.content?.length || 0
+      });
+
+      // Only include fields that are present (avoid sending null)
+      const { content, taskId, projectId, authorId } = commentData;
+      const apiData = {
+        content,
+        ...(taskId && { taskId }),
+        ...(projectId && { projectId }),
+        ...(authorId && { authorId })
+      };
+      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => this.client.post('/comments', apiData));
+      
+      // Invalidate cache after successful creation
+      const cacheKey = `comments:${commentData.taskId ? `task:${commentData.taskId}` : `project:${commentData.projectId}`}`;
+      this.commentCache.invalidate(cacheKey); // Invalidate specific cache
+      
+      mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
+        method: 'createComment',
+        commentId: response.data?.id,
+        taskId: commentData.taskId,
+        projectId: commentData.projectId
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to create comment', {
+        method: 'createComment',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        taskId: commentData?.taskId,
+        projectId: commentData?.projectId
+      });
+      throw this.formatApiError(error, 'create comment');
     }
   }
 }
