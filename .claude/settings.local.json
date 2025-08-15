@@ -33,7 +33,8 @@
       "Bash(echo:*)",
       "Bash(npm run mcp:*)",
       "Bash(MOTION_API_KEY=test timeout 1 node dist/mcp-server.js)",
-      "Bash(MOTION_API_KEY=test timeout 1 node dist/mcp-server.js --version)"
+      "Bash(MOTION_API_KEY=test timeout 1 node dist/mcp-server.js --version)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

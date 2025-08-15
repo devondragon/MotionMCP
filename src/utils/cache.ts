@@ -10,11 +10,34 @@ export class SimpleCache<T = any> {
   private cache: Map<string, CacheItem<T>>;
   private ttl: number;
   private maxSize: number;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
-  constructor(ttlSeconds: number = 300, maxSize: number = 1000) {
+  constructor(ttlSeconds: number = 300, maxSize: number = 1000, options: { autoCleanup?: boolean } = {}) {
     this.cache = new Map();
     this.ttl = ttlSeconds * 1000;
     this.maxSize = maxSize;
+
+    // Set up automatic cleanup if requested
+    if (options.autoCleanup !== false) { // Default to true for automatic cleanup
+      // Run cleanup periodically at half the TTL interval for efficiency
+      this.cleanupInterval = setInterval(() => this.cleanup(), Math.max(30000, this.ttl / 2));
+      
+      // Allow process to exit even if interval is active
+      if (typeof this.cleanupInterval.unref === 'function') {
+        this.cleanupInterval.unref();
+      }
+    }
+  }
+
+  /**
+   * Destroy the cache and clean up resources
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.cache.clear();
   }
 
   set(key: string, value: T): void {
@@ -46,6 +69,11 @@ export class SimpleCache<T = any> {
       this.cache.delete(key);
       return null;
     }
+    
+    // Implement LRU: move accessed item to the end of insertion order
+    // This makes it the "most recently used" item
+    this.cache.delete(key);
+    this.cache.set(key, item);
     
     return item.value;
   }
