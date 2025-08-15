@@ -1,14 +1,15 @@
 # F01 Working State
 
 ## Current Status
-**Not Started** - Ready to begin with Task-001
+**In Progress** - Working on Task-002
 
 ## Current Task
-None - Recommend starting with Task-001 (Enhanced Error Handling)
+**Task-002: Input Validation Improvements** - Started: 2025-08-14
+- Branch: `feature/task-002-input-validation`
 
 ## Progress
-- [ ] Task-001: Enhanced Error Handling
-- [ ] Task-002: Input Validation Improvements
+- [x] Task-001: Enhanced Error Handling (Completed)
+- [ ] Task-002: Input Validation Improvements (In Progress)
 - [ ] Task-003: Implement Caching Layer
 - [ ] Task-004: Improve Type Safety
 - [ ] Task-005: Centralize Error Formatting

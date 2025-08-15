@@ -277,8 +277,11 @@ class MotionMCPServer {
               description: "ISO 8601 format"
             },
             duration: {
-              type: ["string", "number"],
-              description: "Minutes or 'NONE'/'REMINDER'"
+              oneOf: [
+                { type: "string", enum: ["NONE", "REMINDER"] },
+                { type: "number", minimum: 0 }
+              ],
+              description: "Minutes (as number) or 'NONE'/'REMINDER' (as string)"
             },
             labels: {
               type: "array",
@@ -286,7 +289,10 @@ class MotionMCPServer {
               description: "Task labels"
             },
             autoScheduled: {
-              type: ["object", "null"],
+              oneOf: [
+                { type: "object" },
+                { type: "null" }
+              ],
               description: "Auto-scheduling configuration"
             },
             targetProjectId: {

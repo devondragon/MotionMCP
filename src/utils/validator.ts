@@ -16,7 +16,8 @@ export class InputValidator {
   constructor() {
     this.ajv = new Ajv({ 
       allErrors: true,
-      coerceTypes: true  // Automatically coerce types when safe
+      coerceTypes: true,  // Automatically coerce types when safe
+      allowUnionTypes: true  // Allow union types in schemas
     });
     this.validators = new Map();
   }
