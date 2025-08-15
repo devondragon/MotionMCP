@@ -1,14 +1,14 @@
 # Working State
 
-## Current Active Task
-**Task-007: Implement Current User API** - Completed: 2025-08-15
-- Added getCurrentUser method to MotionApiService with proper error handling and MCP logging
-- Created motion_users consolidated tool with 'list' and 'current' operations
-- Implemented proper caching using existing userCache infrastructure
-- Added to 'essential' tool configuration for default availability  
-- getCurrentUser uses GET /users/me endpoint per API documentation
-- Returns user info: id, email, and optional name fields
-- Branch: feature/task-007-current-user-api (ready for PR)
+## Current Active Spike
+**Spike-001: Verify Motion Schemas and Interfaces** - In Progress: 2025-08-15
+- Comprehensive audit of all Motion API schemas against official documentation
+- Type: Investigation | Priority: High | Time Box: 6h max
+- Verifying 18+ API endpoints for schema accuracy and completeness
+- Focus: Task, Project, Workspace, and newer APIs (schedules, custom fields, recurring tasks)
+- Location: context/spikes/todo/spike-001-verify-motion-schemas.md
+
+## Recently Completed Tasks
 
 ## Recently Completed
 **Task-006: Implement Statuses API** - Completed: 2025-08-15
