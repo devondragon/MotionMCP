@@ -788,23 +788,24 @@ class MotionMCPServer {
       },
       {
         name: "motion_schedules",
-        description: "Get user schedules and calendar view",
+        description: "Get user schedules showing their weekly working hours and time zones",
         inputSchema: {
           type: "object",
           properties: {
             userId: {
               type: "string",
-              description: "User ID to get schedule for"
+              description: "User ID to get schedule for (optional, returns all schedules if not specified)"
             },
             startDate: {
               type: "string",
-              description: "Start date (ISO 8601)"
+              description: "Start date for filtering schedules (optional)"
             },
             endDate: {
               type: "string",
-              description: "End date (ISO 8601)"
+              description: "End date for filtering schedules (optional)"
             }
-          }
+          },
+          additionalProperties: false
         }
       }
     ];
@@ -1450,24 +1451,19 @@ class MotionMCPServer {
 
     const { userId, startDate, endDate } = args;
     
-    // Validate date formats if provided
-    const isValidISO8601 = (dateStr: string | undefined): boolean => {
+    // Validate date formats if provided using Date constructor
+    const isValidDate = (dateStr: string | undefined): boolean => {
       if (!dateStr) return true; // Optional fields are valid when not provided
-      try {
-        const date = new Date(dateStr);
-        // Check if date is valid and matches ISO 8601 format
-        return !isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/.test(dateStr);
-      } catch {
-        return false;
-      }
+      const date = new Date(dateStr);
+      return !isNaN(date.getTime());
     };
 
-    if (!isValidISO8601(startDate)) {
-      return formatMcpError(new Error('startDate must be a valid ISO 8601 date string (e.g., "2024-01-15" or "2024-01-15T10:30:00Z")'));
+    if (!isValidDate(startDate)) {
+      return formatMcpError(new Error('startDate must be a valid date string (e.g., "2024-01-15" or "2024-01-15T10:30:00Z")'));
     }
 
-    if (!isValidISO8601(endDate)) {
-      return formatMcpError(new Error('endDate must be a valid ISO 8601 date string (e.g., "2024-01-15" or "2024-01-15T10:30:00Z")'));
+    if (!isValidDate(endDate)) {
+      return formatMcpError(new Error('endDate must be a valid date string (e.g., "2024-01-15" or "2024-01-15T10:30:00Z")'));
     }
 
     // Validate date range logic if both dates are provided

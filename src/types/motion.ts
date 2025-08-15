@@ -172,32 +172,25 @@ export interface MotionStatus {
   isCompleted: boolean;
 }
 
+export interface MotionTimeSlot {
+  start: string;  // "HH:MM" format
+  end: string;    // "HH:MM" format
+}
+
 export interface MotionScheduleDetails {
-  startDate: string;
-  endDate: string;
-  recurrence?: {
-    pattern: 'daily' | 'weekly' | 'monthly' | 'yearly';
-    interval: number;
-    daysOfWeek?: number[];  // 0-6, Sunday to Saturday
-    dayOfMonth?: number;
-    endDate?: string;
-  };
-  blockedTimes?: Array<{
-    start: string;
-    end: string;
-    reason?: string;
-  }>;
-  workingHours?: {
-    start: string;  // e.g., "09:00"
-    end: string;    // e.g., "17:00"
-    timezone: string;
-    daysOfWeek?: number[];
-  };
+  monday?: MotionTimeSlot[];
+  tuesday?: MotionTimeSlot[];
+  wednesday?: MotionTimeSlot[];
+  thursday?: MotionTimeSlot[];
+  friday?: MotionTimeSlot[];
+  saturday?: MotionTimeSlot[];
+  sunday?: MotionTimeSlot[];
 }
 
 export interface MotionSchedule {
-  id: string;
-  userId: string;
+  name: string;
+  isDefaultTimezone: boolean;
+  timezone: string;
   schedule: MotionScheduleDetails;
 }
 

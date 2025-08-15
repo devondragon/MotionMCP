@@ -8,7 +8,7 @@
 
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask, MotionSchedule } from '../types/motion';
+import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask, MotionSchedule, MotionScheduleDetails } from '../types/motion';
 import { LIMITS } from './constants';
 
 /**
@@ -307,13 +307,30 @@ export function formatScheduleList(schedules: MotionSchedule[]): CallToolResult 
   }
   
   const scheduleFormatter = (schedule: MotionSchedule) => {
-    // Add null safety for nested schedule object
-    const startDate = schedule?.schedule?.startDate;
-    const endDate = schedule?.schedule?.endDate;
-    const dateRange = startDate && endDate ? ` (${startDate} to ${endDate})` : '';
-    const scheduleId = schedule?.id || 'Unknown';
-    const userId = schedule?.userId || 'Unknown';
-    return `- Schedule ID: ${scheduleId} | User: ${userId}${dateRange}`;
+    // Defensive programming for nested schedule object
+    if (!schedule) {
+      return '- Invalid schedule entry';
+    }
+    
+    const name = schedule.name || 'Unnamed';
+    const timezone = schedule.timezone || 'Unknown timezone';
+    
+    // Count working days if schedule details are available
+    let workingDays = '';
+    if (schedule.schedule && typeof schedule.schedule === 'object') {
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const activeDays = days.filter(day => 
+        Array.isArray(schedule.schedule[day as keyof MotionScheduleDetails]) && 
+        schedule.schedule[day as keyof MotionScheduleDetails]!.length > 0
+      );
+      workingDays = activeDays.length > 0 
+        ? ` | Working days: ${activeDays.length}/7` 
+        : ' | No working hours defined';
+    } else {
+      workingDays = ' | Schedule details unavailable';
+    }
+    
+    return `- ${name} (${timezone})${workingDays}`;
   };
   
   return formatListResponse(schedules, `Found ${schedules.length} schedule${schedules.length === 1 ? '' : 's'}`, scheduleFormatter);
