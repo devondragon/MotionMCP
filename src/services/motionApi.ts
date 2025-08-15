@@ -10,6 +10,7 @@ import {
 } from '../types/motion';
 import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
+const SimpleCache = require('../utils/cache');
 import { z } from 'zod';
 import { 
   ProjectsListResponseSchema,
@@ -38,9 +39,9 @@ export class MotionApiService {
   private apiKey: string;
   private baseUrl: string;
   private client: AxiosInstance;
-  private workspacesCache: MotionWorkspace[] | null = null;
-  private workspacesCacheTime: number = 0;
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
+  private workspaceCache: any;
+  private userCache: any;
+  private projectCache: any;
 
   /**
    * Validate API response against schema
@@ -106,6 +107,11 @@ export class MotionApiService {
         'Content-Type': 'application/json'
       }
     });
+
+    // Initialize cache instances with different TTL values
+    this.workspaceCache = new SimpleCache(600); // 10 minutes for workspaces
+    this.userCache = new SimpleCache(600); // 10 minutes for users
+    this.projectCache = new SimpleCache(300); // 5 minutes for projects
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -207,48 +213,52 @@ export class MotionApiService {
   }
 
   async getProjects(workspaceId: string): Promise<MotionProject[]> {
-    try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from Motion API', {
-        method: 'getProjects',
-        workspaceId
-      });
+    const cacheKey = `projects:workspace:${workspaceId}`;
+    
+    return this.projectCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from Motion API', {
+          method: 'getProjects',
+          workspaceId
+        });
 
-      // Build the query string with workspace ID (now required)
-      const params = new URLSearchParams();
-      params.append('workspaceId', workspaceId);
-      const queryString = params.toString();
-      const url = `/projects?${queryString}`;
-      
-      const response: AxiosResponse = await this.requestWithRetry(() => this.client.get(url));
-      
-      // Validate the response structure
-      const validatedResponse = this.validateResponse(
-        response.data,
-        ProjectsListResponseSchema,
-        'getProjects'
-      );
-      
-      // Extract projects array (handle both wrapped and unwrapped responses)
-      const projects = Array.isArray(validatedResponse) 
-        ? validatedResponse 
-        : validatedResponse.projects;
-      
-      mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully', {
-        method: 'getProjects',
-        count: projects.length,
-        workspaceId
-      });
+        // Build the query string with workspace ID (now required)
+        const params = new URLSearchParams();
+        params.append('workspaceId', workspaceId);
+        const queryString = params.toString();
+        const url = `/projects?${queryString}`;
+        
+        const response: AxiosResponse = await this.requestWithRetry(() => this.client.get(url));
+        
+        // Validate the response structure
+        const validatedResponse = this.validateResponse(
+          response.data,
+          ProjectsListResponseSchema,
+          'getProjects'
+        );
+        
+        // Extract projects array (handle both wrapped and unwrapped responses)
+        const projects = Array.isArray(validatedResponse) 
+          ? validatedResponse 
+          : validatedResponse.projects;
+        
+        mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully', {
+          method: 'getProjects',
+          count: projects.length,
+          workspaceId
+        });
 
-      return projects;
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects', {
-        method: 'getProjects',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
-      });
-      throw new Error(`Failed to fetch projects: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
-    }
+        return projects;
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects', {
+          method: 'getProjects',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+        });
+        throw new Error(`Failed to fetch projects: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      }
+    });
   }
 
   async getProject(projectId: string): Promise<MotionProject> {
@@ -295,6 +305,9 @@ export class MotionApiService {
       const apiData = convertUndefinedToNull(projectData);
       const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.post('/projects', apiData));
       
+      // Invalidate cache after successful creation
+      this.projectCache.invalidate(`workspace:${projectData.workspaceId}`);
+      
       mcpLog(LOG_LEVELS.INFO, 'Project created successfully', {
         method: 'createProject',
         projectId: response.data.id,
@@ -325,6 +338,9 @@ export class MotionApiService {
       const apiUpdates = convertUndefinedToNull(updates);
       const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.patch(`/projects/${projectId}`, apiUpdates));
       
+      // Invalidate cache after successful update
+      this.projectCache.invalidate(`workspace:${response.data.workspaceId}`);
+      
       mcpLog(LOG_LEVELS.INFO, 'Project updated successfully', {
         method: 'updateProject',
         projectId,
@@ -352,6 +368,9 @@ export class MotionApiService {
       });
 
       await this.requestWithRetry(() => this.client.delete(`/projects/${projectId}`));
+      
+      // Invalidate all project caches since we don't know the workspace ID
+      this.projectCache.invalidate();
       
       mcpLog(LOG_LEVELS.INFO, 'Project deleted successfully', {
         method: 'deleteProject',
@@ -456,6 +475,9 @@ export class MotionApiService {
       const apiData = convertUndefinedToNull(taskData);
       const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.post('/tasks', apiData));
       
+      // Invalidate task-related caches after successful creation
+      // Note: Task cache would need to be implemented separately if needed
+      
       mcpLog(LOG_LEVELS.INFO, 'Task created successfully', {
         method: 'createTask',
         taskId: response.data.id,
@@ -530,107 +552,87 @@ export class MotionApiService {
     }
   }
 
-  /**
-   * Invalidates the workspaces cache
-   */
-  invalidateWorkspacesCache(): void {
-    this.workspacesCache = null;
-    this.workspacesCacheTime = 0;
-    mcpLog(LOG_LEVELS.DEBUG, 'Workspaces cache invalidated', {
-      method: 'invalidateWorkspacesCache'
+  async getWorkspaces(): Promise<MotionWorkspace[]> {
+    return this.workspaceCache.withCache('workspaces', async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching workspaces from Motion API', {
+          method: 'getWorkspaces'
+        });
+
+        const response: AxiosResponse = await this.requestWithRetry(() => this.client.get('/workspaces'));
+        
+        // Validate the response structure
+        const validatedResponse = this.validateResponse(
+          response.data,
+          WorkspacesListResponseSchema,
+          'getWorkspaces'
+        );
+        
+        // Extract workspaces array (handle both wrapped and unwrapped responses)
+        const workspaces = Array.isArray(validatedResponse)
+          ? validatedResponse
+          : validatedResponse.workspaces;
+        
+        mcpLog(LOG_LEVELS.INFO, 'Workspaces fetched and cached successfully', {
+          method: 'getWorkspaces',
+          count: workspaces.length,
+          workspaceNames: workspaces.map((w: MotionWorkspace) => w.name)
+        });
+
+        return workspaces;
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch workspaces', {
+          method: 'getWorkspaces',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+        });
+        throw new Error(`Failed to fetch workspaces: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
+      }
     });
   }
 
-  async getWorkspaces(): Promise<MotionWorkspace[]> {
-    const now = Date.now();
-    
-    // Return cached workspaces if still valid
-    if (this.workspacesCache && (now - this.workspacesCacheTime) < this.CACHE_TTL) {
-      mcpLog(LOG_LEVELS.DEBUG, 'Returning workspaces from cache', {
-        method: 'getWorkspaces',
-        cacheAge: now - this.workspacesCacheTime
-      });
-      return this.workspacesCache;
-    }
-    
-    try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Fetching workspaces from Motion API', {
-        method: 'getWorkspaces'
-      });
-
-      const response: AxiosResponse = await this.requestWithRetry(() => this.client.get('/workspaces'));
-      
-      // Validate the response structure
-      const validatedResponse = this.validateResponse(
-        response.data,
-        WorkspacesListResponseSchema,
-        'getWorkspaces'
-      );
-      
-      // Extract workspaces array (handle both wrapped and unwrapped responses)
-      const workspaces = Array.isArray(validatedResponse)
-        ? validatedResponse
-        : validatedResponse.workspaces;
-      
-      // Update cache
-      this.workspacesCache = workspaces;
-      this.workspacesCacheTime = now;
-      
-      mcpLog(LOG_LEVELS.INFO, 'Workspaces fetched and cached successfully', {
-        method: 'getWorkspaces',
-        count: workspaces.length,
-        workspaceNames: workspaces.map((w: MotionWorkspace) => w.name)
-      });
-
-      return workspaces;
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch workspaces', {
-        method: 'getWorkspaces',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
-      });
-      throw new Error(`Failed to fetch workspaces: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
-    }
-  }
-
   async getUsers(workspaceId?: string): Promise<MotionUser[]> {
-    try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Fetching users from Motion API', {
-        method: 'getUsers',
-        workspaceId
-      });
+    const cacheKey = workspaceId ? `users:workspace:${workspaceId}` : 'users:all';
+    
+    return this.userCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching users from Motion API', {
+          method: 'getUsers',
+          workspaceId
+        });
 
-      const params = new URLSearchParams();
-      if (workspaceId) {
-        params.append('workspaceId', workspaceId);
+        const params = new URLSearchParams();
+        if (workspaceId) {
+          params.append('workspaceId', workspaceId);
+        }
+
+        const queryString = params.toString();
+        const url = queryString ? `/users?${queryString}` : '/users';
+        
+        const response: AxiosResponse<ListResponse<MotionUser>> = await this.requestWithRetry(() => this.client.get(url));
+        
+        // The Motion API might wrap the users in a 'users' array
+        const usersData = response.data?.users || response.data || [];
+        const users = Array.isArray(usersData) ? usersData : [];
+        
+        mcpLog(LOG_LEVELS.INFO, 'Users fetched successfully', {
+          method: 'getUsers',
+          count: users.length,
+          workspaceId
+        });
+
+        return users;
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch users', {
+          method: 'getUsers',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+        });
+        throw new Error(`Failed to fetch users: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
       }
-
-      const queryString = params.toString();
-      const url = queryString ? `/users?${queryString}` : '/users';
-      
-      const response: AxiosResponse<ListResponse<MotionUser>> = await this.requestWithRetry(() => this.client.get(url));
-      
-      // The Motion API might wrap the users in a 'users' array
-      const usersData = response.data?.users || response.data || [];
-      const users = Array.isArray(usersData) ? usersData : [];
-      
-      mcpLog(LOG_LEVELS.INFO, 'Users fetched successfully', {
-        method: 'getUsers',
-        count: users.length,
-        workspaceId
-      });
-
-      return users;
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch users', {
-        method: 'getUsers',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
-      });
-      throw new Error(`Failed to fetch users: ${(isAxiosError(error) ? error.response?.data?.message : undefined) || getErrorMessage(error)}`);
-    }
+    });
   }
 
   // Additional methods for intelligent features
