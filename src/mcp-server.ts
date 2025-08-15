@@ -1078,12 +1078,7 @@ class MotionMCPServer {
     }
 
     const { taskId, targetProjectId, targetWorkspaceId } = args;
-    if (!taskId) {
-      return formatMcpError(new Error("Task ID is required"));
-    }
-    if (!targetProjectId && !targetWorkspaceId) {
-      return formatMcpError(new Error("Either target project ID or target workspace ID is required"));
-    }
+    // Validation already performed in handleMotionTasks
 
     try {
       const task = await motionService.moveTask(taskId, targetProjectId, targetWorkspaceId);
@@ -1100,9 +1095,7 @@ class MotionMCPServer {
     }
 
     const { taskId } = args;
-    if (!taskId) {
-      return formatMcpError(new Error("Task ID is required"));
-    }
+    // Validation already performed in handleMotionTasks
 
     try {
       const task = await motionService.unassignTask(taskId);

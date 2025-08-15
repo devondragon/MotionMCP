@@ -590,7 +590,7 @@ export class MotionApiService {
         targetWorkspaceId
       });
 
-      const moveData: Record<string, string> = {};
+      const moveData: { projectId?: string; workspaceId?: string } = {};
       if (targetProjectId) moveData.projectId = targetProjectId;
       if (targetWorkspaceId) moveData.workspaceId = targetWorkspaceId;
       
@@ -605,6 +605,8 @@ export class MotionApiService {
         targetWorkspaceId
       });
 
+      // TODO: Invalidate task cache for source and destination projects/workspaces when implemented
+      
       return response.data;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to move task', {
@@ -636,6 +638,8 @@ export class MotionApiService {
         taskId
       });
 
+      // TODO: Invalidate task cache for this task and any assignee-related caches when implemented
+      
       return response.data;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to unassign task', {
