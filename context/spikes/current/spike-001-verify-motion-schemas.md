@@ -172,17 +172,44 @@ Recent work has revealed potential gaps:
    - ✅ Basic structure appears correct (id, name, email)
    - ⚠️ May have additional fields not documented
 
-6. **Comments/Custom Fields/Recurring Tasks**
-   - ⚠️ Unable to verify complete schemas from docs
-   - ⚠️ Likely have similar wrapper/structure issues
+6. **Comments API Issues**
+   - ❌ Response wrapped in `{meta: {...}, comments: [...]}`, not direct array
+   - ❌ Missing field: `creator` object (id, name, email)
+   - ❌ Field name mismatch: API returns `createdAt`, we have `createdAt` (optional)
+   - ⚠️ No projectId in response (only taskId)
+
+7. **Custom Fields API Issues**  
+   - ❌ Completely wrong structure! API returns `{id, field}`, we expect `{id, name, type, options, required, workspaceId}`
+   - ❌ Field type stored as `field` property, not `type`
+   - ❌ API path is `/beta/workspaces/{workspaceId}/custom-fields` (BETA endpoint)
+   - ❌ No direct array response, needs workspace in path
+
+8. **Recurring Tasks API Issues**
+   - ❌ Response wrapped in `{meta: {...}, tasks: [...]}` (NOTE: "tasks" not "recurringTasks")
+   - ❌ Completely different structure than expected
+   - ❌ Contains full task objects with creator, assignee, project, workspace
+   - ❌ Missing recurrence configuration fields we defined
+   - ❌ Has nested workspace with labels and statuses arrays
+
+9. **Schedules API**
+   - ✅ Direct array response (no wrapper)
+   - ✅ Structure matches our interface perfectly
+   - ✅ All fields present and correct types
+
+10. **Statuses API**
+   - ✅ Direct array response (no wrapper)
+   - ✅ Structure matches our interface
+   - ✅ All three fields present and correct
 
 ### Critical Issues Found
 
 **Severity: CRITICAL (Will cause runtime errors)**
-1. **Pagination Meta Missing** - List endpoints expect `meta.nextCursor` for pagination
-2. **Labels Type Mismatch** - Expecting string[], receiving {name: string}[]
-3. **CustomFieldValues Structure** - Wrong nested structure, will fail to parse values
-4. **Response Wrapper Mismatch** - Direct array access will fail when API returns wrapped response
+1. **Custom Fields API Completely Wrong** - Interface doesn't match API at all
+2. **Recurring Tasks API Wrong Structure** - Expects recurrence config, gets full task objects
+3. **Pagination Meta Missing** - Multiple list endpoints missing meta.nextCursor handling
+4. **Labels Type Mismatch** - Expecting string[], receiving {name: string}[]
+5. **Response Wrapper Inconsistency** - Some APIs wrapped, some not, no clear pattern
+6. **Comments Missing Creator Field** - Will lose author information
 
 **Severity: HIGH (Data loss or incorrect behavior)**
 1. **Workspace teamId Missing** - Required field not captured
@@ -206,15 +233,16 @@ Recent work has revealed potential gaps:
 ## 🎯 RECOMMENDATION
 
 ### Summary
-Our Motion API implementation has several critical schema mismatches that are likely causing runtime errors or data loss. The most severe issues involve response wrapper structures, pagination metadata, and type mismatches in labels and custom fields. We need immediate fixes for CRITICAL issues to ensure basic functionality, followed by a comprehensive schema alignment to match the actual API responses.
+Our Motion API implementation has severe schema mismatches that ARE causing runtime errors and data loss. The Custom Fields and Recurring Tasks APIs have completely wrong interfaces that don't match the actual API at all. Additionally, response wrapper inconsistency (some wrapped with meta, some not) and missing pagination handling will cause failures. Of 10 API groups checked, only 2 (Schedules and Statuses) are fully correct. This is a critical issue requiring immediate attention.
 
 ### Priority Fixes Needed
 
 **Phase 1: CRITICAL Fixes (1-2 days)**
-1. Fix ListResponse interface to handle `{meta: {...}, [resource]: [...]}`
-2. Update Task labels field to `Array<{name: string}>`
-3. Fix customFieldValues to `Record<string, {type: string, value: any}>`
-4. Add meta field to list response handling
+1. **Rewrite Custom Fields API** - Complete interface overhaul
+2. **Rewrite Recurring Tasks API** - Complete interface overhaul  
+3. **Fix Comments API** - Add creator field, fix response wrapper
+4. **Fix Response Wrappers** - Standardize handling of meta/pagination
+5. **Fix Task/Project labels** - Change to `Array<{name: string}>`
 
 **Phase 2: HIGH Priority (2-3 days)**
 1. Add teamId to MotionWorkspace interface
@@ -289,12 +317,12 @@ Our Motion API implementation has several critical schema mismatches that are li
 - **Total Budget**: 6h
 
 ### Actual Time Spent
-- Research: 0.5h
-- Analysis: 0.5h
+- Research: 1h
+- Analysis: 1h
 - Documentation: 0.5h
-- **Total**: 1.5h / 6h budgeted
+- **Total**: 2.5h / 6h budgeted
 
 ### Time Box Analysis
 - Within budget: ✅ Yes
-- Variance: -75% (under budget)
-- Reason for variance: Focused investigation on critical APIs only due to documentation access limitations
+- Variance: -58% (under budget)
+- Reason for variance: Efficient investigation once proper documentation URLs were provided
