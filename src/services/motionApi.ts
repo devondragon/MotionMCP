@@ -10,7 +10,7 @@ import {
   MotionApiErrorResponse,
   MotionApiError
 } from '../types/motion';
-import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG } from '../utils/constants';
+import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { z } from 'zod';
@@ -111,11 +111,11 @@ export class MotionApiService {
       }
     });
 
-    // Initialize cache instances with different TTL values
-    this.workspaceCache = new SimpleCache(600); // 10 minutes for workspaces
-    this.userCache = new SimpleCache(600); // 10 minutes for users
-    this.projectCache = new SimpleCache(300); // 5 minutes for projects
-    this.commentCache = new SimpleCache(60); // 1 minute for comments
+    // Initialize cache instances with TTL from constants
+    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES);
+    this.userCache = new SimpleCache(CACHE_TTL.USERS);
+    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS);
+    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS);
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -811,13 +811,20 @@ export class MotionApiService {
         contentLength: commentData.content?.length || 0
       });
 
-      // Convert undefined to null for API compatibility
-      const apiData = convertUndefinedToNull(commentData);
+      // Only include fields that are present (avoid sending null)
+      const { content, taskId, projectId, authorId } = commentData;
+      const apiData = {
+        content,
+        ...(taskId && { taskId }),
+        ...(projectId && { projectId }),
+        ...(authorId && { authorId })
+      };
       const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => this.client.post('/comments', apiData));
       
       // Invalidate cache after successful creation
       const cacheKey = `comments:${commentData.taskId ? `task:${commentData.taskId}` : commentData.projectId ? `project:${commentData.projectId}` : 'all'}`;
-      this.commentCache.invalidate(cacheKey);
+      this.commentCache.invalidate('comments:all'); // Invalidate global cache
+      this.commentCache.invalidate(cacheKey); // Invalidate specific cache
       
       mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
         method: 'createComment',

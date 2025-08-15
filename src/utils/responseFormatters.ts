@@ -183,7 +183,8 @@ export function formatCommentList(comments: MotionComment[]): CallToolResult {
   const commentFormatter = (comment: MotionComment) => {
     const location = comment.taskId ? `Task ${comment.taskId}` : `Project ${comment.projectId}`;
     const timestamp = comment.createdAt || 'Unknown time';
-    return `- [${comment.id}] ${location} - ${timestamp}\n  Author: ${comment.authorId}\n  Content: "${comment.content}"`;
+    // Keep as single line for proper list formatting
+    return `- [${comment.id}] ${location} | Author: ${comment.authorId} | ${timestamp} | "${comment.content}"`;
   };
   
   return formatListResponse(

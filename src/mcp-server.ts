@@ -22,7 +22,8 @@ import {
   formatCommentList,
   formatCommentDetail,
   mcpLog,
-  LOG_LEVELS
+  LOG_LEVELS,
+  CACHE_TTL
 } from './utils';
 import { InputValidator } from './utils/validator';
 import { McpToolResponse, McpToolDefinition } from './types/mcp';
@@ -964,19 +965,29 @@ class MotionMCPServer {
           if (!taskId && !projectId) {
             return formatMcpError(new Error('Either taskId or projectId is required for list operation'));
           }
+          if (taskId && projectId) {
+            return formatMcpError(new Error('Provide either taskId or projectId, not both'));
+          }
           
           const comments = await motionService.getComments(taskId, projectId);
           return formatCommentList(comments);
           
         case 'create':
-          if (!content || content.trim() === '') {
+          const trimmedContent = content?.trim();
+          if (!trimmedContent) {
             return formatMcpError(new Error('Content is required and cannot be empty for create operation'));
+          }
+          if (trimmedContent.length > CACHE_TTL.MAX_COMMENT_LENGTH) {
+            return formatMcpError(new Error(`Comment content exceeds maximum length of ${CACHE_TTL.MAX_COMMENT_LENGTH} characters`));
           }
           if (!taskId && !projectId) {
             return formatMcpError(new Error('Either taskId or projectId is required for create operation'));
           }
+          if (taskId && projectId) {
+            return formatMcpError(new Error('Provide either taskId or projectId, not both'));
+          }
           
-          const commentData: CreateCommentData = { content };
+          const commentData: CreateCommentData = { content: trimmedContent };
           if (taskId) commentData.taskId = taskId;
           if (projectId) commentData.projectId = projectId;
           if (authorId) commentData.authorId = authorId;
