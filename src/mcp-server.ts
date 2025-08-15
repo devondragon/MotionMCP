@@ -27,6 +27,7 @@ import {
   formatRecurringTaskList,
   formatRecurringTaskDetail,
   formatScheduleList,
+  formatStatusList,
   mcpLog,
   LOG_LEVELS,
   LIMITS
@@ -34,7 +35,7 @@ import {
 import { InputValidator } from './utils/validator';
 import { McpToolResponse, McpToolDefinition } from './types/mcp';
 import * as ToolArgs from './types/mcp-tool-args';
-import { MotionProjectsArgs, MotionTasksArgs, MotionSchedulesArgs } from './types/mcp-tool-args';
+import { MotionProjectsArgs, MotionTasksArgs, MotionSchedulesArgs, MotionStatusesArgs } from './types/mcp-tool-args';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -183,6 +184,8 @@ class MotionMCPServer {
             return await this.handleMotionRecurringTasks(args as unknown as ToolArgs.MotionRecurringTasksArgs);
           case "motion_schedules":
             return await this.handleMotionSchedules(args as unknown as MotionSchedulesArgs);
+          case "motion_statuses":
+            return await this.handleMotionStatuses(args as unknown as MotionStatusesArgs);
           default:
             return formatMcpError(new Error(`Unknown tool: ${name}`));
         }
@@ -807,6 +810,20 @@ class MotionMCPServer {
           },
           additionalProperties: false
         }
+      },
+      {
+        name: "motion_statuses",
+        description: "Get available task/project statuses for a workspace",
+        inputSchema: {
+          type: "object",
+          properties: {
+            workspaceId: {
+              type: "string",
+              description: "Workspace ID to get statuses for (optional, returns all statuses if not specified)"
+            }
+          },
+          additionalProperties: false
+        }
       }
     ];
   }
@@ -833,6 +850,7 @@ class MotionMCPServer {
           toolsMap.get('motion_custom_fields'),
           toolsMap.get('motion_recurring_tasks'),
           toolsMap.get('motion_schedules'),
+          toolsMap.get('motion_statuses'),
           toolsMap.get('list_motion_workspaces'),
           toolsMap.get('list_motion_users'),
           toolsMap.get('search_motion_content'),
@@ -1478,6 +1496,22 @@ class MotionMCPServer {
     try {
       const schedules = await motionService.getSchedules(userId, startDate, endDate);
       return formatScheduleList(schedules);
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private async handleMotionStatuses(args: MotionStatusesArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
+    const { workspaceId } = args;
+    
+    try {
+      const statuses = await motionService.getStatuses(workspaceId);
+      return formatStatusList(statuses);
     } catch (error: unknown) {
       return formatMcpError(error instanceof Error ? error : new Error(String(error)));
     }

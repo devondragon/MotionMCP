@@ -1,7 +1,7 @@
 # Task 3.2: Implement Statuses API
 
 **Priority:** Additional API Features (Priority 3)
-**Status:** Current
+**Status:** Completed - 2025-08-15
 
 **Endpoint:** GET /statuses  
 **Purpose:** Get available workflow states
@@ -41,3 +41,21 @@ async getStatuses(workspaceId = null) {
   }
 }
 ```
+
+## Implementation Completed
+
+**Files Modified:**
+1. **src/types/motion.ts** - Updated MotionStatus interface to match API response
+2. **src/types/mcp-tool-args.ts** - Added MotionStatusesArgs interface
+3. **src/utils/responseFormatters.ts** - Added formatStatusList function
+4. **src/services/motionApi.ts** - Added getStatuses method with caching
+5. **src/mcp-server.ts** - Added motion_statuses tool and handler
+
+**Key Changes:**
+- Fixed MotionStatus interface to match actual API response structure (name, isDefaultStatus, isResolvedStatus)
+- Implemented caching with 10-minute TTL (same as workspaces)
+- Added to 'essential' tools configuration for default availability
+- Handles both wrapped and unwrapped API responses
+- Tested successfully - tool is available and working
+
+**Branch:** feature/task-006-statuses-api

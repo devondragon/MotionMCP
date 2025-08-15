@@ -166,10 +166,9 @@ export interface CreateRecurringTaskData {
 }
 
 export interface MotionStatus {
-  id: string;
   name: string;
-  color?: string;
-  isCompleted: boolean;
+  isDefaultStatus: boolean;
+  isResolvedStatus: boolean;
 }
 
 export interface MotionTimeSlot {
