@@ -127,6 +127,12 @@ export interface MotionTasksArgs {
   targetWorkspaceId?: string;
 }
 
+export interface MotionUsersArgs {
+  operation: 'list' | 'current';
+  workspaceId?: string;
+  workspaceName?: string;
+}
+
 export interface MotionCommentsArgs {
   operation: 'list' | 'create';
   taskId?: string;
@@ -190,6 +196,7 @@ export type AllToolArgs =
   | GetContextArgs
   | MotionProjectsArgs
   | MotionTasksArgs
+  | MotionUsersArgs
   | MotionCommentsArgs
   | MotionCustomFieldsArgs
   | MotionRecurringTasksArgs
