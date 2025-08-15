@@ -4,6 +4,13 @@
 None - Ready to select next task
 
 ## Recently Completed
+**Task-001: Update Documentation** - Completed: 2025-01-15
+- Updated CLAUDE.md with complete tool configuration details
+- Enhanced README.md with new consolidated tools documentation  
+- Added examples for comments, custom fields, and recurring tasks
+- Updated .env.example with detailed tool set descriptions
+- Branch: feature/task-001-update-documentation (ready for PR)
+
 **Task-004: Move and Unassign Task Operations** - Completed: 2025-01-15
 - Implemented moveTask and unassignTask methods in motionApi.ts
 - Added PATCH /tasks/{id}/move and PATCH /tasks/{id}/unassign endpoints
