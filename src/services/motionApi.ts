@@ -10,6 +10,7 @@ import {
   CreateCustomFieldData,
   MotionRecurringTask,
   CreateRecurringTaskData,
+  MotionSchedule,
   ListResponse,
   MotionApiErrorResponse,
   MotionApiError
@@ -21,6 +22,7 @@ import { z } from 'zod';
 import { 
   ProjectsListResponseSchema,
   WorkspacesListResponseSchema,
+  SchedulesListResponseSchema,
   VALIDATION_CONFIG
 } from '../schemas/motion';
 
@@ -51,6 +53,7 @@ export class MotionApiService {
   private commentCache: SimpleCache<MotionComment[]>;
   private customFieldCache: SimpleCache<MotionCustomField[]>;
   private recurringTaskCache: SimpleCache<MotionRecurringTask[]>;
+  private scheduleCache: SimpleCache<MotionSchedule[]>;
 
   /**
    * Validate API response against schema
@@ -124,6 +127,7 @@ export class MotionApiService {
     this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS * CACHE_TTL_MS_MULTIPLIER);
     this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * CACHE_TTL_MS_MULTIPLIER);
     this.recurringTaskCache = new SimpleCache(CACHE_TTL.RECURRING_TASKS * CACHE_TTL_MS_MULTIPLIER);
+    this.scheduleCache = new SimpleCache(CACHE_TTL.SCHEDULES * CACHE_TTL_MS_MULTIPLIER);
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -846,7 +850,9 @@ export class MotionApiService {
       throw new Error('Either taskId or projectId must be provided to fetch comments');
     }
     
-    const cacheKey = `comments:${taskId ? `task:${taskId}` : `project:${projectId}`}`;
+    // Use JSON.stringify for deterministic cache key generation
+    const cacheParams = { taskId: taskId || null, projectId: projectId || null };
+    const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
     
     return this.commentCache.withCache(cacheKey, async () => {
       try {
@@ -916,7 +922,8 @@ export class MotionApiService {
       const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => this.client.post('/comments', apiData));
       
       // Invalidate cache after successful creation
-      const cacheKey = `comments:${commentData.taskId ? `task:${commentData.taskId}` : `project:${commentData.projectId}`}`;
+      const cacheParams = { taskId: commentData.taskId || null, projectId: commentData.projectId || null };
+      const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
       this.commentCache.invalidate(cacheKey); // Invalidate specific cache
       
       mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
@@ -1374,5 +1381,73 @@ export class MotionApiService {
       });
       throw this.formatApiError(error, 'delete recurring task');
     }
+  }
+
+  /**
+   * Fetch schedules from Motion API
+   * @param userId - Optional user ID to filter schedules
+   * @param startDate - Optional start date (ISO 8601) to filter schedules
+   * @param endDate - Optional end date (ISO 8601) to filter schedules
+   * @returns Array of schedules
+   */
+  async getSchedules(userId?: string, startDate?: string, endDate?: string): Promise<MotionSchedule[]> {
+    // Use JSON.stringify for deterministic cache key generation to avoid collisions
+    const cacheParams = { userId: userId || null, startDate: startDate || null, endDate: endDate || null };
+    const cacheKey = `schedules:${JSON.stringify(cacheParams)}`;
+    
+    return this.scheduleCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching schedules from Motion API', {
+          method: 'getSchedules',
+          userId,
+          startDate,
+          endDate
+        });
+
+        const params = new URLSearchParams();
+        if (userId) params.append('userId', userId);
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        
+        const queryString = params.toString();
+        const url = queryString ? `/schedules?${queryString}` : '/schedules';
+        
+        const response: AxiosResponse<ListResponse<MotionSchedule>> = await this.requestWithRetry(() => this.client.get(url));
+        
+        // Validate response against schema
+        const validatedResponse = this.validateResponse(
+          response.data,
+          SchedulesListResponseSchema,
+          'getSchedules'
+        );
+        
+        // Handle both wrapped and unwrapped responses
+        const schedules = Array.isArray(validatedResponse) 
+          ? validatedResponse 
+          : validatedResponse.schedules || [];
+        const schedulesArray = Array.isArray(schedules) ? schedules : [];
+        
+        mcpLog(LOG_LEVELS.INFO, 'Schedules fetched successfully', {
+          method: 'getSchedules',
+          count: schedulesArray.length,
+          userId,
+          startDate,
+          endDate
+        });
+
+        return schedulesArray;
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch schedules', {
+          method: 'getSchedules',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+          userId,
+          startDate,
+          endDate
+        });
+        throw this.formatApiError(error, 'fetch schedules');
+      }
+    });
   }
 }

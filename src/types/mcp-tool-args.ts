@@ -164,6 +164,12 @@ export interface MotionRecurringTasksArgs {
   };
 }
 
+export interface MotionSchedulesArgs {
+  userId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 // Union type of all tool arguments for type safety
 export type AllToolArgs = 
   | CreateProjectArgs
@@ -182,4 +188,5 @@ export type AllToolArgs =
   | MotionTasksArgs
   | MotionCommentsArgs
   | MotionCustomFieldsArgs
-  | MotionRecurringTasksArgs;
+  | MotionRecurringTasksArgs
+  | MotionSchedulesArgs;

@@ -8,7 +8,7 @@
 
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask } from '../types/motion';
+import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask, MotionSchedule, MotionScheduleDetails } from '../types/motion';
 import { LIMITS } from './constants';
 
 /**
@@ -295,5 +295,44 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
   ].filter(Boolean).join('\n');
   
   return formatMcpSuccess(details);
+}
+
+/**
+ * Format schedule list response
+ */
+export function formatScheduleList(schedules: MotionSchedule[]): CallToolResult {
+  // Add null safety check for the array itself
+  if (!schedules || !Array.isArray(schedules) || schedules.length === 0) {
+    return formatMcpSuccess("No schedules found.");
+  }
+  
+  const scheduleFormatter = (schedule: MotionSchedule) => {
+    // Defensive programming for nested schedule object
+    if (!schedule) {
+      return '- Invalid schedule entry';
+    }
+    
+    const name = schedule.name || 'Unnamed';
+    const timezone = schedule.timezone || 'Unknown timezone';
+    
+    // Count working days if schedule details are available
+    let workingDays = '';
+    if (schedule.schedule && typeof schedule.schedule === 'object') {
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const activeDays = days.filter(day => 
+        Array.isArray(schedule.schedule[day as keyof MotionScheduleDetails]) && 
+        schedule.schedule[day as keyof MotionScheduleDetails]!.length > 0
+      );
+      workingDays = activeDays.length > 0 
+        ? ` | Working days: ${activeDays.length}/7` 
+        : ' | No working hours defined';
+    } else {
+      workingDays = ' | Schedule details unavailable';
+    }
+    
+    return `- ${name} (${timezone})${workingDays}`;
+  };
+  
+  return formatListResponse(schedules, `Found ${schedules.length} schedule${schedules.length === 1 ? '' : 's'}`, scheduleFormatter);
 }
 

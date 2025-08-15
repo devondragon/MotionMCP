@@ -73,34 +73,28 @@ export const MotionStatusSchema = z.object({
   isCompleted: z.boolean()
 });
 
+// Time slot schema
+export const MotionTimeSlotSchema = z.object({
+  start: z.string(),  // "HH:MM" format
+  end: z.string()     // "HH:MM" format
+});
+
 // Schedule details schema
 export const MotionScheduleDetailsSchema = z.object({
-  startDate: z.string(),
-  endDate: z.string(),
-  recurrence: z.object({
-    pattern: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
-    interval: z.number(),
-    daysOfWeek: z.array(z.number()).optional(),
-    dayOfMonth: z.number().optional(),
-    endDate: z.string().optional()
-  }).optional(),
-  blockedTimes: z.array(z.object({
-    start: z.string(),
-    end: z.string(),
-    reason: z.string().optional()
-  })).optional(),
-  workingHours: z.object({
-    start: z.string(),
-    end: z.string(),
-    timezone: z.string(),
-    daysOfWeek: z.array(z.number()).optional()
-  }).optional()
+  monday: z.array(MotionTimeSlotSchema).optional(),
+  tuesday: z.array(MotionTimeSlotSchema).optional(),
+  wednesday: z.array(MotionTimeSlotSchema).optional(),
+  thursday: z.array(MotionTimeSlotSchema).optional(),
+  friday: z.array(MotionTimeSlotSchema).optional(),
+  saturday: z.array(MotionTimeSlotSchema).optional(),
+  sunday: z.array(MotionTimeSlotSchema).optional()
 });
 
 // Motion Schedule schema
 export const MotionScheduleSchema = z.object({
-  id: z.string(),
-  userId: z.string(),
+  name: z.string(),
+  isDefaultTimezone: z.boolean(),
+  timezone: z.string(),
   schedule: MotionScheduleDetailsSchema
 });
 
@@ -131,6 +125,13 @@ export const UsersListResponseSchema = z.union([
     users: z.array(MotionUserSchema)
   }),
   z.array(MotionUserSchema)
+]);
+
+export const SchedulesListResponseSchema = z.union([
+  z.object({
+    schedules: z.array(MotionScheduleSchema)
+  }),
+  z.array(MotionScheduleSchema)
 ]);
 
 // Type inference from schemas
