@@ -123,7 +123,7 @@ export class MotionApiService {
     this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER);
     this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS * CACHE_TTL_MS_MULTIPLIER);
     this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * CACHE_TTL_MS_MULTIPLIER);
-    this.recurringTaskCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER); // Use same TTL as projects
+    this.recurringTaskCache = new SimpleCache(CACHE_TTL.RECURRING_TASKS * CACHE_TTL_MS_MULTIPLIER);
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {

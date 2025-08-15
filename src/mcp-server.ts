@@ -24,6 +24,8 @@ import {
   formatCustomFieldList,
   formatCustomFieldDetail,
   formatCustomFieldSuccess,
+  formatRecurringTaskList,
+  formatRecurringTaskDetail,
   mcpLog,
   LOG_LEVELS,
   LIMITS
@@ -1278,8 +1280,9 @@ class MotionMCPServer {
 
   private async handleMotionRecurringTasks(args: ToolArgs.MotionRecurringTasksArgs): Promise<McpToolResponse> {
     const motionService = this.motionService;
-    if (!motionService) {
-      return formatMcpError(new Error("Motion service is not available"));
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
     }
 
     const { operation, recurringTaskId, workspaceId, name, description, projectId, recurrence } = args;
@@ -1288,38 +1291,76 @@ class MotionMCPServer {
       switch (operation) {
         case 'list':
           const recurringTasks = await motionService.getRecurringTasks(workspaceId);
-          if (recurringTasks.length === 0) {
-            return formatMcpSuccess("No recurring tasks found.");
-          }
-          const taskList = recurringTasks.map(task => 
-            `- ${task.name} (ID: ${task.id}) [${task.recurrence.frequency}]${task.nextOccurrence ? ` Next: ${task.nextOccurrence}` : ''}`
-          ).join('\n');
-          return formatMcpSuccess(`Found ${recurringTasks.length} recurring task${recurringTasks.length === 1 ? '' : 's'}:\n${taskList}`);
+          return formatRecurringTaskList(recurringTasks);
           
         case 'create':
           if (!name || !recurrence) {
             return formatMcpError(new Error('Name and recurrence are required for create operation'));
           }
           
+          // Validate recurrence fields
+          if (recurrence.interval !== undefined && (!Number.isInteger(recurrence.interval) || recurrence.interval < 1)) {
+            return formatMcpError(new Error('Recurrence interval must be a positive integer'));
+          }
+          if (recurrence.daysOfWeek && !recurrence.daysOfWeek.every(day => day >= 0 && day <= 6)) {
+            return formatMcpError(new Error('daysOfWeek must contain values between 0-6 (Sunday-Saturday)'));
+          }
+          if (recurrence.dayOfMonth !== undefined && (recurrence.dayOfMonth < 1 || recurrence.dayOfMonth > 31)) {
+            return formatMcpError(new Error('dayOfMonth must be between 1-31'));
+          }
+          if (recurrence.endDate !== undefined) {
+            // Validate endDate is a valid ISO 8601 format and in the future
+            const endDateObj = new Date(recurrence.endDate);
+            if (isNaN(endDateObj.getTime())) {
+              return formatMcpError(new Error('endDate must be a valid ISO 8601 date format'));
+            }
+            if (endDateObj <= new Date()) {
+              return formatMcpError(new Error('endDate must be in the future'));
+            }
+          }
+          
+          // Cross-field validation for recurrence consistency
+          switch (recurrence.frequency) {
+            case 'weekly':
+              if (!recurrence.daysOfWeek || recurrence.daysOfWeek.length === 0) {
+                return formatMcpError(new Error('daysOfWeek is required for weekly recurrence'));
+              }
+              if (recurrence.dayOfMonth !== undefined) {
+                return formatMcpError(new Error('dayOfMonth should not be set for weekly recurrence'));
+              }
+              break;
+            case 'monthly':
+              if (recurrence.dayOfMonth === undefined) {
+                return formatMcpError(new Error('dayOfMonth is required for monthly recurrence'));
+              }
+              if (recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
+                return formatMcpError(new Error('daysOfWeek should not be set for monthly recurrence'));
+              }
+              break;
+            case 'daily':
+            case 'yearly':
+              if (recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
+                return formatMcpError(new Error(`daysOfWeek should not be set for ${recurrence.frequency} recurrence`));
+              }
+              if (recurrence.dayOfMonth !== undefined) {
+                return formatMcpError(new Error(`dayOfMonth should not be set for ${recurrence.frequency} recurrence`));
+              }
+              break;
+          }
+          
+          // Resolve workspace
+          const workspace = await workspaceResolver.resolveWorkspace({ workspaceId });
+          
           const taskData: CreateRecurringTaskData = {
             name,
+            workspaceId: workspace.id, // Ensure workspace is always set
             ...(description && { description }),
-            ...(workspaceId && { workspaceId }),
             ...(projectId && { projectId }),
             recurrence
           };
           
           const newTask = await motionService.createRecurringTask(taskData);
-          const details = [
-            `Recurring task created successfully:`,
-            `- ID: ${newTask.id}`,
-            `- Name: ${newTask.name}`,
-            `- Frequency: ${newTask.recurrence.frequency}`,
-            `- Workspace: ${newTask.workspaceId}`,
-            newTask.projectId ? `- Project: ${newTask.projectId}` : null,
-            newTask.nextOccurrence ? `- Next occurrence: ${newTask.nextOccurrence}` : null
-          ].filter(Boolean).join('\n');
-          return formatMcpSuccess(details);
+          return formatRecurringTaskDetail(newTask);
           
         case 'delete':
           if (!recurringTaskId) {

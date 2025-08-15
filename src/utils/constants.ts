@@ -75,7 +75,8 @@ export const CACHE_TTL = {
   USERS: 600,         // 10 minutes
   PROJECTS: 300,      // 5 minutes
   COMMENTS: 60,       // 1 minute
-  CUSTOM_FIELDS: 600  // 10 minutes
+  CUSTOM_FIELDS: 600,  // 10 minutes
+  RECURRING_TASKS: 300 // 5 minutes (same as projects)
 } as const;
 
 // Cache TTL conversion factor
