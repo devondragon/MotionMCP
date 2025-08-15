@@ -1,13 +1,16 @@
 # Working State
 
 ## Current Active Task
-**Task-005: Implement Schedules API** - Started: 2025-08-15
-- Adding GET /schedules endpoint to Motion API integration
-- Implementing motion_schedules tool for MCP server
-- Branch: feature/task-005-schedules-api
-- Task Path: context/features/epic-001-f02-api-completeness/tasks/current/
+None - Ready to select next task
 
 ## Recently Completed
+**Task-005: Implement Schedules API** - Completed: 2025-08-15
+- Added getSchedules method to MotionApiService with caching support
+- Implemented motion_schedules tool for MCP server calendar access
+- Supports optional userId, startDate, and endDate parameters  
+- Added to 'essential' tool configuration for default availability
+- Branch: feature/task-005-schedules-api (ready for PR)
+
 **Task-001: Update Documentation** - Completed: 2025-01-15
 - Updated CLAUDE.md with complete tool configuration details
 - Enhanced README.md with new consolidated tools documentation  
