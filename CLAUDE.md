@@ -41,17 +41,25 @@ This is a Model Context Protocol (MCP) server that bridges Motion's task managem
 
 ## Tool Configuration
 
-The server now supports consolidated tools to reduce tool count. Configure via `MOTION_MCP_TOOLS` environment variable:
+The server supports different tool exposure levels via `MOTION_MCP_TOOLS` environment variable:
 
-- `minimal`: Only consolidated tools (motion_tasks, motion_projects, workspaces) - 3 tools
-- `essential` (default): Consolidated tools + search, context, users - 6 tools  
-- `all`: All tools including legacy individual tools - 20 tools
-- `custom:tool1,tool2`: Specify exact tools needed
+- `minimal`: Only core consolidated tools (motion_tasks, motion_projects, motion_workspaces) - 3 tools
+- `essential` (default): Core tools plus enhanced features:
+  - Consolidated: motion_tasks, motion_projects, motion_comments, motion_custom_fields, motion_recurring_tasks
+  - Additional: motion_workspaces, motion_users, motion_search, motion_context
+  - Total: ~9 tools
+- `all`: All available tools including legacy individual tools - 20+ tools
+- `custom:tool1,tool2`: Specify exact tools needed (e.g., `custom:motion_tasks,motion_projects`)
 
 ### Consolidated Tools
 
-- **motion_projects**: Single tool for all project operations (create, list, get, update, delete)
-- **motion_tasks**: Single tool for all task operations (create, list, get, update, delete, move, unassign)
+Many operations are now consolidated to reduce tool count and improve usability:
+
+- **motion_tasks**: All task operations (create, list, get, update, delete, move, unassign)
+- **motion_projects**: All project operations (create, list, get, update, delete)
+- **motion_comments**: Comment operations (list, create for tasks and projects)
+- **motion_custom_fields**: Custom field management (list, create, update, delete, add/remove from projects/tasks)
+- **motion_recurring_tasks**: Recurring task management (list, create, delete)
 
 ## Common Commands
 

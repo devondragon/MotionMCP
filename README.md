@@ -92,8 +92,8 @@ MOTION_MCP_TOOLS=minimal npm run mcp
 - `motion_projects` - Consolidated project operations (create, list, get, update, delete)
 - `list_motion_workspaces` - List available workspaces
 
-#### Essential (6 tools) - Default
-Balanced configuration with core functionality plus search and context awareness.
+#### Essential (9 tools) - Default
+Balanced configuration with core functionality plus search, context awareness, and advanced features.
 
 ```bash
 # Default - no configuration needed
@@ -104,6 +104,9 @@ MOTION_MCP_TOOLS=essential npm run mcp
 
 **Available tools:**
 - All from Minimal, plus:
+- `motion_comments` - Manage comments on tasks and projects
+- `motion_custom_fields` - Manage custom field definitions and values
+- `motion_recurring_tasks` - Manage recurring task templates
 - `list_motion_users` - List workspace users
 - `search_motion_content` - Search across tasks and projects
 - `get_motion_context` - Get contextual workspace information
@@ -138,6 +141,19 @@ The consolidated tools reduce the total tool count by combining related operatio
 - **`motion_tasks`**: Single tool for all task operations  
   - Operations: `create`, `list`, `get`, `update`, `delete`, `move`, `unassign`
   - Example: `{"operation": "create", "name": "New Task", "projectName": "My Project"}`
+
+- **`motion_comments`**: Single tool for all comment operations
+  - Operations: `list`, `create`
+  - Supports both task and project comments
+  - Example: `{"operation": "create", "taskId": "task_123", "content": "Great progress!"}`
+
+- **`motion_custom_fields`**: Single tool for custom field management
+  - Operations: `list`, `create`, `update`, `delete`, `add_to_project`, `remove_from_project`, `add_to_task`, `remove_from_task`
+  - Example: `{"operation": "create", "name": "Priority Level", "type": "DROPDOWN", "options": ["Low", "Medium", "High"]}`
+
+- **`motion_recurring_tasks`**: Single tool for recurring task templates
+  - Operations: `list`, `create`, `delete`
+  - Example: `{"operation": "create", "name": "Weekly Review", "recurrence": "WEEKLY", "projectName": "Personal"}`
 
 ## Providing Your Motion API Key
 
@@ -230,15 +246,52 @@ Supports all Motion API parameters:
 
 ## Example Tool Use
 
+### Creating a task with the consolidated tool
 ```json
-Tool: create_motion_task
+Tool: motion_tasks
 Args: {
+  "operation": "create",
   "name": "Complete API integration",
   "workspaceName": "Development",
   "projectName": "Release Cycle Q2",
   "dueDate": "2025-06-15T09:00:00Z",
   "priority": "HIGH",
   "labels": ["api", "release"]
+}
+```
+
+### Adding a comment to a task
+```json
+Tool: motion_comments
+Args: {
+  "operation": "create",
+  "taskId": "task_123",
+  "content": "Updated the API endpoints as discussed"
+}
+```
+
+### Creating a custom field
+```json
+Tool: motion_custom_fields
+Args: {
+  "operation": "create",
+  "name": "Sprint",
+  "type": "DROPDOWN",
+  "options": ["Sprint 1", "Sprint 2", "Sprint 3"],
+  "workspaceName": "Development"
+}
+```
+
+### Creating a recurring task
+```json
+Tool: motion_recurring_tasks
+Args: {
+  "operation": "create",
+  "name": "Weekly Team Standup",
+  "recurrence": "WEEKLY",
+  "projectName": "Team Meetings",
+  "daysOfWeek": ["MONDAY", "WEDNESDAY", "FRIDAY"],
+  "duration": 30
 }
 ```
 

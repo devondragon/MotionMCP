@@ -1,7 +1,11 @@
 # Working State
 
 ## Current Active Task
-None - Ready to select next task
+**Task-001: Update Documentation** - Started: 2025-01-15
+- Feature: epic-001-f03-documentation
+- Task Path: context/features/epic-001-f03-documentation/tasks/current/
+- Branch: feature/task-001-update-documentation
+- Updating CLAUDE.md, README.md, and .env.example with new tool configurations
 
 ## Recently Completed
 **Task-004: Move and Unassign Task Operations** - Completed: 2025-01-15
