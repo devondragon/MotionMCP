@@ -1,15 +1,5 @@
 # Technical Decisions Log
 
-## TypeScript vs JavaScript
-**Decision**: Stay with JavaScript (for now)
-**Date**: Current
-**Rationale**: 
-- Project currently implemented in pure JavaScript
-- MCP protocol works well with JavaScript
-- TypeScript migration is in task backlog for future consideration
-- Allows faster initial development without type overhead
-**Status**: Active
-
 ## Tool Consolidation Strategy
 **Decision**: Hybrid approach - consolidate CRUD operations, keep specialized tools separate
 **Date**: Current
@@ -19,15 +9,6 @@
 - Related operations (CRUD) in single tool makes sense
 - Specialized tools (search, analytics) remain separate for clarity
 **Status**: Planned (Task 1.1)
-
-## API Version Targeting
-**Decision**: Target Motion API v1
-**Date**: Current
-**Rationale**:
-- Current stable version
-- Documentation available at api.usemotion.com
-- No v2 announced yet
-**Status**: Active
 
 ## Testing Approach
 **Decision**: Manual testing with MCP clients
