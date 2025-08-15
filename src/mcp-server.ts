@@ -35,7 +35,7 @@ import {
 import { InputValidator } from './utils/validator';
 import { McpToolResponse, McpToolDefinition } from './types/mcp';
 import * as ToolArgs from './types/mcp-tool-args';
-import { MotionProjectsArgs, MotionTasksArgs, MotionSchedulesArgs, MotionStatusesArgs } from './types/mcp-tool-args';
+import { MotionProjectsArgs, MotionTasksArgs, MotionUsersArgs, MotionSchedulesArgs, MotionStatusesArgs } from './types/mcp-tool-args';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -176,6 +176,8 @@ class MotionMCPServer {
             return await this.handleSearchContent(args as unknown as ToolArgs.SearchContentArgs);
           case "get_motion_context":
             return await this.handleGetContext(args as unknown as ToolArgs.GetContextArgs);
+          case "motion_users":
+            return await this.handleMotionUsers(args as unknown as MotionUsersArgs);
           case "motion_comments":
             return await this.handleMotionComments(args as unknown as ToolArgs.MotionCommentsArgs);
           case "motion_custom_fields":
@@ -644,6 +646,29 @@ class MotionMCPServer {
         }
       },
       {
+        name: "motion_users",
+        description: "Manage users and get current user information",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: {
+              type: "string",
+              enum: ["list", "current"],
+              description: "Operation to perform"
+            },
+            workspaceId: {
+              type: "string",
+              description: "Workspace ID (optional for list operation, ignored for current)"
+            },
+            workspaceName: {
+              type: "string",
+              description: "Workspace name (alternative to workspaceId, ignored for current)"
+            }
+          },
+          required: ["operation"]
+        }
+      },
+      {
         name: "motion_comments",
         description: "Manage comments on tasks and projects",
         inputSchema: {
@@ -846,6 +871,7 @@ class MotionMCPServer {
         return [
           toolsMap.get('motion_tasks'),
           toolsMap.get('motion_projects'),
+          toolsMap.get('motion_users'),
           toolsMap.get('motion_comments'),
           toolsMap.get('motion_custom_fields'),
           toolsMap.get('motion_recurring_tasks'),
@@ -1219,6 +1245,40 @@ class MotionMCPServer {
     }
     
     return formatMcpSuccess(contextText);
+  }
+
+  private async handleMotionUsers(args: MotionUsersArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service is not available"));
+    }
+
+    const { operation, workspaceId, workspaceName } = args;
+    
+    try {
+      switch (operation) {
+        case 'list':
+          if (!workspaceResolver) {
+            return formatMcpError(new Error("Workspace resolver not available"));
+          }
+          const workspace = await workspaceResolver.resolveWorkspace({ workspaceId, workspaceName });
+          const users = await motionService.getUsers(workspace.id);
+          
+          const userList = users.map(u => `- ${u.name} (${u.email}) [ID: ${u.id}]`).join('\n');
+          return formatMcpSuccess(`Users in workspace "${workspace.name}":\n${userList}`);
+          
+        case 'current':
+          const currentUser = await motionService.getCurrentUser();
+          const userInfo = `Current user: ${currentUser.name || 'No name'} (${currentUser.email}) [ID: ${currentUser.id}]`;
+          return formatMcpSuccess(userInfo);
+          
+        default:
+          return formatMcpError(new Error(`Unknown operation: ${operation}`));
+      }
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
   private async handleMotionComments(args: ToolArgs.MotionCommentsArgs): Promise<McpToolResponse> {

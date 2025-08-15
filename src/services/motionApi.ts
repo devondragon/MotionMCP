@@ -744,6 +744,41 @@ export class MotionApiService {
     });
   }
 
+  async getCurrentUser(): Promise<MotionUser> {
+    const cacheKey = 'currentUser';
+    
+    // Use userCache but with a special single-user wrapper
+    const cachedUsers = await this.userCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching current user from Motion API', {
+          method: 'getCurrentUser'
+        });
+
+        const response: AxiosResponse<MotionUser> = await this.requestWithRetry(() => this.client.get('/users/me'));
+        
+        const user = response.data;
+        
+        mcpLog(LOG_LEVELS.INFO, 'Current user fetched successfully', {
+          method: 'getCurrentUser',
+          userId: user.id,
+          email: user.email
+        });
+
+        return [user]; // Wrap in array for cache compatibility
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch current user', {
+          method: 'getCurrentUser',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+        });
+        throw this.formatApiError(error, 'fetch current user');
+      }
+    });
+    
+    return cachedUsers[0]; // Return just the user object
+  }
+
   // Additional methods for intelligent features
 
   async getProjectByName(projectName: string, workspaceId: string): Promise<MotionProject | undefined> {

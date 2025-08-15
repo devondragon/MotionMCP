@@ -1,7 +1,14 @@
 # Working State
 
 ## Current Active Task
-None - Ready to select next task
+**Task-007: Implement Current User API** - Completed: 2025-08-15
+- Added getCurrentUser method to MotionApiService with proper error handling and MCP logging
+- Created motion_users consolidated tool with 'list' and 'current' operations
+- Implemented proper caching using existing userCache infrastructure
+- Added to 'essential' tool configuration for default availability  
+- getCurrentUser uses GET /users/me endpoint per API documentation
+- Returns user info: id, email, and optional name fields
+- Branch: feature/task-007-current-user-api (ready for PR)
 
 ## Recently Completed
 **Task-006: Implement Statuses API** - Completed: 2025-08-15
