@@ -5,27 +5,42 @@ export interface MotionWorkspace {
 }
 
 // Minimal interfaces for nested object references
+
+/**
+ * A minimal reference to a Motion Project, typically used in nested objects
+ */
 export interface ProjectReference {
   id: string;
   name: string;
   workspaceId?: string;
 }
 
+/**
+ * A minimal reference to a Motion Workspace, typically used in nested objects
+ */
 export interface WorkspaceReference {
   id: string;
   name: string;
   type?: string;
 }
 
+/**
+ * A minimal reference to a Motion User/Assignee, typically used in nested objects
+ */
 export interface AssigneeReference {
   id: string;
   name: string;
   email?: string;
 }
 
+/**
+ * A time chunk reference in Motion, representing a scheduled time block
+ */
 export interface ChunkReference {
   id: string;
+  /** ISO 8601 date-time string for the start of the chunk */
   start: string;
+  /** ISO 8601 date-time string for the end of the chunk */
   end: string;
   [key: string]: unknown;
 }
@@ -58,7 +73,7 @@ export interface MotionTask {
   duration?: number | 'NONE' | 'REMINDER';
   assigneeId?: string;
   labels?: string[];
-  autoScheduled?: object | null;
+  autoScheduled?: Record<string, unknown> | null;
   completed?: boolean;
   completedTime?: string;
   createdTime?: string;
@@ -68,11 +83,7 @@ export interface MotionTask {
   scheduledEnd?: string;
   deadlineType?: string;
   parentRecurringTaskId?: string;
-  creator?: {
-    id: string;
-    name: string;
-    email?: string;
-  };
+  creator?: AssigneeReference;
   project?: ProjectReference;
   workspace?: WorkspaceReference;
   assignees?: AssigneeReference[];
