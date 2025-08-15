@@ -849,7 +849,9 @@ export class MotionApiService {
       throw new Error('Either taskId or projectId must be provided to fetch comments');
     }
     
-    const cacheKey = `comments:${taskId ? `task:${taskId}` : `project:${projectId}`}`;
+    // Use JSON.stringify for deterministic cache key generation
+    const cacheParams = { taskId: taskId || null, projectId: projectId || null };
+    const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
     
     return this.commentCache.withCache(cacheKey, async () => {
       try {
@@ -919,7 +921,8 @@ export class MotionApiService {
       const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => this.client.post('/comments', apiData));
       
       // Invalidate cache after successful creation
-      const cacheKey = `comments:${commentData.taskId ? `task:${commentData.taskId}` : `project:${commentData.projectId}`}`;
+      const cacheParams = { taskId: commentData.taskId || null, projectId: commentData.projectId || null };
+      const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
       this.commentCache.invalidate(cacheKey); // Invalidate specific cache
       
       mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
@@ -1387,7 +1390,9 @@ export class MotionApiService {
    * @returns Array of schedules
    */
   async getSchedules(userId?: string, startDate?: string, endDate?: string): Promise<MotionSchedule[]> {
-    const cacheKey = `schedules:${userId || 'all'}:${startDate || ''}:${endDate || ''}`;
+    // Use JSON.stringify for deterministic cache key generation to avoid collisions
+    const cacheParams = { userId: userId || null, startDate: startDate || null, endDate: endDate || null };
+    const cacheKey = `schedules:${JSON.stringify(cacheParams)}`;
     
     return this.scheduleCache.withCache(cacheKey, async () => {
       try {

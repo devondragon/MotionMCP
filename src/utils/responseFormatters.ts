@@ -301,15 +301,19 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
  * Format schedule list response
  */
 export function formatScheduleList(schedules: MotionSchedule[]): CallToolResult {
-  if (schedules.length === 0) {
+  // Add null safety check for the array itself
+  if (!schedules || !Array.isArray(schedules) || schedules.length === 0) {
     return formatMcpSuccess("No schedules found.");
   }
   
   const scheduleFormatter = (schedule: MotionSchedule) => {
-    const startDate = schedule.schedule.startDate;
-    const endDate = schedule.schedule.endDate;
+    // Add null safety for nested schedule object
+    const startDate = schedule?.schedule?.startDate;
+    const endDate = schedule?.schedule?.endDate;
     const dateRange = startDate && endDate ? ` (${startDate} to ${endDate})` : '';
-    return `- Schedule ID: ${schedule.id} | User: ${schedule.userId}${dateRange}`;
+    const scheduleId = schedule?.id || 'Unknown';
+    const userId = schedule?.userId || 'Unknown';
+    return `- Schedule ID: ${scheduleId} | User: ${userId}${dateRange}`;
   };
   
   return formatListResponse(schedules, `Found ${schedules.length} schedule${schedules.length === 1 ? '' : 's'}`, scheduleFormatter);

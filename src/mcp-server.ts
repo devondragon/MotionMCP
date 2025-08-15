@@ -1450,6 +1450,35 @@ class MotionMCPServer {
 
     const { userId, startDate, endDate } = args;
     
+    // Validate date formats if provided
+    const isValidISO8601 = (dateStr: string | undefined): boolean => {
+      if (!dateStr) return true; // Optional fields are valid when not provided
+      try {
+        const date = new Date(dateStr);
+        // Check if date is valid and matches ISO 8601 format
+        return !isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/.test(dateStr);
+      } catch {
+        return false;
+      }
+    };
+
+    if (!isValidISO8601(startDate)) {
+      return formatMcpError(new Error('startDate must be a valid ISO 8601 date string (e.g., "2024-01-15" or "2024-01-15T10:30:00Z")'));
+    }
+
+    if (!isValidISO8601(endDate)) {
+      return formatMcpError(new Error('endDate must be a valid ISO 8601 date string (e.g., "2024-01-15" or "2024-01-15T10:30:00Z")'));
+    }
+
+    // Validate date range logic if both dates are provided
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (start > end) {
+        return formatMcpError(new Error('startDate must be before or equal to endDate'));
+      }
+    }
+    
     try {
       const schedules = await motionService.getSchedules(userId, startDate, endDate);
       return formatScheduleList(schedules);
