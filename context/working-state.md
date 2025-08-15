@@ -1,16 +1,20 @@
 # Working State
 
 ## Current Active Task
-**Task-002: Input Validation Improvements** - Started: 2025-08-14
-- Branch: `feature/task-002-input-validation`
-- Path: `context/features/epic-001-f01-error-handling/tasks/current/task-002-input-validation.md`
+None - Ready to select next task
 
 ## Recently Completed
+**Task-002: Input Validation Improvements** - Completed: 2025-08-15
+- Fixed AJV strict mode warnings for union types
+- Enhanced JSON Schema compliance
+- Validation system already comprehensive with AJV
+- PR #14 merged to main
+
 **Task-001: Enhanced Error Handling** - Completed: 2025-08-14
 - Implemented retry logic with exponential backoff
 - Added 429 rate limit handling with retry-after support  
 - All 12 Motion API calls now resilient to transient failures
-- Branch: `feature/task-001-enhanced-error-handling` (ready for PR)
+- PR #13 merged to main
 
 ## Current Feature
 **Error Handling & Stability** - See `current-feature.md`
