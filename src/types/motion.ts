@@ -93,19 +93,27 @@ export interface MotionTask {
   chunks?: ChunkReference[];
 }
 
+export interface MotionComment {
+  id: string;
+  content: string;
+  authorId: string;
+  taskId?: string;
+  projectId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateCommentData {
+  content: string;
+  taskId?: string;
+  projectId?: string;
+  authorId?: string;
+}
+
 export interface MotionUser {
   id: string;
   name: string;
   email?: string;
-}
-
-export interface MotionComment {
-  id: string;
-  taskId?: string;
-  projectId?: string;
-  content: string;
-  authorId: string;
-  createdAt: string;
 }
 
 export interface MotionCustomField {
@@ -170,6 +178,7 @@ export interface ListResponse<T> {
   tasks?: T[];
   workspaces?: T[];
   users?: T[];
+  comments?: T[];
 }
 
 export interface MotionApiErrorResponse {

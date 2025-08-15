@@ -4,6 +4,8 @@ import {
   MotionProject, 
   MotionTask, 
   MotionUser,
+  MotionComment,
+  CreateCommentData,
   ListResponse,
   MotionApiErrorResponse,
   MotionApiError
@@ -42,6 +44,7 @@ export class MotionApiService {
   private workspaceCache: SimpleCache<MotionWorkspace[]>;
   private userCache: SimpleCache<MotionUser[]>;
   private projectCache: SimpleCache<MotionProject[]>;
+  private commentCache: SimpleCache<MotionComment[]>;
 
   /**
    * Validate API response against schema
@@ -112,6 +115,7 @@ export class MotionApiService {
     this.workspaceCache = new SimpleCache(600); // 10 minutes for workspaces
     this.userCache = new SimpleCache(600); // 10 minutes for users
     this.projectCache = new SimpleCache(300); // 5 minutes for projects
+    this.commentCache = new SimpleCache(60); // 1 minute for comments
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -749,6 +753,90 @@ export class MotionApiService {
         error: getErrorMessage(error)
       });
       throw error;
+    }
+  }
+
+  async getComments(taskId?: string, projectId?: string): Promise<MotionComment[]> {
+    const cacheKey = `comments:${taskId ? `task:${taskId}` : projectId ? `project:${projectId}` : 'all'}`;
+    
+    return this.commentCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching comments from Motion API', {
+          method: 'getComments',
+          taskId,
+          projectId
+        });
+
+        const params = new URLSearchParams();
+        if (taskId) params.append('taskId', taskId);
+        if (projectId) params.append('projectId', projectId);
+        
+        const queryString = params.toString();
+        const url = queryString ? `/comments?${queryString}` : '/comments';
+        
+        const response: AxiosResponse<ListResponse<MotionComment>> = await this.requestWithRetry(() => this.client.get(url));
+        
+        // Handle both wrapped and unwrapped responses
+        const comments = response.data?.comments || response.data || [];
+        const commentsArray = Array.isArray(comments) ? comments : [];
+        
+        mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully', {
+          method: 'getComments',
+          count: commentsArray.length,
+          taskId,
+          projectId
+        });
+
+        return commentsArray;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch comments', {
+        method: 'getComments',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        taskId,
+        projectId
+      });
+        throw this.formatApiError(error, 'fetch comments');
+      }
+    });
+  }
+
+  async createComment(commentData: CreateCommentData): Promise<MotionComment> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Creating comment in Motion API', {
+        method: 'createComment',
+        taskId: commentData.taskId,
+        projectId: commentData.projectId,
+        contentLength: commentData.content?.length || 0
+      });
+
+      // Convert undefined to null for API compatibility
+      const apiData = convertUndefinedToNull(commentData);
+      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => this.client.post('/comments', apiData));
+      
+      // Invalidate cache after successful creation
+      const cacheKey = `comments:${commentData.taskId ? `task:${commentData.taskId}` : commentData.projectId ? `project:${commentData.projectId}` : 'all'}`;
+      this.commentCache.invalidate(cacheKey);
+      
+      mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
+        method: 'createComment',
+        commentId: response.data?.id,
+        taskId: commentData.taskId,
+        projectId: commentData.projectId
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to create comment', {
+        method: 'createComment',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        taskId: commentData?.taskId,
+        projectId: commentData?.projectId
+      });
+      throw this.formatApiError(error, 'create comment');
     }
   }
 }

@@ -8,7 +8,7 @@
 
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MotionProject, MotionTask, MotionWorkspace } from '../types/motion';
+import { MotionProject, MotionTask, MotionWorkspace, MotionComment } from '../types/motion';
 
 /**
  * Format a list of items for MCP response
@@ -170,5 +170,45 @@ export function formatSearchResults(
   if (searchScope) title += ` (Scope: ${searchScope})`;
   
   return formatListResponse(results, title, resultFormatter);
+}
+
+/**
+ * Format comments list response
+ */
+export function formatCommentList(comments: MotionComment[]): CallToolResult {
+  if (comments.length === 0) {
+    return formatMcpSuccess("No comments found.");
+  }
+  
+  const commentFormatter = (comment: MotionComment) => {
+    const location = comment.taskId ? `Task ${comment.taskId}` : `Project ${comment.projectId}`;
+    const timestamp = comment.createdAt || 'Unknown time';
+    return `- [${comment.id}] ${location} - ${timestamp}\n  Author: ${comment.authorId}\n  Content: "${comment.content}"`;
+  };
+  
+  return formatListResponse(
+    comments, 
+    `Found ${comments.length} comment${comments.length === 1 ? '' : 's'}`,
+    commentFormatter
+  );
+}
+
+/**
+ * Format single comment response  
+ */
+export function formatCommentDetail(comment: MotionComment): CallToolResult {
+  const location = comment.taskId ? `Task ${comment.taskId}` : `Project ${comment.projectId}`;
+  const timestamp = comment.createdAt || 'Unknown time';
+  
+  const details = [
+    `Comment created successfully:`,
+    `- ID: ${comment.id}`,
+    `- Location: ${location}`,
+    `- Author: ${comment.authorId}`,
+    `- Created: ${timestamp}`,
+    `- Content: "${comment.content}"`
+  ].join('\n');
+  
+  return formatMcpSuccess(details);
 }
 

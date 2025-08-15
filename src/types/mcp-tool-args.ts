@@ -127,6 +127,14 @@ export interface MotionTasksArgs {
   targetWorkspaceId?: string;
 }
 
+export interface MotionCommentsArgs {
+  operation: 'list' | 'create';
+  taskId?: string;
+  projectId?: string;
+  content?: string;
+  authorId?: string;
+}
+
 // Union type of all tool arguments for type safety
 export type AllToolArgs = 
   | CreateProjectArgs
@@ -142,4 +150,5 @@ export type AllToolArgs =
   | SearchContentArgs
   | GetContextArgs
   | MotionProjectsArgs
-  | MotionTasksArgs;
+  | MotionTasksArgs
+  | MotionCommentsArgs;
