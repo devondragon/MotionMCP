@@ -12,7 +12,7 @@ import {
   MotionApiErrorResponse,
   MotionApiError
 } from '../types/motion';
-import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL } from '../utils/constants';
+import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { z } from 'zod';
@@ -115,11 +115,11 @@ export class MotionApiService {
     });
 
     // Initialize cache instances with TTL from constants (converted to ms)
-    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES * 1000);
-    this.userCache = new SimpleCache(CACHE_TTL.USERS * 1000);
-    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS * 1000);
-    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS * 1000);
-    this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * 1000);
+    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES * CACHE_TTL_MS_MULTIPLIER);
+    this.userCache = new SimpleCache(CACHE_TTL.USERS * CACHE_TTL_MS_MULTIPLIER);
+    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER);
+    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS * CACHE_TTL_MS_MULTIPLIER);
+    this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * CACHE_TTL_MS_MULTIPLIER);
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -881,7 +881,7 @@ export class MotionApiService {
         const queryString = params.toString();
         const url = queryString ? `/custom-fields?${queryString}` : '/custom-fields';
         
-        const response: AxiosResponse<any> = await this.requestWithRetry(() => this.client.get(url));
+        const response: AxiosResponse<ListResponse<MotionCustomField>> = await this.requestWithRetry(() => this.client.get(url));
         
         // Handle both wrapped and unwrapped responses
         const customFields = response.data?.customFields || response.data || [];
@@ -991,7 +991,7 @@ export class MotionApiService {
    * @param value - Optional value for the field
    * @returns Updated project data
    */
-  async addCustomFieldToProject(projectId: string, fieldId: string, value?: any): Promise<any> {
+  async addCustomFieldToProject(projectId: string, fieldId: string, value?: string | number | boolean | string[] | null): Promise<MotionProject> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Adding custom field to project', {
         method: 'addCustomFieldToProject',
@@ -1005,12 +1005,17 @@ export class MotionApiService {
         ...(value !== undefined && { value })
       };
 
-      const response: AxiosResponse = await this.requestWithRetry(() => 
+      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => 
         this.client.post(`/projects/${projectId}/custom-fields`, requestData)
       );
       
-      // Invalidate project cache
-      this.projectCache.invalidate(`projects:`);
+      // Invalidate project cache for specific workspace if available
+      if (response.data?.workspaceId) {
+        this.projectCache.invalidate(`projects:workspace:${response.data.workspaceId}`);
+      } else {
+        // Fallback to broader invalidation if workspace unknown
+        this.projectCache.invalidate(`projects:`);
+      }
       
       mcpLog(LOG_LEVELS.INFO, 'Custom field added to project successfully', {
         method: 'addCustomFieldToProject',
@@ -1050,7 +1055,8 @@ export class MotionApiService {
         this.client.delete(`/projects/${projectId}/custom-fields/${fieldId}`)
       );
       
-      // Invalidate project cache
+      // TODO: Invalidate project cache for specific workspace when project data is available
+      // For now, invalidate all project caches
       this.projectCache.invalidate(`projects:`);
       
       mcpLog(LOG_LEVELS.INFO, 'Custom field removed from project successfully', {
@@ -1080,7 +1086,7 @@ export class MotionApiService {
    * @param value - Optional value for the field
    * @returns Updated task data
    */
-  async addCustomFieldToTask(taskId: string, fieldId: string, value?: any): Promise<any> {
+  async addCustomFieldToTask(taskId: string, fieldId: string, value?: string | number | boolean | string[] | null): Promise<MotionTask> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Adding custom field to task', {
         method: 'addCustomFieldToTask',
@@ -1094,9 +1100,14 @@ export class MotionApiService {
         ...(value !== undefined && { value })
       };
 
-      const response: AxiosResponse = await this.requestWithRetry(() => 
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => 
         this.client.post(`/tasks/${taskId}/custom-fields`, requestData)
       );
+      
+      // TODO: Invalidate task cache when implemented
+      // if (response.data?.workspaceId) {
+      //   this.taskCache.invalidate(`tasks:workspace:${response.data.workspaceId}`);
+      // }
       
       mcpLog(LOG_LEVELS.INFO, 'Custom field added to task successfully', {
         method: 'addCustomFieldToTask',
@@ -1135,6 +1146,9 @@ export class MotionApiService {
       await this.requestWithRetry(() => 
         this.client.delete(`/tasks/${taskId}/custom-fields/${fieldId}`)
       );
+      
+      // TODO: Invalidate task cache when implemented
+      // this.taskCache.invalidate(`tasks:`);
       
       mcpLog(LOG_LEVELS.INFO, 'Custom field removed from task successfully', {
         method: 'removeCustomFieldFromTask',

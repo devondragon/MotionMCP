@@ -133,11 +133,6 @@ export interface CreateCustomFieldData {
   required?: boolean;
 }
 
-export interface CustomFieldValue {
-  fieldId: string;
-  value: string | number | boolean | string[] | null;
-}
-
 export interface MotionRecurringTask {
   id: string;
   name: string;
@@ -194,6 +189,7 @@ export interface ListResponse<T> {
   workspaces?: T[];
   users?: T[];
   comments?: T[];
+  customFields?: T[];
 }
 
 export interface MotionApiErrorResponse {

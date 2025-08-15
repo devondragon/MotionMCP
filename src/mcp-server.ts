@@ -1142,6 +1142,16 @@ class MotionMCPServer {
             return formatMcpError(new Error('Name and type are required for create operation'));
           }
           
+          // Validate custom field name length
+          if (name.length > LIMITS.CUSTOM_FIELD_NAME_MAX_LENGTH) {
+            return formatMcpError(new Error(`Field name exceeds ${LIMITS.CUSTOM_FIELD_NAME_MAX_LENGTH} characters`));
+          }
+          
+          // Validate options array size for select fields
+          if (options && options.length > LIMITS.CUSTOM_FIELD_OPTIONS_MAX_COUNT) {
+            return formatMcpError(new Error(`Options array exceeds ${LIMITS.CUSTOM_FIELD_OPTIONS_MAX_COUNT} items`));
+          }
+          
           const fieldData: CreateCustomFieldData = {
             name,
             type,
