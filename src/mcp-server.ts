@@ -730,19 +730,15 @@ class MotionMCPServer {
   
   // Original handler methods
   private async handleCreateProject(args: ToolArgs.CreateProjectArgs) {
-    if (!this.motionService || !this.workspaceResolver) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
     const projectData = parseProjectArgs(args as unknown as Record<string, unknown>);
     
     // Resolve workspace
-    const workspace = await this.workspaceResolver.resolveWorkspace({
+    const workspace = await this.workspaceResolver!.resolveWorkspace({
       workspaceId: projectData.workspaceId,
       workspaceName: projectData.workspaceName
     });
 
-    const project = await this.motionService.createProject({
+    const project = await this.motionService!.createProject({
       ...projectData,
       workspaceId: workspace.id
     });
@@ -751,28 +747,20 @@ class MotionMCPServer {
   }
 
   private async handleListProjects(args: ToolArgs.ListProjectsArgs) {
-    if (!this.motionService || !this.workspaceResolver) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
-    const workspace = await this.workspaceResolver.resolveWorkspace(args);
-    const projects = await this.motionService.getProjects(workspace.id);
+    const workspace = await this.workspaceResolver!.resolveWorkspace(args);
+    const projects = await this.motionService!.getProjects(workspace.id);
     
     return formatProjectList(projects, workspace.name, workspace.id);
   }
 
   private async handleGetProject(args: ToolArgs.GetProjectArgs) {
-    if (!this.motionService) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
     const { projectId } = args;
     if (!projectId) {
       return formatMcpError(new Error("Project ID is required"));
     }
 
     try {
-      const project = await this.motionService.getProject(projectId);
+      const project = await this.motionService!.getProject(projectId);
       
       return formatDetailResponse(project, 'Project', [
         'id', 'name', 'description', 'status', 'color', 
@@ -785,27 +773,23 @@ class MotionMCPServer {
 
 
   private async handleCreateTask(args: ToolArgs.CreateTaskArgs) {
-    if (!this.motionService || !this.workspaceResolver) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
     const taskData = parseTaskArgs(args as unknown as Record<string, unknown>);
     
     // Resolve workspace
-    const workspace = await this.workspaceResolver.resolveWorkspace({
+    const workspace = await this.workspaceResolver!.resolveWorkspace({
       workspaceId: taskData.workspaceId,
       workspaceName: taskData.workspaceName
     });
 
     // Resolve project if name provided
     if (taskData.projectName && !taskData.projectId) {
-      const project = await this.motionService.getProjectByName(taskData.projectName, workspace.id);
+      const project = await this.motionService!.getProjectByName(taskData.projectName, workspace.id);
       if (project) {
         taskData.projectId = project.id;
       }
     }
 
-    const task = await this.motionService.createTask({
+    const task = await this.motionService!.createTask({
       ...taskData,
       workspaceId: workspace.id
     });
@@ -814,22 +798,18 @@ class MotionMCPServer {
   }
 
   private async handleListTasks(args: ToolArgs.ListTasksArgs) {
-    if (!this.motionService || !this.workspaceResolver) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
-    const workspace = await this.workspaceResolver.resolveWorkspace(args);
+    const workspace = await this.workspaceResolver!.resolveWorkspace(args);
     
     // Resolve project if name provided
     let projectId = args.projectId;
     if (args.projectName && !projectId) {
-      const project = await this.motionService.getProjectByName(args.projectName, workspace.id);
+      const project = await this.motionService!.getProjectByName(args.projectName, workspace.id);
       if (project) {
         projectId = project.id;
       }
     }
 
-    const tasks = await this.motionService.getTasks(workspace.id, projectId);
+    const tasks = await this.motionService!.getTasks(workspace.id, projectId);
     
     return formatTaskList(tasks, {
       workspaceName: workspace.name,
@@ -839,17 +819,13 @@ class MotionMCPServer {
   }
 
   private async handleGetTask(args: ToolArgs.GetTaskArgs) {
-    if (!this.motionService) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
     const { taskId } = args;
     if (!taskId) {
       return formatMcpError(new Error("Task ID is required"));
     }
 
     try {
-      const task = await this.motionService.getTask(taskId);
+      const task = await this.motionService!.getTask(taskId);
       
       return formatDetailResponse(task, 'Task', [
         'id', 'name', 'description', 'status', 'priority', 
@@ -863,73 +839,53 @@ class MotionMCPServer {
   }
 
   private async handleUpdateTask(args: ToolArgs.UpdateTaskArgs) {
-    if (!this.motionService) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
     const { taskId, ...updates } = args;
     if (!taskId) {
       return formatMcpError(new Error("Task ID is required"));
     }
 
-    const task = await this.motionService.updateTask(taskId, updates);
+    const task = await this.motionService!.updateTask(taskId, updates);
     return formatMcpSuccess(`Successfully updated task "${task.name}"`);
   }
 
   private async handleDeleteTask(args: ToolArgs.DeleteTaskArgs) {
-    if (!this.motionService) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
     const { taskId } = args;
     if (!taskId) {
       return formatMcpError(new Error("Task ID is required"));
     }
 
-    await this.motionService.deleteTask(taskId);
+    await this.motionService!.deleteTask(taskId);
     return formatMcpSuccess(`Successfully deleted task ${taskId}`);
   }
 
   private async handleListWorkspaces(_args: ToolArgs.ListWorkspacesArgs): Promise<McpToolResponse> {
-    if (!this.motionService) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
-    const workspaces = await this.motionService.getWorkspaces();
+    const workspaces = await this.motionService!.getWorkspaces();
     return formatWorkspaceList(workspaces);
   }
 
   private async handleListUsers(args: ToolArgs.ListUsersArgs): Promise<McpToolResponse> {
-    if (!this.motionService || !this.workspaceResolver) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
-    const workspace = await this.workspaceResolver.resolveWorkspace(args);
-    const users = await this.motionService.getUsers(workspace.id);
+    const workspace = await this.workspaceResolver!.resolveWorkspace(args);
+    const users = await this.motionService!.getUsers(workspace.id);
     
     const userList = users.map(u => `- ${u.name} (ID: ${u.id})`).join('\n');
     return formatMcpSuccess(`Users in workspace "${workspace.name}":\n${userList}`);
   }
 
   private async handleSearchContent(args: ToolArgs.SearchContentArgs): Promise<McpToolResponse> {
-    if (!this.motionService || !this.workspaceResolver) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
     const { query, entityTypes = ['projects', 'tasks'] } = args;
     const limit = 20;
     
-    const workspace = await this.workspaceResolver.resolveWorkspace(args);
+    const workspace = await this.workspaceResolver!.resolveWorkspace(args);
     
     let results: Array<any> = [];
     
     if (entityTypes?.includes('tasks')) {
-      const tasks = await this.motionService.searchTasks(query, workspace.id);
+      const tasks = await this.motionService!.searchTasks(query, workspace.id);
       results.push(...tasks.slice(0, limit));
     }
     
     if (entityTypes?.includes('projects')) {
-      const projects = await this.motionService.searchProjects(query, workspace.id);
+      const projects = await this.motionService!.searchProjects(query, workspace.id);
       results.push(...projects.slice(0, limit));
     }
     
@@ -937,10 +893,6 @@ class MotionMCPServer {
   }
 
   private async handleGetContext(args: ToolArgs.GetContextArgs): Promise<McpToolResponse> {
-    if (!this.motionService) {
-      return formatMcpError(new Error("Service not initialized"));
-    }
-
     const { entityType, entityId, includeRelated = false } = args;
     
     let contextText = `Context for ${entityType} ${entityId}:\n\n`;
