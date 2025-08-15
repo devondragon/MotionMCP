@@ -577,6 +577,82 @@ export class MotionApiService {
     }
   }
 
+  async moveTask(taskId: string, targetProjectId?: string | null, targetWorkspaceId?: string | null): Promise<MotionTask> {
+    try {
+      if (!targetProjectId && !targetWorkspaceId) {
+        throw new Error('Either targetProjectId or targetWorkspaceId must be provided');
+      }
+      
+      mcpLog(LOG_LEVELS.DEBUG, 'Moving task in Motion API', {
+        method: 'moveTask',
+        taskId,
+        targetProjectId,
+        targetWorkspaceId
+      });
+
+      const moveData: { projectId?: string; workspaceId?: string } = {};
+      if (targetProjectId) moveData.projectId = targetProjectId;
+      if (targetWorkspaceId) moveData.workspaceId = targetWorkspaceId;
+      
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => 
+        this.client.patch(`/tasks/${taskId}/move`, moveData)
+      );
+      
+      mcpLog(LOG_LEVELS.INFO, 'Task moved successfully', {
+        method: 'moveTask',
+        taskId,
+        targetProjectId,
+        targetWorkspaceId
+      });
+
+      // TODO: Invalidate task cache for source and destination projects/workspaces when implemented
+      
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to move task', {
+        method: 'moveTask',
+        taskId,
+        targetProjectId,
+        targetWorkspaceId,
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+      });
+      throw this.formatApiError(error, 'move task');
+    }
+  }
+
+  async unassignTask(taskId: string): Promise<MotionTask> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Unassigning task in Motion API', {
+        method: 'unassignTask',
+        taskId
+      });
+
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => 
+        this.client.patch(`/tasks/${taskId}/unassign`)
+      );
+      
+      mcpLog(LOG_LEVELS.INFO, 'Task unassigned successfully', {
+        method: 'unassignTask',
+        taskId
+      });
+
+      // TODO: Invalidate task cache for this task and any assignee-related caches when implemented
+      
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to unassign task', {
+        method: 'unassignTask',
+        taskId,
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+      });
+      throw this.formatApiError(error, 'unassign task');
+    }
+  }
+
   async getWorkspaces(): Promise<MotionWorkspace[]> {
     return this.workspaceCache.withCache('workspaces', async () => {
       try {
