@@ -10,7 +10,7 @@ import {
 } from '../types/motion';
 import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
-const SimpleCache = require('../utils/cache');
+import { SimpleCache } from '../utils/cache';
 import { z } from 'zod';
 import { 
   ProjectsListResponseSchema,
@@ -39,9 +39,9 @@ export class MotionApiService {
   private apiKey: string;
   private baseUrl: string;
   private client: AxiosInstance;
-  private workspaceCache: any;
-  private userCache: any;
-  private projectCache: any;
+  private workspaceCache: SimpleCache<MotionWorkspace[]>;
+  private userCache: SimpleCache<MotionUser[]>;
+  private projectCache: SimpleCache<MotionProject[]>;
 
   /**
    * Validate API response against schema
@@ -306,7 +306,7 @@ export class MotionApiService {
       const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.post('/projects', apiData));
       
       // Invalidate cache after successful creation
-      this.projectCache.invalidate(`workspace:${projectData.workspaceId}`);
+      this.projectCache.invalidate(`projects:workspace:${projectData.workspaceId}`);
       
       mcpLog(LOG_LEVELS.INFO, 'Project created successfully', {
         method: 'createProject',
@@ -339,7 +339,7 @@ export class MotionApiService {
       const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.patch(`/projects/${projectId}`, apiUpdates));
       
       // Invalidate cache after successful update
-      this.projectCache.invalidate(`workspace:${response.data.workspaceId}`);
+      this.projectCache.invalidate(`projects:workspace:${response.data.workspaceId}`);
       
       mcpLog(LOG_LEVELS.INFO, 'Project updated successfully', {
         method: 'updateProject',
