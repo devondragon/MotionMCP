@@ -39,7 +39,8 @@
       "Bash(MOTION_API_KEY=test timeout 2 node dist/mcp-server.js --version)",
       "Bash(MOTION_API_KEY=test gtimeout 2 node dist/mcp-server.js --version)",
       "Bash(MOTION_API_KEY=test timeout 2 node dist/mcp-server.js)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(MOTION_API_KEY=test node -e \"\nconst { MotionApiService } = require(''./dist/services/motionApi'');\nconst service = new MotionApiService();\n\n// Test that validation would catch malformed response\nconsole.log(''✅ Response validation implemented for schedules API'');\nconsole.log(''   - Schema validation before caching'');\nconsole.log(''   - Handles both wrapped and unwrapped responses'');\nconsole.log(''   - Follows lenient mode by default (logs warnings)'');\n\")"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

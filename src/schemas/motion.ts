@@ -133,6 +133,13 @@ export const UsersListResponseSchema = z.union([
   z.array(MotionUserSchema)
 ]);
 
+export const SchedulesListResponseSchema = z.union([
+  z.object({
+    schedules: z.array(MotionScheduleSchema)
+  }),
+  z.array(MotionScheduleSchema)
+]);
+
 // Type inference from schemas
 export type MotionWorkspaceValidated = z.infer<typeof MotionWorkspaceSchema>;
 export type MotionProjectValidated = z.infer<typeof MotionProjectSchema>;

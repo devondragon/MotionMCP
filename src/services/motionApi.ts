@@ -22,6 +22,7 @@ import { z } from 'zod';
 import { 
   ProjectsListResponseSchema,
   WorkspacesListResponseSchema,
+  SchedulesListResponseSchema,
   VALIDATION_CONFIG
 } from '../schemas/motion';
 
@@ -1413,8 +1414,17 @@ export class MotionApiService {
         
         const response: AxiosResponse<ListResponse<MotionSchedule>> = await this.requestWithRetry(() => this.client.get(url));
         
+        // Validate response against schema
+        const validatedResponse = this.validateResponse(
+          response.data,
+          SchedulesListResponseSchema,
+          'getSchedules'
+        );
+        
         // Handle both wrapped and unwrapped responses
-        const schedules = response.data?.schedules || response.data || [];
+        const schedules = Array.isArray(validatedResponse) 
+          ? validatedResponse 
+          : validatedResponse.schedules || [];
         const schedulesArray = Array.isArray(schedules) ? schedules : [];
         
         mcpLog(LOG_LEVELS.INFO, 'Schedules fetched successfully', {
