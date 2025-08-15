@@ -757,7 +757,12 @@ export class MotionApiService {
   }
 
   async getComments(taskId?: string, projectId?: string): Promise<MotionComment[]> {
-    const cacheKey = `comments:${taskId ? `task:${taskId}` : projectId ? `project:${projectId}` : 'all'}`;
+    // Require at least one parameter to prevent ambiguous 'all' queries
+    if (!taskId && !projectId) {
+      throw new Error('Either taskId or projectId must be provided to fetch comments');
+    }
+    
+    const cacheKey = `comments:${taskId ? `task:${taskId}` : `project:${projectId}`}`;
     
     return this.commentCache.withCache(cacheKey, async () => {
       try {
@@ -804,6 +809,11 @@ export class MotionApiService {
 
   async createComment(commentData: CreateCommentData): Promise<MotionComment> {
     try {
+      // Validate that at least one target ID is provided
+      if (!commentData.taskId && !commentData.projectId) {
+        throw new Error('Either taskId or projectId must be supplied for comment creation');
+      }
+
       mcpLog(LOG_LEVELS.DEBUG, 'Creating comment in Motion API', {
         method: 'createComment',
         taskId: commentData.taskId,
@@ -822,8 +832,7 @@ export class MotionApiService {
       const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => this.client.post('/comments', apiData));
       
       // Invalidate cache after successful creation
-      const cacheKey = `comments:${commentData.taskId ? `task:${commentData.taskId}` : commentData.projectId ? `project:${commentData.projectId}` : 'all'}`;
-      this.commentCache.invalidate('comments:all'); // Invalidate global cache
+      const cacheKey = `comments:${commentData.taskId ? `task:${commentData.taskId}` : `project:${commentData.projectId}`}`;
       this.commentCache.invalidate(cacheKey); // Invalidate specific cache
       
       mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {

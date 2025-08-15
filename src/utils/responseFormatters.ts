@@ -9,6 +9,7 @@
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { MotionProject, MotionTask, MotionWorkspace, MotionComment } from '../types/motion';
+import { LIMITS } from './constants';
 
 /**
  * Format a list of items for MCP response
@@ -183,8 +184,12 @@ export function formatCommentList(comments: MotionComment[]): CallToolResult {
   const commentFormatter = (comment: MotionComment) => {
     const location = comment.taskId ? `Task ${comment.taskId}` : `Project ${comment.projectId}`;
     const timestamp = comment.createdAt || 'Unknown time';
+    // Truncate long comments for display
+    const displayContent = comment.content.length > LIMITS.COMMENT_DISPLAY_LENGTH 
+      ? comment.content.substring(0, LIMITS.COMMENT_DISPLAY_LENGTH) + '...'
+      : comment.content;
     // Keep as single line for proper list formatting
-    return `- [${comment.id}] ${location} | Author: ${comment.authorId} | ${timestamp} | "${comment.content}"`;
+    return `- [${comment.id}] ${location} | Author: ${comment.authorId} | ${timestamp} | "${displayContent}"`;
   };
   
   return formatListResponse(

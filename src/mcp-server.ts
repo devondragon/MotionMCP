@@ -23,7 +23,7 @@ import {
   formatCommentDetail,
   mcpLog,
   LOG_LEVELS,
-  CACHE_TTL
+  LIMITS
 } from './utils';
 import { InputValidator } from './utils/validator';
 import { McpToolResponse, McpToolDefinition } from './types/mcp';
@@ -768,15 +768,21 @@ class MotionMCPServer {
   
   // Original handler methods
   private async handleCreateProject(args: ToolArgs.CreateProjectArgs) {
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+
     const projectData = parseProjectArgs(args as unknown as Record<string, unknown>);
     
     // Resolve workspace
-    const workspace = await this.workspaceResolver!.resolveWorkspace({
+    const workspace = await workspaceResolver.resolveWorkspace({
       workspaceId: projectData.workspaceId,
       workspaceName: projectData.workspaceName
     });
 
-    const project = await this.motionService!.createProject({
+    const project = await motionService.createProject({
       ...projectData,
       workspaceId: workspace.id
     });
@@ -785,20 +791,31 @@ class MotionMCPServer {
   }
 
   private async handleListProjects(args: ToolArgs.ListProjectsArgs) {
-    const workspace = await this.workspaceResolver!.resolveWorkspace(args);
-    const projects = await this.motionService!.getProjects(workspace.id);
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+
+    const workspace = await workspaceResolver.resolveWorkspace(args);
+    const projects = await motionService.getProjects(workspace.id);
     
     return formatProjectList(projects, workspace.name, workspace.id);
   }
 
   private async handleGetProject(args: ToolArgs.GetProjectArgs) {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
     const { projectId } = args;
     if (!projectId) {
       return formatMcpError(new Error("Project ID is required"));
     }
 
     try {
-      const project = await this.motionService!.getProject(projectId);
+      const project = await motionService.getProject(projectId);
       
       return formatDetailResponse(project, 'Project', [
         'id', 'name', 'description', 'status', 'color', 
@@ -811,23 +828,29 @@ class MotionMCPServer {
 
 
   private async handleCreateTask(args: ToolArgs.CreateTaskArgs) {
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+
     const taskData = parseTaskArgs(args as unknown as Record<string, unknown>);
     
     // Resolve workspace
-    const workspace = await this.workspaceResolver!.resolveWorkspace({
+    const workspace = await workspaceResolver.resolveWorkspace({
       workspaceId: taskData.workspaceId,
       workspaceName: taskData.workspaceName
     });
 
     // Resolve project if name provided
     if (taskData.projectName && !taskData.projectId) {
-      const project = await this.motionService!.getProjectByName(taskData.projectName, workspace.id);
+      const project = await motionService.getProjectByName(taskData.projectName, workspace.id);
       if (project) {
         taskData.projectId = project.id;
       }
     }
 
-    const task = await this.motionService!.createTask({
+    const task = await motionService.createTask({
       ...taskData,
       workspaceId: workspace.id
     });
@@ -836,18 +859,24 @@ class MotionMCPServer {
   }
 
   private async handleListTasks(args: ToolArgs.ListTasksArgs) {
-    const workspace = await this.workspaceResolver!.resolveWorkspace(args);
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+
+    const workspace = await workspaceResolver.resolveWorkspace(args);
     
     // Resolve project if name provided
     let projectId = args.projectId;
     if (args.projectName && !projectId) {
-      const project = await this.motionService!.getProjectByName(args.projectName, workspace.id);
+      const project = await motionService.getProjectByName(args.projectName, workspace.id);
       if (project) {
         projectId = project.id;
       }
     }
 
-    const tasks = await this.motionService!.getTasks(workspace.id, projectId);
+    const tasks = await motionService.getTasks(workspace.id, projectId);
     
     return formatTaskList(tasks, {
       workspaceName: workspace.name,
@@ -857,13 +886,18 @@ class MotionMCPServer {
   }
 
   private async handleGetTask(args: ToolArgs.GetTaskArgs) {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
     const { taskId } = args;
     if (!taskId) {
       return formatMcpError(new Error("Task ID is required"));
     }
 
     try {
-      const task = await this.motionService!.getTask(taskId);
+      const task = await motionService.getTask(taskId);
       
       return formatDetailResponse(task, 'Task', [
         'id', 'name', 'description', 'status', 'priority', 
@@ -877,53 +911,80 @@ class MotionMCPServer {
   }
 
   private async handleUpdateTask(args: ToolArgs.UpdateTaskArgs) {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
     const { taskId, ...updates } = args;
     if (!taskId) {
       return formatMcpError(new Error("Task ID is required"));
     }
 
-    const task = await this.motionService!.updateTask(taskId, updates);
+    const task = await motionService.updateTask(taskId, updates);
     return formatMcpSuccess(`Successfully updated task "${task.name}"`);
   }
 
   private async handleDeleteTask(args: ToolArgs.DeleteTaskArgs) {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
     const { taskId } = args;
     if (!taskId) {
       return formatMcpError(new Error("Task ID is required"));
     }
 
-    await this.motionService!.deleteTask(taskId);
+    await motionService.deleteTask(taskId);
     return formatMcpSuccess(`Successfully deleted task ${taskId}`);
   }
 
   private async handleListWorkspaces(_args: ToolArgs.ListWorkspacesArgs): Promise<McpToolResponse> {
-    const workspaces = await this.motionService!.getWorkspaces();
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
+    const workspaces = await motionService.getWorkspaces();
     return formatWorkspaceList(workspaces);
   }
 
   private async handleListUsers(args: ToolArgs.ListUsersArgs): Promise<McpToolResponse> {
-    const workspace = await this.workspaceResolver!.resolveWorkspace(args);
-    const users = await this.motionService!.getUsers(workspace.id);
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+
+    const workspace = await workspaceResolver.resolveWorkspace(args);
+    const users = await motionService.getUsers(workspace.id);
     
     const userList = users.map(u => `- ${u.name} (ID: ${u.id})`).join('\n');
     return formatMcpSuccess(`Users in workspace "${workspace.name}":\n${userList}`);
   }
 
   private async handleSearchContent(args: ToolArgs.SearchContentArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+
     const { query, entityTypes = ['projects', 'tasks'] } = args;
     const limit = 20;
     
-    const workspace = await this.workspaceResolver!.resolveWorkspace(args);
+    const workspace = await workspaceResolver.resolveWorkspace(args);
     
     let results: Array<any> = [];
     
     if (entityTypes?.includes('tasks')) {
-      const tasks = await this.motionService!.searchTasks(query, workspace.id);
+      const tasks = await motionService.searchTasks(query, workspace.id);
       results.push(...tasks.slice(0, limit));
     }
     
     if (entityTypes?.includes('projects')) {
-      const projects = await this.motionService!.searchProjects(query, workspace.id);
+      const projects = await motionService.searchProjects(query, workspace.id);
       results.push(...projects.slice(0, limit));
     }
     
@@ -977,8 +1038,8 @@ class MotionMCPServer {
           if (!trimmedContent) {
             return formatMcpError(new Error('Content is required and cannot be empty for create operation'));
           }
-          if (trimmedContent.length > CACHE_TTL.MAX_COMMENT_LENGTH) {
-            return formatMcpError(new Error(`Comment content exceeds maximum length of ${CACHE_TTL.MAX_COMMENT_LENGTH} characters`));
+          if (trimmedContent.length > LIMITS.COMMENT_MAX_LENGTH) {
+            return formatMcpError(new Error(`Comment content exceeds maximum length of ${LIMITS.COMMENT_MAX_LENGTH} characters`));
           }
           if (!taskId && !projectId) {
             return formatMcpError(new Error('Either taskId or projectId is required for create operation'));
