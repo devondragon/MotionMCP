@@ -876,17 +876,22 @@ class MotionMCPServer {
         }
         return this.handleDeleteTask({ taskId: params.taskId });
       case 'move':
-        if (!params.taskId || !params.targetProjectId) {
-          return formatMcpError(new Error("Task ID and target project ID are required for move operation"));
+        if (!params.taskId) {
+          return formatMcpError(new Error("Task ID is required for move operation"));
         }
-        // TODO: Implement move task handler (see task-2.4)
-        return formatMcpError(new Error("Move operation is not yet implemented. This will be added in a future update."));
+        if (!params.targetProjectId && !params.targetWorkspaceId) {
+          return formatMcpError(new Error("Either target project ID or target workspace ID is required for move operation"));
+        }
+        return this.handleMoveTask({
+          taskId: params.taskId,
+          targetProjectId: params.targetProjectId,
+          targetWorkspaceId: params.targetWorkspaceId
+        });
       case 'unassign':
         if (!params.taskId) {
           return formatMcpError(new Error("Task ID is required for unassign operation"));
         }
-        // TODO: Implement unassign task handler (see task-2.4)
-        return formatMcpError(new Error("Unassign operation is not yet implemented. This will be added in a future update."));
+        return this.handleUnassignTask({ taskId: params.taskId });
       default:
         return formatMcpError(new Error(`Unknown operation: ${operation}`));
     }
@@ -1064,6 +1069,47 @@ class MotionMCPServer {
 
     await motionService.deleteTask(taskId);
     return formatMcpSuccess(`Successfully deleted task ${taskId}`);
+  }
+
+  private async handleMoveTask(args: { taskId: string; targetProjectId?: string; targetWorkspaceId?: string }) {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
+    const { taskId, targetProjectId, targetWorkspaceId } = args;
+    if (!taskId) {
+      return formatMcpError(new Error("Task ID is required"));
+    }
+    if (!targetProjectId && !targetWorkspaceId) {
+      return formatMcpError(new Error("Either target project ID or target workspace ID is required"));
+    }
+
+    try {
+      const task = await motionService.moveTask(taskId, targetProjectId, targetWorkspaceId);
+      return formatMcpSuccess(`Successfully moved task "${task.name}" (ID: ${task.id})`);
+    } catch (error) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private async handleUnassignTask(args: { taskId: string }) {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+
+    const { taskId } = args;
+    if (!taskId) {
+      return formatMcpError(new Error("Task ID is required"));
+    }
+
+    try {
+      const task = await motionService.unassignTask(taskId);
+      return formatMcpSuccess(`Successfully unassigned task "${task.name}" (ID: ${task.id})`);
+    } catch (error) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
   private async handleListWorkspaces(_args: ToolArgs.ListWorkspacesArgs): Promise<McpToolResponse> {

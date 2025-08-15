@@ -4,6 +4,14 @@
 None - Ready to select next task
 
 ## Recently Completed
+**Task-004: Move and Unassign Task Operations** - Completed: 2025-01-15
+- Implemented moveTask and unassignTask methods in motionApi.ts
+- Added PATCH /tasks/{id}/move and PATCH /tasks/{id}/unassign endpoints
+- Updated motion_tasks consolidated tool to call the new handlers
+- Both operations return the updated task object
+- Move operation supports moving to different project or workspace
+- Branch: feature/task-004-move-unassign-operations (ready for PR)
+
 **Task-003: Recurring Tasks API** - Completed: 2025-08-15
 - Added complete Recurring Tasks API implementation to motionApi.ts
 - Implemented motion_recurring_tasks consolidated tool for MCP server
