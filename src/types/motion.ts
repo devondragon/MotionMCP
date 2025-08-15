@@ -136,8 +136,33 @@ export interface CreateCustomFieldData {
 export interface MotionRecurringTask {
   id: string;
   name: string;
-  pattern: string;
+  description?: string;
+  workspaceId: string;
+  projectId?: string;
+  recurrence: {
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval?: number;
+    daysOfWeek?: number[];  // 0-6 for Sunday-Saturday
+    dayOfMonth?: number;    // 1-31 for monthly recurrence
+    endDate?: string;       // ISO 8601 format
+  };
   nextOccurrence?: string;
+  createdTime?: string;
+  updatedTime?: string;
+}
+
+export interface CreateRecurringTaskData {
+  name: string;
+  description?: string;
+  workspaceId?: string;
+  projectId?: string;
+  recurrence: {
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval?: number;
+    daysOfWeek?: number[];
+    dayOfMonth?: number;
+    endDate?: string;
+  };
 }
 
 export interface MotionStatus {
@@ -190,6 +215,7 @@ export interface ListResponse<T> {
   users?: T[];
   comments?: T[];
   customFields?: T[];
+  recurringTasks?: T[];
 }
 
 export interface MotionApiErrorResponse {

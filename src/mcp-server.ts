@@ -7,7 +7,7 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { MotionApiService } from './services/motionApi';
-import { CreateCommentData, CreateCustomFieldData } from './types/motion';
+import { CreateCommentData, CreateCustomFieldData, CreateRecurringTaskData } from './types/motion';
 import { 
   WorkspaceResolver,
   formatMcpError,
@@ -176,6 +176,8 @@ class MotionMCPServer {
             return await this.handleMotionComments(args as unknown as ToolArgs.MotionCommentsArgs);
           case "motion_custom_fields":
             return await this.handleMotionCustomFields(args as unknown as ToolArgs.MotionCustomFieldsArgs);
+          case "motion_recurring_tasks":
+            return await this.handleMotionRecurringTasks(args as unknown as ToolArgs.MotionRecurringTasksArgs);
           default:
             return formatMcpError(new Error(`Unknown tool: ${name}`));
         }
@@ -716,6 +718,68 @@ class MotionMCPServer {
           },
           required: ["operation"]
         }
+      },
+      {
+        name: "motion_recurring_tasks",
+        description: "Manage recurring tasks",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: {
+              type: "string",
+              enum: ["list", "create", "delete"],
+              description: "Operation to perform"
+            },
+            recurringTaskId: {
+              type: "string",
+              description: "Recurring task ID (for delete)"
+            },
+            workspaceId: {
+              type: "string",
+              description: "Workspace ID"
+            },
+            name: {
+              type: "string",
+              description: "Task name (for create)"
+            },
+            description: {
+              type: "string",
+              description: "Task description"
+            },
+            projectId: {
+              type: "string",
+              description: "Project ID"
+            },
+            recurrence: {
+              type: "object",
+              properties: {
+                frequency: {
+                  type: "string",
+                  enum: ["daily", "weekly", "monthly", "yearly"]
+                },
+                interval: {
+                  type: "number",
+                  description: "Repeat every N periods"
+                },
+                daysOfWeek: {
+                  type: "array",
+                  items: { type: "number" },
+                  description: "0-6 for Sunday-Saturday"
+                },
+                dayOfMonth: {
+                  type: "number",
+                  description: "1-31 for monthly recurrence"
+                },
+                endDate: {
+                  type: "string",
+                  description: "ISO 8601 format"
+                }
+              },
+              required: ["frequency"]
+            }
+          },
+          required: ["operation"]
+        }
       }
     ];
   }
@@ -740,6 +804,7 @@ class MotionMCPServer {
           toolsMap.get('motion_projects'),
           toolsMap.get('motion_comments'),
           toolsMap.get('motion_custom_fields'),
+          toolsMap.get('motion_recurring_tasks'),
           toolsMap.get('list_motion_workspaces'),
           toolsMap.get('list_motion_users'),
           toolsMap.get('search_motion_content'),
@@ -1202,6 +1267,67 @@ class MotionMCPServer {
           
           await motionService.removeCustomFieldFromTask(taskId, fieldId);
           return formatCustomFieldSuccess('removed', 'task', taskId);
+          
+        default:
+          return formatMcpError(new Error(`Unknown operation: ${operation}`));
+      }
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private async handleMotionRecurringTasks(args: ToolArgs.MotionRecurringTasksArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service is not available"));
+    }
+
+    const { operation, recurringTaskId, workspaceId, name, description, projectId, recurrence } = args;
+    
+    try {
+      switch (operation) {
+        case 'list':
+          const recurringTasks = await motionService.getRecurringTasks(workspaceId);
+          if (recurringTasks.length === 0) {
+            return formatMcpSuccess("No recurring tasks found.");
+          }
+          const taskList = recurringTasks.map(task => 
+            `- ${task.name} (ID: ${task.id}) [${task.recurrence.frequency}]${task.nextOccurrence ? ` Next: ${task.nextOccurrence}` : ''}`
+          ).join('\n');
+          return formatMcpSuccess(`Found ${recurringTasks.length} recurring task${recurringTasks.length === 1 ? '' : 's'}:\n${taskList}`);
+          
+        case 'create':
+          if (!name || !recurrence) {
+            return formatMcpError(new Error('Name and recurrence are required for create operation'));
+          }
+          
+          const taskData: CreateRecurringTaskData = {
+            name,
+            ...(description && { description }),
+            ...(workspaceId && { workspaceId }),
+            ...(projectId && { projectId }),
+            recurrence
+          };
+          
+          const newTask = await motionService.createRecurringTask(taskData);
+          const details = [
+            `Recurring task created successfully:`,
+            `- ID: ${newTask.id}`,
+            `- Name: ${newTask.name}`,
+            `- Frequency: ${newTask.recurrence.frequency}`,
+            `- Workspace: ${newTask.workspaceId}`,
+            newTask.projectId ? `- Project: ${newTask.projectId}` : null,
+            newTask.nextOccurrence ? `- Next occurrence: ${newTask.nextOccurrence}` : null
+          ].filter(Boolean).join('\n');
+          return formatMcpSuccess(details);
+          
+        case 'delete':
+          if (!recurringTaskId) {
+            return formatMcpError(new Error('Recurring task ID is required for delete operation'));
+          }
+          
+          await motionService.deleteRecurringTask(recurringTaskId);
+          return formatMcpSuccess(`Recurring task ${recurringTaskId} deleted successfully`);
           
         default:
           return formatMcpError(new Error(`Unknown operation: ${operation}`));

@@ -1,7 +1,11 @@
 # Working State
 
 ## Current Active Task
-None - Ready to select next task
+**Task-003: Recurring Tasks API** - Started: 2025-08-15
+- Adding recurring tasks endpoints to Motion API integration
+- Implementing motion_recurring_tasks consolidated tool for MCP server
+- Supports list, create, and delete operations for recurring tasks
+- Branch: feature/task-003-recurring-tasks-api
 
 ## Recently Completed
 **Task-002: Custom Fields API** - Completed: 2025-08-15

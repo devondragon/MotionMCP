@@ -8,6 +8,8 @@ import {
   CreateCommentData,
   MotionCustomField,
   CreateCustomFieldData,
+  MotionRecurringTask,
+  CreateRecurringTaskData,
   ListResponse,
   MotionApiErrorResponse,
   MotionApiError
@@ -48,6 +50,7 @@ export class MotionApiService {
   private projectCache: SimpleCache<MotionProject[]>;
   private commentCache: SimpleCache<MotionComment[]>;
   private customFieldCache: SimpleCache<MotionCustomField[]>;
+  private recurringTaskCache: SimpleCache<MotionRecurringTask[]>;
 
   /**
    * Validate API response against schema
@@ -120,6 +123,7 @@ export class MotionApiService {
     this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER);
     this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS * CACHE_TTL_MS_MULTIPLIER);
     this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * CACHE_TTL_MS_MULTIPLIER);
+    this.recurringTaskCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER); // Use same TTL as projects
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -1167,6 +1171,132 @@ export class MotionApiService {
         fieldId
       });
       throw this.formatApiError(error, 'remove custom field from task');
+    }
+  }
+
+  /**
+   * Fetch recurring tasks from Motion API
+   * @param workspaceId - Optional workspace ID to filter recurring tasks
+   * @returns Array of recurring tasks
+   */
+  async getRecurringTasks(workspaceId?: string): Promise<MotionRecurringTask[]> {
+    const cacheKey = workspaceId ? `recurring-tasks:workspace:${workspaceId}` : 'recurring-tasks:all';
+    
+    return this.recurringTaskCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching recurring tasks from Motion API', {
+          method: 'getRecurringTasks',
+          workspaceId
+        });
+
+        const params = new URLSearchParams();
+        if (workspaceId) params.append('workspaceId', workspaceId);
+        
+        const queryString = params.toString();
+        const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
+        
+        const response: AxiosResponse<ListResponse<MotionRecurringTask>> = await this.requestWithRetry(() => this.client.get(url));
+        
+        // Handle both wrapped and unwrapped responses
+        const recurringTasks = response.data?.recurringTasks || response.data || [];
+        const tasksArray = Array.isArray(recurringTasks) ? recurringTasks : [];
+        
+        mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully', {
+          method: 'getRecurringTasks',
+          count: tasksArray.length,
+          workspaceId
+        });
+
+        return tasksArray;
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch recurring tasks', {
+          method: 'getRecurringTasks',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+          workspaceId
+        });
+        throw this.formatApiError(error, 'fetch recurring tasks');
+      }
+    });
+  }
+
+  /**
+   * Create a new recurring task
+   * @param taskData - Data for creating the recurring task
+   * @returns The created recurring task
+   */
+  async createRecurringTask(taskData: CreateRecurringTaskData): Promise<MotionRecurringTask> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Creating recurring task in Motion API', {
+        method: 'createRecurringTask',
+        name: taskData.name,
+        frequency: taskData.recurrence.frequency,
+        workspaceId: taskData.workspaceId
+      });
+
+      // Convert undefined to null for API compatibility
+      const apiData = convertUndefinedToNull(taskData);
+      const response: AxiosResponse<MotionRecurringTask> = await this.requestWithRetry(() => 
+        this.client.post('/recurring-tasks', apiData)
+      );
+      
+      // Invalidate cache after successful creation
+      this.recurringTaskCache.invalidate('recurring-tasks:');
+      
+      mcpLog(LOG_LEVELS.INFO, 'Recurring task created successfully', {
+        method: 'createRecurringTask',
+        taskId: response.data?.id,
+        name: taskData.name
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to create recurring task', {
+        method: 'createRecurringTask',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        taskName: taskData?.name
+      });
+      throw this.formatApiError(error, 'create recurring task');
+    }
+  }
+
+  /**
+   * Delete a recurring task
+   * @param recurringTaskId - ID of the recurring task to delete
+   * @returns Success indicator
+   */
+  async deleteRecurringTask(recurringTaskId: string): Promise<{ success: boolean }> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Deleting recurring task from Motion API', {
+        method: 'deleteRecurringTask',
+        recurringTaskId
+      });
+
+      await this.requestWithRetry(() => 
+        this.client.delete(`/recurring-tasks/${recurringTaskId}`)
+      );
+      
+      // Invalidate cache after successful deletion
+      this.recurringTaskCache.invalidate('recurring-tasks:');
+      
+      mcpLog(LOG_LEVELS.INFO, 'Recurring task deleted successfully', {
+        method: 'deleteRecurringTask',
+        recurringTaskId
+      });
+
+      return { success: true };
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to delete recurring task', {
+        method: 'deleteRecurringTask',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        recurringTaskId
+      });
+      throw this.formatApiError(error, 'delete recurring task');
     }
   }
 }
