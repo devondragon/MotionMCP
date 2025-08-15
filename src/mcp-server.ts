@@ -670,22 +670,22 @@ class MotionMCPServer {
       case 'minimal':
         // Only consolidated tools and essential workspace tool
         return [
-          toolsMap.get('motion_tasks')!,
-          toolsMap.get('motion_projects')!,
-          toolsMap.get('list_motion_workspaces')!
-        ].filter(Boolean);
+          toolsMap.get('motion_tasks'),
+          toolsMap.get('motion_projects'),
+          toolsMap.get('list_motion_workspaces')
+        ].filter((tool): tool is McpToolDefinition => tool !== undefined);
       
       case 'essential':
         // Consolidated tools plus commonly needed tools
         return [
-          toolsMap.get('motion_tasks')!,
-          toolsMap.get('motion_projects')!,
-          toolsMap.get('motion_comments')!,
-          toolsMap.get('list_motion_workspaces')!,
-          toolsMap.get('list_motion_users')!,
-          toolsMap.get('search_motion_content')!,
-          toolsMap.get('get_motion_context')!
-        ].filter(Boolean);
+          toolsMap.get('motion_tasks'),
+          toolsMap.get('motion_projects'),
+          toolsMap.get('motion_comments'),
+          toolsMap.get('list_motion_workspaces'),
+          toolsMap.get('list_motion_users'),
+          toolsMap.get('search_motion_content'),
+          toolsMap.get('get_motion_context')
+        ].filter((tool): tool is McpToolDefinition => tool !== undefined);
       
       case 'all':
         // Return all tools
@@ -697,7 +697,7 @@ class MotionMCPServer {
           const customTools = this.toolsConfig.substring(7).split(',').map(s => s.trim());
           return customTools
             .map(name => toolsMap.get(name))
-            .filter(Boolean) as McpToolDefinition[];
+            .filter((tool): tool is McpToolDefinition => tool !== undefined);
         }
         // This should never happen since we validate in initialize()
         // But if it does, throw an error instead of silently defaulting
