@@ -146,7 +146,7 @@ export interface MotionCustomFieldsArgs {
   fieldId?: string;
   workspaceId: string;
   name?: string;
-  type?: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 'phone' | 'select' | 'multiSelect' | 'number' | 'email' | 'checkbox' | 'relatedTo';
+  field?: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 'phone' | 'select' | 'multiSelect' | 'number' | 'email' | 'checkbox' | 'relatedTo';
   options?: string[];
   projectId?: string;
   taskId?: string;

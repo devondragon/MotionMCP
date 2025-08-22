@@ -722,7 +722,7 @@ class MotionMCPServer {
               type: "string",
               description: "Field name (for create)"
             },
-            type: {
+            field: {
               type: "string",
               enum: ["text", "url", "date", "person", "multiPerson", "phone", "select", "multiSelect", "number", "email", "checkbox", "relatedTo"],
               description: "Field type (for create)"
@@ -1339,7 +1339,7 @@ class MotionMCPServer {
       return formatMcpError(new Error("Motion service is not available"));
     }
 
-    const { operation, fieldId, workspaceId, name, type, options, projectId, taskId, value } = args;
+    const { operation, fieldId, workspaceId, name, field, options, projectId, taskId, value } = args;
     
     try {
       switch (operation) {
@@ -1354,8 +1354,8 @@ class MotionMCPServer {
           if (!workspaceId) {
             return formatMcpError(new Error('Workspace ID is required for create operation'));
           }
-          if (!name || !type) {
-            return formatMcpError(new Error('Name and type are required for create operation'));
+          if (!name || !field) {
+            return formatMcpError(new Error('Name and field are required for create operation'));
           }
           
           // Validate custom field name length
@@ -1363,9 +1363,14 @@ class MotionMCPServer {
             return formatMcpError(new Error(`Field name exceeds ${LIMITS.CUSTOM_FIELD_NAME_MAX_LENGTH} characters`));
           }
           
+          // Validate options parameter - only allowed for select/multiSelect fields
+          if (['select', 'multiSelect'].includes(field) !== Boolean(options)) {
+            return formatMcpError(new Error('Options parameter only allowed for select/multiSelect field types'));
+          }
+          
           const fieldData: CreateCustomFieldData = {
             name,
-            type,
+            field,
             ...(options && { metadata: { options } })
           };
           

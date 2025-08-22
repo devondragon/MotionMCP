@@ -125,9 +125,9 @@ export interface MotionCustomField {
 
 export interface CreateCustomFieldData {
   name: string;
-  type: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 
-       'phone' | 'select' | 'multiSelect' | 'number' |
-       'email' | 'checkbox' | 'relatedTo';
+  field: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 
+        'phone' | 'select' | 'multiSelect' | 'number' |
+        'email' | 'checkbox' | 'relatedTo';
   metadata?: Record<string, unknown>;
 }
 

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, AxiosError, isAxiosError } from 'axios';
 import { 
   MotionWorkspace, 
   MotionProject, 
@@ -28,14 +28,7 @@ import {
   VALIDATION_CONFIG
 } from '../schemas/motion';
 
-// Type guard for axios errors
-function isAxiosError(error: unknown): error is MotionApiError {
-  return (
-    error instanceof Error &&
-    'response' in error &&
-    typeof (error as any).response === 'object'
-  );
-}
+// Note: Using native axios.isAxiosError instead of custom implementation
 
 // Helper to get error message
 function getErrorMessage(error: unknown): string {
@@ -1039,12 +1032,20 @@ export class MotionApiService {
       mcpLog(LOG_LEVELS.DEBUG, 'Creating custom field in Motion API', {
         method: 'createCustomField',
         name: fieldData.name,
-        type: fieldData.type,
+        field: fieldData.field,
         workspaceId
       });
 
+      // Transform payload to match Motion API expectations
+      // POST API expects 'type' in request, but returns 'field' in response
+      const apiPayload = { 
+        name: fieldData.name, 
+        type: fieldData.field,  // Motion API POST expects 'type' property in request body
+        ...(fieldData.metadata && { metadata: fieldData.metadata }) 
+      };
+
       const response: AxiosResponse<MotionCustomField> = await this.requestWithRetry(() => 
-        this.client.post(`/beta/workspaces/${workspaceId}/custom-fields`, fieldData)
+        this.client.post(`/beta/workspaces/${workspaceId}/custom-fields`, apiPayload)
       );
       
       // Invalidate cache after successful creation
