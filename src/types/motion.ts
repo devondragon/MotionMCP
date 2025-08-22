@@ -118,10 +118,8 @@ export interface MotionComment {
 }
 
 export interface CreateCommentData {
+  taskId: string;
   content: string;
-  taskId?: string;
-  projectId?: string;
-  authorId?: string;
 }
 
 export interface MotionUser {

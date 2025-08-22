@@ -1039,38 +1039,30 @@ export class MotionApiService {
 
   async createComment(commentData: CreateCommentData): Promise<MotionComment> {
     try {
-      // Validate that at least one target ID is provided
-      if (!commentData.taskId && !commentData.projectId) {
-        throw new Error('Either taskId or projectId must be supplied for comment creation');
-      }
-
       mcpLog(LOG_LEVELS.DEBUG, 'Creating comment in Motion API', {
         method: 'createComment',
         taskId: commentData.taskId,
-        projectId: commentData.projectId,
         contentLength: commentData.content?.length || 0
       });
 
-      // Only include fields that are present (avoid sending null)
-      const { content, taskId, projectId, authorId } = commentData;
+      // API only accepts taskId and content
       const apiData = {
-        content,
-        ...(taskId && { taskId }),
-        ...(projectId && { projectId }),
-        ...(authorId && { authorId })
+        taskId: commentData.taskId,
+        content: commentData.content
       };
-      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => this.client.post('/comments', apiData));
+      
+      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => 
+        this.client.post('/comments', apiData)
+      );
       
       // Invalidate cache after successful creation
-      const cacheParams = { taskId: commentData.taskId || null, projectId: commentData.projectId || null };
-      const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
-      this.commentCache.invalidate(cacheKey); // Invalidate specific cache
+      const cacheKey = `comments:${JSON.stringify({ taskId: commentData.taskId, cursor: null })}`;
+      this.commentCache.invalidate(cacheKey);
       
       mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
         method: 'createComment',
         commentId: response.data?.id,
-        taskId: commentData.taskId,
-        projectId: commentData.projectId
+        taskId: commentData.taskId
       });
 
       return response.data;
@@ -1080,8 +1072,7 @@ export class MotionApiService {
         error: getErrorMessage(error),
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        taskId: commentData?.taskId,
-        projectId: commentData?.projectId
+        taskId: commentData?.taskId
       });
       throw this.formatApiError(error, 'create comment');
     }
