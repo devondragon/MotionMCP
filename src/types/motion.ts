@@ -68,17 +68,17 @@ export interface MotionPaginatedResponse<T> {
 export interface MotionProject {
   id: string;
   name: string;
-  description?: string;
+  description?: string; // Optional in CREATE, may be empty string in responses
   workspaceId: string;
   color?: string;
   status?: string | {
     name: string;
-    isDefaultStatus?: boolean;
-    isResolvedStatus?: boolean;
+    isDefaultStatus: boolean;
+    isResolvedStatus: boolean;
   };
   createdTime?: string;
   updatedTime?: string;
-  customFieldValues?: Record<string, unknown>;
+  customFieldValues?: Record<string, MotionCustomFieldValue>;
 }
 
 /**
@@ -102,7 +102,7 @@ export interface MotionTask {
   };
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate?: string;
-  duration?: number | 'NONE' | 'REMINDER';
+  duration?: number | 'REMINDER';
   assigneeId?: string;
   labels?: Array<{name: string}>;
   autoScheduled?: Record<string, unknown> | null;
@@ -218,7 +218,7 @@ export interface MotionRecurringTask {
       isDefaultStatus: boolean;
       isResolvedStatus: boolean;
     };
-    customFieldValues?: Record<string, unknown>;
+    customFieldValues?: Record<string, MotionCustomFieldValue>;
   };
   workspace: {
     id: string;
