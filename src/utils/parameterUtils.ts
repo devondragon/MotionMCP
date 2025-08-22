@@ -8,6 +8,7 @@
 
 import { DEFAULTS } from './constants';
 import { ValidationError } from './errorHandling';
+import { sanitizeName, sanitizeDescription } from './sanitize';
 
 interface WorkspaceArgs {
   workspaceId?: string;
@@ -44,7 +45,7 @@ interface ProjectArgs extends WorkspaceArgs {
 export function parseWorkspaceArgs(args: Record<string, unknown> = {}): WorkspaceArgs {
   return {
     workspaceId: (args.workspaceId as string) || undefined,
-    workspaceName: (args.workspaceName as string) || undefined
+    workspaceName: args.workspaceName ? sanitizeName(args.workspaceName as string) : undefined
   };
 }
 
@@ -53,7 +54,7 @@ export function parseWorkspaceArgs(args: Record<string, unknown> = {}): Workspac
  */
 export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs {
   return {
-    query: (args.query as string) || '',
+    query: args.query ? sanitizeName(args.query as string) : '',
     searchScope: (args.searchScope as 'both' | 'tasks' | 'projects') || DEFAULTS.SEARCH_SCOPE,
     limit: (args.limit as number) || DEFAULTS.SEARCH_LIMIT,
     ...parseWorkspaceArgs(args)
@@ -65,10 +66,10 @@ export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs 
  */
 export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
   return {
-    name: (args.name as string) || undefined,
-    description: (args.description as string) || undefined,
+    name: args.name ? sanitizeName(args.name as string) : undefined,
+    description: sanitizeDescription(args.description as string),
     projectId: (args.projectId as string) || undefined,
-    projectName: (args.projectName as string) || undefined,
+    projectName: args.projectName ? sanitizeName(args.projectName as string) : undefined,
     status: (args.status as string) || undefined,
     priority: (args.priority as 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW') || undefined,
     dueDate: (args.dueDate as string) || undefined,
@@ -82,8 +83,8 @@ export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
  */
 export function parseProjectArgs(args: Record<string, unknown> = {}): ProjectArgs {
   return {
-    name: (args.name as string) || undefined,
-    description: (args.description as string) || undefined,
+    name: args.name ? sanitizeName(args.name as string) : undefined,
+    description: sanitizeDescription(args.description as string),
     color: (args.color as string) || undefined,
     status: (args.status as string) || undefined,
     ...parseWorkspaceArgs(args)

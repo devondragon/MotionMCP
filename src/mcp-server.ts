@@ -1132,7 +1132,10 @@ class MotionMCPServer {
       }
     }
 
-    const tasks = await motionService.getTasks(workspace.id, projectId, LIMITS.MAX_PAGES, limit);
+    // Calculate appropriate maxPages based on limit to prevent DoS
+    // If user specifies a small limit, don't fetch more pages than necessary
+    const maxPages = limit && limit <= LIMITS.DEFAULT_PAGE_SIZE ? 1 : LIMITS.MAX_PAGES;
+    const tasks = await motionService.getTasks(workspace.id, projectId, maxPages, limit);
     
     return formatTaskList(tasks, {
       workspaceName: workspace.name,

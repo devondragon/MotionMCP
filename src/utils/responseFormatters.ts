@@ -133,7 +133,7 @@ export function formatDetailResponse<T extends Record<string, any>>(
     const value = item[field];
     const fieldStr = String(field);
     const displayName = fieldStr.charAt(0).toUpperCase() + fieldStr.slice(1);
-    const displayValue = value || 'N/A';
+    const displayValue = value ?? 'N/A';
     responseText += `- ${displayName}: ${displayValue}\n`;
   });
   
@@ -284,10 +284,10 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
     `- Priority: ${task.priority}`,
     `- Creator: ${task.creator.name} (${task.creator.email})`,
     `- Workspace: ${task.workspace.name} (${task.workspace.id})`,
-    `- Project: ${task.project.name} (${task.project.id})`,
+    task.project ? `- Project: ${task.project.name} (${task.project.id})` : `- Project: No project assigned`,
     task.assignee ? `- Assignee: ${task.assignee.name} (${task.assignee.email})` : null,
     `- Status: ${task.status.name}`,
-    task.labels.length > 0 ? `- Labels: ${task.labels.map(l => l.name).join(', ')}` : null
+    (task.labels && task.labels.length > 0) ? `- Labels: ${task.labels.map(l => l.name).join(', ')}` : null
   ].filter(Boolean).join('\n');
   
   return formatMcpSuccess(details);

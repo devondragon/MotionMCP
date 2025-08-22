@@ -7,7 +7,7 @@
 
 import { AxiosResponse } from 'axios';
 import { mcpLog } from './logger';
-import { LOG_LEVELS } from './constants';
+import { LOG_LEVELS, LIMITS } from './constants';
 
 export interface PaginatedResponse<T> {
   items: T[];
@@ -72,6 +72,17 @@ export async function fetchAllPages<T>(
       
       // Extract items from various possible response structures
       const pageItems = extractItemsFromResponse(data);
+      
+      // Enforce page size limit to prevent memory exhaustion
+      if (pageItems.length > LIMITS.MAX_PAGE_SIZE) {
+        mcpLog(LOG_LEVELS.WARN, `Page size ${pageItems.length} exceeds maximum allowed ${LIMITS.MAX_PAGE_SIZE}, truncating`, {
+          pageNumber: pageCount + 1,
+          originalSize: pageItems.length,
+          truncatedSize: LIMITS.MAX_PAGE_SIZE
+        });
+        pageItems.splice(LIMITS.MAX_PAGE_SIZE); // Truncate to limit
+      }
+      
       allItems = allItems.concat(pageItems);
       
       // Update pagination state

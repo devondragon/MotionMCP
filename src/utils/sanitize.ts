@@ -100,3 +100,54 @@ export function sanitizeCommentContent(content: string | undefined | null): {
     isValid: true
   };
 }
+
+/**
+ * Sanitize task/project description content
+ * Similar to comment content but allows empty descriptions
+ * 
+ * @param description - Task or project description to sanitize
+ * @returns Sanitized description or undefined if empty/invalid
+ */
+export function sanitizeDescription(description: string | undefined | null): string | undefined {
+  if (!description || typeof description !== 'string') {
+    return undefined;
+  }
+  
+  const sanitized = sanitizeTextContent(description);
+  if (sanitized === '') {
+    return undefined;
+  }
+  
+  // Check if sanitization removed significant content (potential attack)
+  if (description.trim().length > 0 && !isValidSanitizedContent(description, sanitized)) {
+    throw new Error('Description contains invalid or potentially harmful content');
+  }
+  
+  return sanitized;
+}
+
+/**
+ * Sanitize task/project name content
+ * Names are required and must be non-empty after sanitization
+ * 
+ * @param name - Task or project name to sanitize
+ * @returns Sanitized name
+ * @throws Error if name is empty or contains invalid content
+ */
+export function sanitizeName(name: string | undefined | null): string {
+  if (!name || typeof name !== 'string') {
+    throw new Error('Name is required');
+  }
+  
+  const sanitized = sanitizeTextContent(name);
+  if (sanitized === '') {
+    throw new Error('Name cannot be empty');
+  }
+  
+  // Check if sanitization removed significant content (potential attack)
+  if (!isValidSanitizedContent(name, sanitized)) {
+    throw new Error('Name contains invalid or potentially harmful content');
+  }
+  
+  return sanitized;
+}
