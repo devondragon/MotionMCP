@@ -266,7 +266,7 @@ export function formatRecurringTaskList(tasks: MotionRecurringTask[]): CallToolR
   }
   
   const taskFormatter = (task: MotionRecurringTask) => {
-    const projectName = task.project?.name || 'No Project';
+    const projectName = task.project.name || 'No Project';
     return `- ${task.name} (ID: ${task.id}) [${task.priority}] (Project: ${projectName})`;
   };
   
@@ -282,12 +282,12 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
     `- ID: ${task.id}`,
     `- Name: ${task.name}`,
     `- Priority: ${task.priority}`,
-    task.creator ? `- Creator: ${task.creator.name} (${task.creator.email})` : null,
-    task.workspace ? `- Workspace: ${task.workspace.name} (${task.workspace.id})` : null,
-    task.project ? `- Project: ${task.project.name} (${task.project.id})` : null,
+    `- Creator: ${task.creator.name} (${task.creator.email})`,
+    `- Workspace: ${task.workspace.name} (${task.workspace.id})`,
+    `- Project: ${task.project.name} (${task.project.id})`,
     task.assignee ? `- Assignee: ${task.assignee.name} (${task.assignee.email})` : null,
-    task.status ? `- Status: ${task.status.name}` : null,
-    task.labels && task.labels.length > 0 ? `- Labels: ${task.labels.map(l => l.name).join(', ')}` : null
+    `- Status: ${task.status.name}`,
+    task.labels.length > 0 ? `- Labels: ${task.labels.map(l => l.name).join(', ')}` : null
   ].filter(Boolean).join('\n');
   
   return formatMcpSuccess(details);

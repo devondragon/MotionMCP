@@ -842,7 +842,7 @@ class MotionMCPServer {
             },
             priority: {
               type: "string",
-              enum: ["HIGH", "MEDIUM"],
+              enum: ["ASAP", "HIGH", "MEDIUM", "LOW"],
               description: "Task priority (default: MEDIUM)"
             }
           },
@@ -1475,6 +1475,9 @@ class MotionMCPServer {
     try {
       switch (operation) {
         case 'list':
+          if (!workspaceId) {
+            return formatMcpError(new Error('Workspace ID is required for list operation'));
+          }
           const recurringTasks = await motionService.getRecurringTasks(workspaceId);
           return formatRecurringTaskList(recurringTasks);
           
@@ -1497,15 +1500,39 @@ class MotionMCPServer {
             return formatMcpError(new Error('Frequency type must be one of: daily, weekly, monthly, yearly'));
           }
           
+          // Validate frequency-specific fields
+          if (frequency.interval && (!Number.isInteger(frequency.interval) || frequency.interval < 1)) {
+            return formatMcpError(new Error('Frequency interval must be a positive integer'));
+          }
+          if (frequency.daysOfWeek && !frequency.daysOfWeek.every(day => Number.isInteger(day) && day >= 0 && day <= 6)) {
+            return formatMcpError(new Error('daysOfWeek must contain integers between 0-6 (Sunday-Saturday)'));
+          }
+          if (frequency.dayOfMonth && (!Number.isInteger(frequency.dayOfMonth) || frequency.dayOfMonth < 1 || frequency.dayOfMonth > 31)) {
+            return formatMcpError(new Error('dayOfMonth must be an integer between 1-31'));
+          }
+          if (frequency.endDate) {
+            const endDate = new Date(frequency.endDate);
+            if (isNaN(endDate.getTime())) {
+              return formatMcpError(new Error('frequency.endDate must be a valid ISO 8601 date format'));
+            }
+            if (endDate <= new Date()) {
+              return formatMcpError(new Error('frequency.endDate must be in the future'));
+            }
+          }
+          
           // Validate optional fields
-          if (priority && !['HIGH', 'MEDIUM'].includes(priority)) {
-            return formatMcpError(new Error('Priority must be one of: HIGH, MEDIUM'));
+          if (priority && !['ASAP', 'HIGH', 'MEDIUM', 'LOW'].includes(priority)) {
+            return formatMcpError(new Error('Priority must be one of: ASAP, HIGH, MEDIUM, LOW'));
           }
           if (deadlineType && !['HARD', 'SOFT'].includes(deadlineType)) {
             return formatMcpError(new Error('Deadline type must be one of: HARD, SOFT'));
           }
-          if (duration && typeof duration === 'number' && duration < 0) {
-            return formatMcpError(new Error('Duration must be a positive number'));
+          if (duration !== undefined) {
+            if (typeof duration === 'number' && duration < 0) {
+              return formatMcpError(new Error('Duration must be a positive number'));
+            } else if (typeof duration === 'string' && duration !== 'REMINDER') {
+              return formatMcpError(new Error('Duration string must be "REMINDER"'));
+            }
           }
           if (startingOn) {
             const startDate = new Date(startingOn);

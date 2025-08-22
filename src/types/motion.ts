@@ -194,7 +194,7 @@ export interface CreateRecurringTaskData {
   startingOn?: string;
   idealTime?: string;
   schedule?: string;
-  priority?: 'HIGH' | 'MEDIUM';
+  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
 export interface MotionStatus {

@@ -172,7 +172,7 @@ export interface MotionRecurringTasksArgs {
   startingOn?: string;
   idealTime?: string;
   schedule?: string;
-  priority?: 'HIGH' | 'MEDIUM';
+  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
 export interface MotionSchedulesArgs {
