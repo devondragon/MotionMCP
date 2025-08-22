@@ -139,7 +139,7 @@ export interface MotionCommentsArgs {
   taskId?: string;
   projectId?: string;
   content?: string;
-  authorId?: string;
+  cursor?: string;
 }
 
 export interface MotionCustomFieldsArgs {

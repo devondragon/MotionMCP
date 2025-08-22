@@ -182,14 +182,15 @@ export function formatCommentList(comments: MotionComment[]): CallToolResult {
   }
   
   const commentFormatter = (comment: MotionComment) => {
-    const location = comment.taskId ? `Task ${comment.taskId}` : `Project ${comment.projectId}`;
-    const timestamp = comment.createdAt || 'Unknown time';
+    const location = `Task ${comment.taskId}`;
+    const timestamp = comment.createdAt;
+    const author = comment.creator.name || comment.creator.email || comment.creator.id;
     // Truncate long comments for display
     const displayContent = comment.content.length > LIMITS.COMMENT_DISPLAY_LENGTH 
       ? comment.content.substring(0, LIMITS.COMMENT_DISPLAY_LENGTH) + '...'
       : comment.content;
     // Keep as single line for proper list formatting
-    return `- [${comment.id}] ${location} | Author: ${comment.authorId} | ${timestamp} | "${displayContent}"`;
+    return `- [${comment.id}] ${location} | Author: ${author} | ${timestamp} | "${displayContent}"`;
   };
   
   return formatListResponse(
@@ -203,14 +204,15 @@ export function formatCommentList(comments: MotionComment[]): CallToolResult {
  * Format single comment response  
  */
 export function formatCommentDetail(comment: MotionComment): CallToolResult {
-  const location = comment.taskId ? `Task ${comment.taskId}` : `Project ${comment.projectId}`;
-  const timestamp = comment.createdAt || 'Unknown time';
+  const location = `Task ${comment.taskId}`;
+  const timestamp = comment.createdAt;
+  const author = comment.creator.name || comment.creator.email || comment.creator.id;
   
   const details = [
     `Comment created successfully:`,
     `- ID: ${comment.id}`,
     `- Location: ${location}`,
-    `- Author: ${comment.authorId}`,
+    `- Author: ${author}`,
     `- Created: ${timestamp}`,
     `- Content: "${comment.content}"`
   ].join('\n');
