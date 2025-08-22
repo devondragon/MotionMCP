@@ -1,7 +1,14 @@
 export interface MotionWorkspace {
   id: string;
   name: string;
+  teamId: string;
   type: string;
+  labels: Array<{name: string}>;
+  statuses: Array<{
+    name: string;
+    isDefaultStatus: boolean;
+    isResolvedStatus: boolean;
+  }>;
 }
 
 // Minimal interfaces for nested object references
@@ -68,7 +75,7 @@ export interface MotionPaginatedResponse<T> {
 export interface MotionProject {
   id: string;
   name: string;
-  description?: string; // Optional in CREATE, may be empty string in responses
+  description: string; // Required according to API documentation
   workspaceId: string;
   color?: string;
   status?: string | {
