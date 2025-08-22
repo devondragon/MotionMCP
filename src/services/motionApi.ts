@@ -19,6 +19,7 @@ import {
 import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
+import { fetchAllPages, PaginatedApiResponse } from '../utils/pagination';
 import { z } from 'zod';
 import { 
   ProjectsListResponseSchema,
@@ -238,23 +239,69 @@ export class MotionApiService {
     throw new Error('Max retries exceeded');
   }
 
-  async getProjects(workspaceId: string): Promise<MotionProject[]> {
+  async getProjects(workspaceId: string, maxPages: number = 5): Promise<MotionProject[]> {
     const cacheKey = `projects:workspace:${workspaceId}`;
     
     return this.projectCache.withCache(cacheKey, async () => {
       try {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from Motion API', {
           method: 'getProjects',
-          workspaceId
+          workspaceId,
+          maxPages
         });
 
-        // Build the query string with workspace ID (now required)
-        const params = new URLSearchParams();
-        params.append('workspaceId', workspaceId);
-        const queryString = params.toString();
-        const url = `/projects?${queryString}`;
-        
-        const response: AxiosResponse = await this.requestWithRetry(() => this.client.get(url));
+        // Create a fetch function for potential pagination
+        const fetchPage = async (cursor?: string) => {
+          const params = new URLSearchParams();
+          params.append('workspaceId', workspaceId);
+          if (cursor) {
+            params.append('cursor', cursor);
+          }
+
+          const queryString = params.toString();
+          const url = `/projects?${queryString}`;
+          
+          return this.requestWithRetry(() => this.client.get(url)) as Promise<AxiosResponse<PaginatedApiResponse<MotionProject>>>;
+        };
+
+        try {
+          // Attempt pagination-aware fetch
+          const paginatedResult = await fetchAllPages(fetchPage, { 
+            maxPages,
+            logProgress: false
+          });
+          
+          if (paginatedResult.totalFetched > 0) {
+            // Validate the response structure
+            const validatedResponse = this.validateResponse(
+              paginatedResult.items,
+              ProjectsListResponseSchema,
+              'getProjects'
+            );
+            
+            // Extract projects array (handle both wrapped and unwrapped responses)
+            const projects = Array.isArray(validatedResponse) 
+              ? validatedResponse 
+              : validatedResponse.projects;
+            
+            mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully with pagination', {
+              method: 'getProjects',
+              totalCount: projects.length,
+              hasMore: paginatedResult.hasMore,
+              workspaceId
+            });
+
+            return projects;
+          }
+        } catch (paginationError) {
+          mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
+            method: 'getProjects',
+            error: paginationError instanceof Error ? paginationError.message : String(paginationError)
+          });
+        }
+
+        // Fallback: simple single-page fetch
+        const response: AxiosResponse = await fetchPage();
         
         // Validate the response structure
         const validatedResponse = this.validateResponse(
@@ -268,7 +315,7 @@ export class MotionApiService {
           ? validatedResponse 
           : validatedResponse.projects;
         
-        mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully', {
+        mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully (single page)', {
           method: 'getProjects',
           count: projects.length,
           workspaceId
@@ -414,30 +461,63 @@ export class MotionApiService {
     }
   }
 
-  async getTasks(workspaceId: string, projectId?: string): Promise<MotionTask[]> {
+  async getTasks(workspaceId: string, projectId?: string, maxPages: number = 5): Promise<MotionTask[]> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching tasks from Motion API', {
         method: 'getTasks',
         workspaceId,
-        projectId
+        projectId,
+        maxPages
       });
 
-      const params = new URLSearchParams();
-      params.append('workspaceId', workspaceId);
-      if (projectId) {
-        params.append('projectId', projectId);
+      // Create a fetch function for potential pagination
+      const fetchPage = async (cursor?: string) => {
+        const params = new URLSearchParams();
+        params.append('workspaceId', workspaceId);
+        if (projectId) {
+          params.append('projectId', projectId);
+        }
+        if (cursor) {
+          params.append('cursor', cursor);
+        }
+
+        const queryString = params.toString();
+        const url = queryString ? `/tasks?${queryString}` : '/tasks';
+        
+        return this.requestWithRetry(() => this.client.get(url)) as Promise<AxiosResponse<PaginatedApiResponse<MotionTask>>>;
+      };
+
+      try {
+        // Attempt pagination-aware fetch
+        const paginatedResult = await fetchAllPages(fetchPage, { 
+          maxPages,
+          logProgress: false  // Less verbose for tasks
+        });
+        
+        if (paginatedResult.totalFetched > 0) {
+          mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully with pagination', {
+            method: 'getTasks',
+            totalCount: paginatedResult.totalFetched,
+            hasMore: paginatedResult.hasMore,
+            workspaceId,
+            projectId
+          });
+          return paginatedResult.items;
+        }
+      } catch (paginationError) {
+        // Fallback to simple fetch if pagination fails
+        mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
+          method: 'getTasks',
+          error: paginationError instanceof Error ? paginationError.message : String(paginationError)
+        });
       }
 
-      const queryString = params.toString();
-      const url = queryString ? `/tasks?${queryString}` : '/tasks';
-      
-      const response: AxiosResponse<ListResponse<MotionTask>> = await this.requestWithRetry(() => this.client.get(url));
-      
-      // The Motion API might wrap the tasks in a 'tasks' array
+      // Fallback: simple single-page fetch
+      const response: AxiosResponse<ListResponse<MotionTask>> = await fetchPage();
       const tasksData = response.data?.tasks || response.data || [];
       const tasks = Array.isArray(tasksData) ? tasksData : [];
       
-      mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully', {
+      mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully (single page)', {
         method: 'getTasks',
         count: tasks.length,
         workspaceId,
@@ -876,7 +956,7 @@ export class MotionApiService {
     }
   }
 
-  async getComments(taskId?: string, projectId?: string): Promise<MotionComment[]> {
+  async getComments(taskId?: string, projectId?: string, maxPages: number = 3): Promise<MotionComment[]> {
     // Require at least one parameter to prevent ambiguous 'all' queries
     if (!taskId && !projectId) {
       throw new Error('Either taskId or projectId must be provided to fetch comments');
@@ -891,23 +971,55 @@ export class MotionApiService {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching comments from Motion API', {
           method: 'getComments',
           taskId,
-          projectId
+          projectId,
+          maxPages
         });
 
-        const params = new URLSearchParams();
-        if (taskId) params.append('taskId', taskId);
-        if (projectId) params.append('projectId', projectId);
-        
-        const queryString = params.toString();
-        const url = queryString ? `/comments?${queryString}` : '/comments';
-        
-        const response: AxiosResponse<ListResponse<MotionComment>> = await this.requestWithRetry(() => this.client.get(url));
+        // Create a fetch function for potential pagination
+        const fetchPage = async (cursor?: string) => {
+          const params = new URLSearchParams();
+          if (taskId) params.append('taskId', taskId);
+          if (projectId) params.append('projectId', projectId);
+          if (cursor) params.append('cursor', cursor);
+          
+          const queryString = params.toString();
+          const url = queryString ? `/comments?${queryString}` : '/comments';
+          
+          return this.requestWithRetry(() => this.client.get(url)) as Promise<AxiosResponse<PaginatedApiResponse<MotionComment>>>;
+        };
+
+        try {
+          // Attempt pagination-aware fetch
+          const paginatedResult = await fetchAllPages(fetchPage, { 
+            maxPages,
+            logProgress: false
+          });
+          
+          if (paginatedResult.totalFetched > 0) {
+            mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully with pagination', {
+              method: 'getComments',
+              totalCount: paginatedResult.totalFetched,
+              hasMore: paginatedResult.hasMore,
+              taskId,
+              projectId
+            });
+            return paginatedResult.items;
+          }
+        } catch (paginationError) {
+          mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
+            method: 'getComments',
+            error: paginationError instanceof Error ? paginationError.message : String(paginationError)
+          });
+        }
+
+        // Fallback: simple single-page fetch
+        const response: AxiosResponse<ListResponse<MotionComment>> = await fetchPage();
         
         // Handle both wrapped and unwrapped responses
         const comments = response.data?.comments || response.data || [];
         const commentsArray = Array.isArray(comments) ? comments : [];
         
-        mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully', {
+        mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully (single page)', {
           method: 'getComments',
           count: commentsArray.length,
           taskId,
@@ -1300,54 +1412,49 @@ export class MotionApiService {
   }
 
   /**
-   * Fetch recurring tasks from Motion API
+   * Fetch recurring tasks from Motion API with automatic pagination
    * @param workspaceId - Optional workspace ID to filter recurring tasks
-   * @param cursor - Optional pagination cursor
-   * @returns Array of recurring tasks
+   * @param maxPages - Maximum number of pages to fetch (default: 10)
+   * @returns Array of recurring tasks from all pages
    */
-  async getRecurringTasks(workspaceId?: string, cursor?: string): Promise<MotionRecurringTask[]> {
+  async getRecurringTasks(workspaceId?: string, maxPages: number = 10): Promise<MotionRecurringTask[]> {
     const cacheKey = workspaceId ? `recurring-tasks:workspace:${workspaceId}` : 'recurring-tasks:all';
     
     return this.recurringTaskCache.withCache(cacheKey, async () => {
       try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching recurring tasks from Motion API', {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching recurring tasks from Motion API with pagination', {
           method: 'getRecurringTasks',
           workspaceId,
-          cursor
+          maxPages
         });
 
-        const params = new URLSearchParams();
-        if (workspaceId) params.append('workspaceId', workspaceId);
-        if (cursor) params.append('cursor', cursor);
+        // Create a fetch function for pagination utility
+        const fetchPage = async (cursor?: string) => {
+          const params = new URLSearchParams();
+          if (workspaceId) params.append('workspaceId', workspaceId);
+          if (cursor) params.append('cursor', cursor);
+          
+          const queryString = params.toString();
+          const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
+          
+          return this.requestWithRetry(() => this.client.get(url)) as Promise<AxiosResponse<PaginatedApiResponse<MotionRecurringTask>>>;
+        };
+
+        // Use pagination utility to fetch all pages
+        const paginatedResult = await fetchAllPages(fetchPage, { 
+          maxPages, 
+          logProgress: true 
+        });
         
-        const queryString = params.toString();
-        const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
-        
-        const response: AxiosResponse<{meta?: {nextCursor?: string}, tasks: MotionRecurringTask[]}> = await this.requestWithRetry(() => this.client.get(url));
-        
-        // Handle the API response structure: {meta: {...}, tasks: [...]}
-        const tasks = response.data?.tasks || [];
-        const tasksArray = Array.isArray(tasks) ? tasks : [];
-        
-        // Handle pagination - for now just log if there are more pages
-        const nextCursor = response.data?.meta?.nextCursor;
-        if (nextCursor) {
-          mcpLog(LOG_LEVELS.INFO, 'More recurring tasks available', {
-            method: 'getRecurringTasks',
-            nextCursor,
-            workspaceId
-          });
-          // TODO: Implement automatic pagination to fetch all pages
-          // For now, we return the first page and log that more data is available
-        }
-        
-        mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully', {
+        mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully with pagination', {
           method: 'getRecurringTasks',
-          count: tasksArray.length,
+          totalCount: paginatedResult.totalFetched,
+          pagesProcessed: Math.ceil(paginatedResult.totalFetched / 50), // Assuming ~50 items per page
+          hasMore: paginatedResult.hasMore,
           workspaceId
         });
 
-        return tasksArray;
+        return paginatedResult.items;
       } catch (error: unknown) {
         mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch recurring tasks', {
           method: 'getRecurringTasks',

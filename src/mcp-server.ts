@@ -1470,7 +1470,7 @@ class MotionMCPServer {
       return formatMcpError(new Error("Services not available"));
     }
 
-    const { operation, recurringTaskId, workspaceId, name, description, assigneeId, frequency, deadlineType, duration, startingOn, idealTime, schedule, priority } = args;
+    const { operation, recurringTaskId, workspaceId, name, description, projectId, assigneeId, frequency, deadlineType, duration, startingOn, idealTime, schedule, priority } = args;
     
     try {
       switch (operation) {
@@ -1528,8 +1528,10 @@ class MotionMCPServer {
             return formatMcpError(new Error('Deadline type must be one of: HARD, SOFT'));
           }
           if (duration !== undefined) {
-            if (typeof duration === 'number' && duration < 0) {
-              return formatMcpError(new Error('Duration must be a positive number'));
+            if (typeof duration === 'number') {
+              if (!Number.isInteger(duration) || duration <= 0) {
+                return formatMcpError(new Error('Duration must be a positive integer'));
+              }
             } else if (typeof duration === 'string' && duration !== 'REMINDER') {
               return formatMcpError(new Error('Duration string must be "REMINDER"'));
             }
@@ -1552,6 +1554,7 @@ class MotionMCPServer {
             assigneeId,
             frequency,
             ...(description && { description }),
+            ...(projectId && { projectId }),
             ...(deadlineType && { deadlineType }),
             ...(duration && { duration }),
             ...(startingOn && { startingOn }),

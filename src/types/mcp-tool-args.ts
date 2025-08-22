@@ -158,6 +158,7 @@ export interface MotionRecurringTasksArgs {
   recurringTaskId?: string;
   workspaceId?: string;
   name?: string;
+  projectId?: string;
   assigneeId?: string;
   frequency?: {
     type: 'daily' | 'weekly' | 'monthly' | 'yearly';

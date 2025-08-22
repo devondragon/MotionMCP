@@ -180,6 +180,7 @@ export interface MotionRecurringTask {
 export interface CreateRecurringTaskData {
   name: string;
   workspaceId: string;
+  projectId?: string;
   assigneeId: string;
   frequency: {
     type: 'daily' | 'weekly' | 'monthly' | 'yearly';

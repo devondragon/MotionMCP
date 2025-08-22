@@ -266,7 +266,7 @@ export function formatRecurringTaskList(tasks: MotionRecurringTask[]): CallToolR
   }
   
   const taskFormatter = (task: MotionRecurringTask) => {
-    const projectName = task.project.name || 'No Project';
+    const projectName = task.project?.name ?? 'No Project';
     return `- ${task.name} (ID: ${task.id}) [${task.priority}] (Project: ${projectName})`;
   };
   
