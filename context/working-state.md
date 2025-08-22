@@ -5,6 +5,16 @@ None - Ready to start next task
 
 ## Recently Completed Tasks
 
+**Task-005: Fix Task API Schema** - Completed: 2025-08-22
+- Fixed multiple critical schema mismatches in MotionTask interface
+- Updated labels from string[] to Array<{name: string}>
+- Added teamId to workspace objects and WorkspaceReference interface
+- Fixed chunks interface with correct field names (scheduledStart/End) and isFixed field
+- Updated customFieldValues to Record<string, {type, value}> structure
+- Enhanced nested objects with complete field definitions matching API
+- Priority: High | Estimated: 3h | Actual: ~2h
+- Branch: feature/task-005-fix-task-api-schema (ready for PR)
+
 **Task-003: Fix Comments API Schema** - Completed: 2025-08-22
 - Fixed missing creator field and incorrect response wrapper handling
 - Updated MotionComment interface to use creator object instead of authorId  

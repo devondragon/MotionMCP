@@ -21,6 +21,7 @@ export interface ProjectReference {
 export interface WorkspaceReference {
   id: string;
   name: string;
+  teamId: string; // Added required teamId field
   type?: string;
 }
 
@@ -38,10 +39,13 @@ export interface AssigneeReference {
  */
 export interface ChunkReference {
   id: string;
+  duration: number;
   /** ISO 8601 date-time string for the start of the chunk */
-  start: string;
+  scheduledStart: string;
   /** ISO 8601 date-time string for the end of the chunk */
-  end: string;
+  scheduledEnd: string;
+  completedTime?: string;
+  isFixed: boolean;
   [key: string]: unknown;
 }
 
@@ -77,18 +81,30 @@ export interface MotionProject {
   customFieldValues?: Record<string, unknown>;
 }
 
+/**
+ * A custom field value in Motion, with type and value information
+ */
+export interface MotionCustomFieldValue {
+  type: string; // e.g., 'SELECT', 'TEXT', 'NUMBER', 'DATE', etc.
+  value: any;   // The actual value, which can be of various types
+}
+
 export interface MotionTask {
   id: string;
   name: string;
   description?: string;
   workspaceId: string;
   projectId?: string;
-  status?: string;
+  status?: string | {
+    name: string;
+    isDefaultStatus: boolean;
+    isResolvedStatus: boolean;
+  };
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate?: string;
   duration?: number | 'NONE' | 'REMINDER';
   assigneeId?: string;
-  labels?: string[];
+  labels?: Array<{name: string}>;
   autoScheduled?: Record<string, unknown> | null;
   completed?: boolean;
   completedTime?: string;
@@ -97,16 +113,52 @@ export interface MotionTask {
   startOn?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
-  deadlineType?: string;
+  deadlineType?: 'HARD' | 'SOFT' | 'NONE';
   parentRecurringTaskId?: string;
-  creator?: AssigneeReference;
-  project?: ProjectReference;
-  workspace?: WorkspaceReference;
-  assignees?: AssigneeReference[];
+  
+  // Full nested objects with complete field definitions
+  creator?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  
+  project?: {
+    id: string;
+    name: string;
+    description?: string;
+    workspaceId: string;
+    status?: {
+      name: string;
+      isDefaultStatus: boolean;
+      isResolvedStatus: boolean;
+    };
+  };
+  
+  workspace: {
+    id: string;
+    name: string;
+    teamId: string; // Added required teamId field
+    type: string;
+  };
+  
+  assignees?: Array<{
+    id: string;
+    name: string;
+    email: string;
+  }>;
+  
   schedulingIssue?: boolean;
   lastInteractedTime?: string;
-  customFieldValues?: Record<string, unknown>;
-  chunks?: ChunkReference[];
+  customFieldValues?: Record<string, MotionCustomFieldValue>;
+  chunks?: Array<{
+    id: string;
+    duration: number;
+    scheduledStart: string; // Fixed field name from 'start'
+    scheduledEnd: string;   // Fixed field name from 'end'
+    completedTime?: string;
+    isFixed: boolean;       // Added missing isFixed field
+  }>;
 }
 
 export interface MotionComment {
