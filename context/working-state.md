@@ -1,12 +1,13 @@
 # Working State
 
-## Current Active Spike
-**Spike-001: Verify Motion Schemas and Interfaces** - In Progress: 2025-08-15
-- Comprehensive audit of all Motion API schemas against official documentation
-- Type: Investigation | Priority: High | Time Box: 6h max
-- Verifying 18+ API endpoints for schema accuracy and completeness
-- Focus: Task, Project, Workspace, and newer APIs (schedules, custom fields, recurring tasks)
-- Location: context/spikes/todo/spike-001-verify-motion-schemas.md
+## Current Active Task
+**Task-001: Rewrite Custom Fields API** - Started: 2025-08-22
+- Critical: API completely broken - wrong interface and endpoints
+- Priority: Critical | Estimated: 4h
+- Fixing interface structure and beta API endpoints
+- Feature: epic-001-f04-schema-fixes
+- Location: context/features/epic-001-f04-schema-fixes/tasks/current/
+- Branch: feature/task-001-rewrite-custom-fields-api
 
 ## Recently Completed Tasks
 

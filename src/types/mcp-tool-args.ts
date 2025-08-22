@@ -144,11 +144,10 @@ export interface MotionCommentsArgs {
 export interface MotionCustomFieldsArgs {
   operation: 'list' | 'create' | 'delete' | 'add_to_project' | 'remove_from_project' | 'add_to_task' | 'remove_from_task';
   fieldId?: string;
-  workspaceId?: string;
+  workspaceId: string;
   name?: string;
-  type?: 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox';
+  type?: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 'phone' | 'select' | 'multiSelect' | 'number' | 'email' | 'checkbox' | 'relatedTo';
   options?: string[];
-  required?: boolean;
   projectId?: string;
   taskId?: string;
   value?: string | number | boolean | string[] | null;

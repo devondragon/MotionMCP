@@ -227,12 +227,7 @@ export function formatCustomFieldList(fields: MotionCustomField[]): CallToolResu
   }
   
   const fieldFormatter = (field: MotionCustomField) => {
-    let line = `- ${field.name} (ID: ${field.id}) [${field.type}]`;
-    if (field.required) line += ' *Required*';
-    if (field.options && field.options.length > 0) {
-      line += ` Options: ${field.options.join(', ')}`;
-    }
-    return line;
+    return `- ID: ${field.id} [Type: ${field.field}]`;
   };
   
   return formatListResponse(fields, `Found ${fields.length} custom field${fields.length === 1 ? '' : 's'}`, fieldFormatter);
@@ -245,11 +240,8 @@ export function formatCustomFieldDetail(field: MotionCustomField): CallToolResul
   const details = [
     `Custom field created successfully:`,
     `- ID: ${field.id}`,
-    `- Name: ${field.name}`,
-    `- Type: ${field.type}`,
-    `- Required: ${field.required ? 'Yes' : 'No'}`,
-    field.options && field.options.length > 0 ? `- Options: ${field.options.join(', ')}` : null
-  ].filter(Boolean).join('\n');
+    `- Type: ${field.field}`
+  ].join('\n');
   
   return formatMcpSuccess(details);
 }

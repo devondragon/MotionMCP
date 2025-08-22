@@ -724,7 +724,7 @@ class MotionMCPServer {
             },
             type: {
               type: "string",
-              enum: ["text", "number", "date", "select", "multiselect", "checkbox"],
+              enum: ["text", "url", "date", "person", "multiPerson", "phone", "select", "multiSelect", "number", "email", "checkbox", "relatedTo"],
               description: "Field type (for create)"
             },
             options: {
@@ -749,7 +749,7 @@ class MotionMCPServer {
               description: "Field value"
             }
           },
-          required: ["operation"]
+          required: ["operation", "workspaceId"]
         }
       },
       {
@@ -1339,15 +1339,21 @@ class MotionMCPServer {
       return formatMcpError(new Error("Motion service is not available"));
     }
 
-    const { operation, fieldId, workspaceId, name, type, options, required, projectId, taskId, value } = args;
+    const { operation, fieldId, workspaceId, name, type, options, projectId, taskId, value } = args;
     
     try {
       switch (operation) {
         case 'list':
+          if (!workspaceId) {
+            return formatMcpError(new Error('Workspace ID is required for list operation'));
+          }
           const fields = await motionService.getCustomFields(workspaceId);
           return formatCustomFieldList(fields);
           
         case 'create':
+          if (!workspaceId) {
+            return formatMcpError(new Error('Workspace ID is required for create operation'));
+          }
           if (!name || !type) {
             return formatMcpError(new Error('Name and type are required for create operation'));
           }
@@ -1357,28 +1363,24 @@ class MotionMCPServer {
             return formatMcpError(new Error(`Field name exceeds ${LIMITS.CUSTOM_FIELD_NAME_MAX_LENGTH} characters`));
           }
           
-          // Validate options array size for select fields
-          if (options && options.length > LIMITS.CUSTOM_FIELD_OPTIONS_MAX_COUNT) {
-            return formatMcpError(new Error(`Options array exceeds ${LIMITS.CUSTOM_FIELD_OPTIONS_MAX_COUNT} items`));
-          }
-          
           const fieldData: CreateCustomFieldData = {
             name,
             type,
-            ...(workspaceId && { workspaceId }),
-            ...(options && { options }),
-            ...(required !== undefined && { required })
+            ...(options && { metadata: { options } })
           };
           
-          const newField = await motionService.createCustomField(fieldData);
+          const newField = await motionService.createCustomField(workspaceId, fieldData);
           return formatCustomFieldDetail(newField);
           
         case 'delete':
+          if (!workspaceId) {
+            return formatMcpError(new Error('Workspace ID is required for delete operation'));
+          }
           if (!fieldId) {
             return formatMcpError(new Error('Field ID is required for delete operation'));
           }
           
-          await motionService.deleteCustomField(fieldId);
+          await motionService.deleteCustomField(workspaceId, fieldId);
           return formatCustomFieldSuccess('deleted');
           
         case 'add_to_project':
