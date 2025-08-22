@@ -1360,9 +1360,15 @@ class MotionMCPServer {
           const commentsResult = formatCommentList(commentsResponse.data);
           
           // Add pagination info if there's more data
-          if (commentsResponse.meta.nextCursor && commentsResult.content[0] && typeof commentsResult.content[0] === 'object' && 'text' in commentsResult.content[0]) {
-            const textContent = commentsResult.content[0] as { text: string };
-            textContent.text += `\n\n📄 More comments available. Use cursor: ${commentsResponse.meta.nextCursor}`;
+          if (commentsResponse.meta.nextCursor && commentsResult.content[0]) {
+            // Type guard to safely check if content[0] has text property
+            function hasTextProperty(obj: unknown): obj is { text: string } {
+              return typeof obj === 'object' && obj !== null && 'text' in obj && typeof (obj as any).text === 'string';
+            }
+            
+            if (hasTextProperty(commentsResult.content[0])) {
+              commentsResult.content[0].text += `\n\n📄 More comments available. Use cursor: ${commentsResponse.meta.nextCursor}`;
+            }
           }
           
           return commentsResult;
