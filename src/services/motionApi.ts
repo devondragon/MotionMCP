@@ -16,7 +16,7 @@ import {
   MotionApiErrorResponse,
   MotionApiError
 } from '../types/motion';
-import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER } from '../utils/constants';
+import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER, LIMITS } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { fetchAllPages, PaginatedApiResponse } from '../utils/pagination';
@@ -461,7 +461,7 @@ export class MotionApiService {
     }
   }
 
-  async getTasks(workspaceId: string, projectId?: string, maxPages: number = 5): Promise<MotionTask[]> {
+  async getTasks(workspaceId: string, projectId?: string, maxPages: number = 5, limit?: number): Promise<MotionTask[]> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching tasks from Motion API', {
         method: 'getTasks',
@@ -495,14 +495,23 @@ export class MotionApiService {
         });
         
         if (paginatedResult.totalFetched > 0) {
+          let tasks = paginatedResult.items;
+          
+          // Apply limit if specified
+          if (limit && limit > 0) {
+            tasks = tasks.slice(0, limit);
+          }
+          
           mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully with pagination', {
             method: 'getTasks',
             totalCount: paginatedResult.totalFetched,
+            returnedCount: tasks.length,
             hasMore: paginatedResult.hasMore,
             workspaceId,
-            projectId
+            projectId,
+            limitApplied: limit
           });
-          return paginatedResult.items;
+          return tasks;
         }
       } catch (paginationError) {
         // Fallback to simple fetch if pagination fails
@@ -515,13 +524,19 @@ export class MotionApiService {
       // Fallback: simple single-page fetch
       const response: AxiosResponse<ListResponse<MotionTask>> = await fetchPage();
       const tasksData = response.data?.tasks || response.data || [];
-      const tasks = Array.isArray(tasksData) ? tasksData : [];
+      let tasks = Array.isArray(tasksData) ? tasksData : [];
+      
+      // Apply limit if specified
+      if (limit && limit > 0) {
+        tasks = tasks.slice(0, limit);
+      }
       
       mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully (single page)', {
         method: 'getTasks',
         count: tasks.length,
         workspaceId,
-        projectId
+        projectId,
+        limitApplied: limit
       });
 
       return tasks;
@@ -890,26 +905,30 @@ export class MotionApiService {
     }
   }
 
-  async searchTasks(query: string, workspaceId: string): Promise<MotionTask[]> {
+  async searchTasks(query: string, workspaceId: string, limit?: number): Promise<MotionTask[]> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Searching tasks', {
         method: 'searchTasks',
         query,
-        workspaceId
+        workspaceId,
+        limit
       });
 
-      const tasks = await this.getTasks(workspaceId);
+      // Apply search limit to prevent resource exhaustion
+      const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
+      const tasks = await this.getTasks(workspaceId, undefined, LIMITS.MAX_PAGES, effectiveLimit);
       const lowerQuery = query.toLowerCase();
       
       const matchingTasks = tasks.filter(task => 
         task.name?.toLowerCase().includes(lowerQuery) ||
         task.description?.toLowerCase().includes(lowerQuery)
-      );
+      ).slice(0, effectiveLimit); // Additional safety limit
 
       mcpLog(LOG_LEVELS.INFO, 'Task search completed', {
         method: 'searchTasks',
         query,
-        resultsCount: matchingTasks.length
+        resultsCount: matchingTasks.length,
+        limit: effectiveLimit
       });
 
       return matchingTasks;
@@ -923,26 +942,30 @@ export class MotionApiService {
     }
   }
 
-  async searchProjects(query: string, workspaceId: string): Promise<MotionProject[]> {
+  async searchProjects(query: string, workspaceId: string, limit?: number): Promise<MotionProject[]> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Searching projects', {
         method: 'searchProjects',
         query,
-        workspaceId
+        workspaceId,
+        limit
       });
 
-      const projects = await this.getProjects(workspaceId);
+      // Apply search limit to prevent resource exhaustion
+      const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
+      const projects = await this.getProjects(workspaceId, LIMITS.MAX_PAGES);
       const lowerQuery = query.toLowerCase();
       
       const matchingProjects = projects.filter(project => 
         project.name?.toLowerCase().includes(lowerQuery) ||
         project.description?.toLowerCase().includes(lowerQuery)
-      );
+      ).slice(0, effectiveLimit); // Additional safety limit
 
       mcpLog(LOG_LEVELS.INFO, 'Project search completed', {
         method: 'searchProjects',
         query,
-        resultsCount: matchingProjects.length
+        resultsCount: matchingProjects.length,
+        limit: effectiveLimit
       });
 
       return matchingProjects;

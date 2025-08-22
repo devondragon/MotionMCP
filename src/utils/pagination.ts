@@ -58,7 +58,10 @@ export async function fetchAllPages<T>(
   let pageCount = 0;
   let hasMore = true;
   
-  while (hasMore && pageCount < maxPages) {
+  // Infinite loop protection - ensure we never fetch more than absolute max pages
+  const absoluteMaxPages = Math.min(maxPages, 50); // Hard limit to prevent infinite loops
+  
+  while (hasMore && pageCount < absoluteMaxPages) {
     try {
       if (logProgress && pageCount > 0) {
         mcpLog(LOG_LEVELS.DEBUG, `Fetching page ${pageCount + 1}`, { cursor });
@@ -72,7 +75,19 @@ export async function fetchAllPages<T>(
       allItems = allItems.concat(pageItems);
       
       // Update pagination state
-      cursor = data.meta?.nextCursor;
+      const newCursor = data.meta?.nextCursor;
+      
+      // Infinite loop protection: If cursor doesn't change, break
+      if (cursor && newCursor === cursor) {
+        mcpLog(LOG_LEVELS.WARN, 'Pagination cursor not advancing - breaking to prevent infinite loop', {
+          cursor,
+          pageCount,
+          itemsCount: pageItems.length
+        });
+        break;
+      }
+      
+      cursor = newCursor;
       hasMore = !!cursor && pageItems.length > 0;
       pageCount++;
       
@@ -96,8 +111,8 @@ export async function fetchAllPages<T>(
     }
   }
   
-  if (pageCount >= maxPages && hasMore) {
-    mcpLog(LOG_LEVELS.WARN, `Reached maximum page limit (${maxPages})`, {
+  if (pageCount >= absoluteMaxPages && hasMore) {
+    mcpLog(LOG_LEVELS.WARN, `Reached maximum page limit (${absoluteMaxPages})`, {
       totalFetched: allItems.length,
       finalCursor: cursor
     });

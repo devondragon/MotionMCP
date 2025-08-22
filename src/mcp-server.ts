@@ -32,6 +32,7 @@ import {
   LOG_LEVELS,
   LIMITS
 } from './utils';
+import { sanitizeCommentContent } from './utils/sanitize';
 import { InputValidator } from './utils/validator';
 import { McpToolResponse, McpToolDefinition } from './types/mcp';
 import * as ToolArgs from './types/mcp-tool-args';
@@ -1101,6 +1102,25 @@ class MotionMCPServer {
       return formatMcpError(new Error("Services not available"));
     }
 
+    // Validate and sanitize limit parameter
+    let limit = args.limit;
+    if (limit !== undefined) {
+      if (typeof limit !== 'number' || limit < 1) {
+        return formatMcpError(new Error('Limit must be a positive number'));
+      }
+      if (limit > LIMITS.MAX_PAGE_SIZE) {
+        limit = LIMITS.MAX_PAGE_SIZE;
+        mcpLog(LOG_LEVELS.WARN, `Requested limit ${args.limit} exceeds maximum, capping at ${LIMITS.MAX_PAGE_SIZE}`, {
+          method: 'handleListTasks',
+          requestedLimit: args.limit,
+          appliedLimit: limit
+        });
+      }
+    } else {
+      // Apply default limit
+      limit = LIMITS.DEFAULT_PAGE_SIZE;
+    }
+
     const workspace = await workspaceResolver.resolveWorkspace(args);
     
     // Resolve project if name provided
@@ -1112,12 +1132,13 @@ class MotionMCPServer {
       }
     }
 
-    const tasks = await motionService.getTasks(workspace.id, projectId);
+    const tasks = await motionService.getTasks(workspace.id, projectId, LIMITS.MAX_PAGES, limit);
     
     return formatTaskList(tasks, {
       workspaceName: workspace.name,
       projectName: args.projectName,
-      status: args.status
+      status: args.status,
+      limit: limit
     });
   }
 
@@ -1242,20 +1263,23 @@ class MotionMCPServer {
     }
 
     const { query, entityTypes = ['projects', 'tasks'] } = args;
-    const limit = 20;
+    // Use configurable limit to prevent resource exhaustion
+    const limit = LIMITS.MAX_SEARCH_RESULTS;
     
     const workspace = await workspaceResolver.resolveWorkspace(args);
     
     let results: Array<any> = [];
     
     if (entityTypes?.includes('tasks')) {
-      const tasks = await motionService.searchTasks(query, workspace.id);
-      results.push(...tasks.slice(0, limit));
+      // Pass limit to prevent fetching unlimited results
+      const tasks = await motionService.searchTasks(query, workspace.id, limit);
+      results.push(...tasks);
     }
     
     if (entityTypes?.includes('projects')) {
-      const projects = await motionService.searchProjects(query, workspace.id);
-      results.push(...projects.slice(0, limit));
+      // Pass limit to prevent fetching unlimited results
+      const projects = await motionService.searchProjects(query, workspace.id, limit);
+      results.push(...projects);
     }
     
     return formatSearchResults(results.slice(0, limit), query, { limit, searchScope: entityTypes?.join(',') || 'both' });
@@ -1338,11 +1362,14 @@ class MotionMCPServer {
           return formatCommentList(comments);
           
         case 'create':
-          const trimmedContent = content?.trim();
-          if (!trimmedContent) {
-            return formatMcpError(new Error('Content is required and cannot be empty for create operation'));
+          // Sanitize and validate comment content
+          const sanitizationResult = sanitizeCommentContent(content);
+          if (!sanitizationResult.isValid) {
+            return formatMcpError(new Error(sanitizationResult.error || 'Invalid comment content'));
           }
-          if (trimmedContent.length > LIMITS.COMMENT_MAX_LENGTH) {
+          
+          const sanitizedContent = sanitizationResult.sanitized;
+          if (sanitizedContent.length > LIMITS.COMMENT_MAX_LENGTH) {
             return formatMcpError(new Error(`Comment content exceeds maximum length of ${LIMITS.COMMENT_MAX_LENGTH} characters`));
           }
           if (!taskId && !projectId) {
@@ -1352,7 +1379,7 @@ class MotionMCPServer {
             return formatMcpError(new Error('Provide either taskId or projectId, not both'));
           }
           
-          const commentData: CreateCommentData = { content: trimmedContent };
+          const commentData: CreateCommentData = { content: sanitizedContent };
           if (taskId) commentData.taskId = taskId;
           if (projectId) commentData.projectId = projectId;
           if (authorId) commentData.authorId = authorId;

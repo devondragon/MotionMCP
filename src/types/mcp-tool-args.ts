@@ -42,6 +42,7 @@ export interface ListTasksArgs {
   projectName?: string;
   status?: string;
   assigneeId?: string;
+  limit?: number;
 }
 
 export interface GetTaskArgs {
