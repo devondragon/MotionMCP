@@ -5,6 +5,8 @@
  * to prevent injection attacks and ensure data integrity.
  */
 
+import { LIMITS } from './constants';
+
 /**
  * Sanitize user-provided text content for safe storage and transmission
  * Removes dangerous HTML tags, script content, and other potentially harmful input
@@ -39,10 +41,9 @@ export function sanitizeTextContent(input: string | undefined | null): string {
     // Escape ampersands (but do it last to avoid double-escaping)
     .replace(/&(?!(lt|gt|quot|#39|amp);)/g, '&amp;');
 
-  // Limit length to prevent abuse
-  const MAX_COMMENT_LENGTH = 10000;
-  if (sanitized.length > MAX_COMMENT_LENGTH) {
-    sanitized = sanitized.substring(0, MAX_COMMENT_LENGTH);
+  // Limit length to prevent abuse - use consistent limit from constants
+  if (sanitized.length > LIMITS.COMMENT_MAX_LENGTH) {
+    sanitized = sanitized.substring(0, LIMITS.COMMENT_MAX_LENGTH);
   }
 
   return sanitized;

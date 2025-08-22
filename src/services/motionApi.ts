@@ -20,10 +20,10 @@ import {
 import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER, LIMITS } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
-import { fetchAllPages, PaginatedApiResponse } from '../utils/pagination';
+import { fetchAllPages as fetchAllPagesNew } from '../utils/paginationNew';
+import { unwrapApiResponse } from '../utils/responseWrapper';
 import { z } from 'zod';
 import { 
-  ProjectsListResponseSchema,
   WorkspacesListResponseSchema,
   SchedulesListResponseSchema,
   StatusesListResponseSchema,
@@ -262,28 +262,18 @@ export class MotionApiService {
           const queryString = params.toString();
           const url = `/projects?${queryString}`;
           
-          return this.requestWithRetry(() => this.client.get(url)) as Promise<AxiosResponse<PaginatedApiResponse<MotionProject>>>;
+          return this.requestWithRetry(() => this.client.get(url));
         };
 
         try {
-          // Attempt pagination-aware fetch
-          const paginatedResult = await fetchAllPages(fetchPage, { 
+          // Attempt pagination-aware fetch with new response wrapper
+          const paginatedResult = await fetchAllPagesNew<MotionProject>(fetchPage, 'projects', { 
             maxPages,
             logProgress: false
           });
           
           if (paginatedResult.totalFetched > 0) {
-            // Validate the response structure
-            const validatedResponse = this.validateResponse(
-              paginatedResult.items,
-              ProjectsListResponseSchema,
-              'getProjects'
-            );
-            
-            // Extract projects array (handle both wrapped and unwrapped responses)
-            const projects = Array.isArray(validatedResponse) 
-              ? validatedResponse 
-              : validatedResponse.projects;
+            let projects = paginatedResult.items;
             
             mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully with pagination', {
               method: 'getProjects',
@@ -301,20 +291,10 @@ export class MotionApiService {
           });
         }
 
-        // Fallback: simple single-page fetch
-        const response: AxiosResponse = await fetchPage();
-        
-        // Validate the response structure
-        const validatedResponse = this.validateResponse(
-          response.data,
-          ProjectsListResponseSchema,
-          'getProjects'
-        );
-        
-        // Extract projects array (handle both wrapped and unwrapped responses)
-        const projects = Array.isArray(validatedResponse) 
-          ? validatedResponse 
-          : validatedResponse.projects;
+        // Use new response wrapper for single page fallback
+        const response = await fetchPage();
+        const unwrapped = unwrapApiResponse<MotionProject>(response.data, 'projects');
+        let projects = unwrapped.data;
         
         mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully (single page)', {
           method: 'getProjects',
@@ -485,12 +465,12 @@ export class MotionApiService {
         const queryString = params.toString();
         const url = queryString ? `/tasks?${queryString}` : '/tasks';
         
-        return this.requestWithRetry(() => this.client.get(url)) as Promise<AxiosResponse<PaginatedApiResponse<MotionTask>>>;
+        return this.requestWithRetry(() => this.client.get(url));
       };
 
       try {
-        // Attempt pagination-aware fetch
-        const paginatedResult = await fetchAllPages(fetchPage, { 
+        // Attempt pagination-aware fetch with new response wrapper
+        const paginatedResult = await fetchAllPagesNew<MotionTask>(fetchPage, 'tasks', { 
           maxPages,
           logProgress: false  // Less verbose for tasks
         });
@@ -522,10 +502,10 @@ export class MotionApiService {
         });
       }
 
-      // Fallback: simple single-page fetch
-      const response: AxiosResponse<ListResponse<MotionTask>> = await fetchPage();
-      const tasksData = response.data?.tasks || response.data || [];
-      let tasks = Array.isArray(tasksData) ? tasksData : [];
+      // Use new response wrapper for single page fallback
+      const response = await fetchPage();
+      const unwrapped = unwrapApiResponse<MotionTask>(response.data, 'tasks');
+      let tasks = unwrapped.data;
       
       // Apply limit if specified
       if (limit && limit > 0) {
@@ -1005,22 +985,22 @@ export class MotionApiService {
           this.client.get(`/comments?${params.toString()}`)
         );
 
-        // The API response structure is { meta: {...}, comments: [...] }
-        const { meta = {}, comments = [] } = response.data || {};
+        // Use new response wrapper for consistent handling
+        const unwrapped = unwrapApiResponse<MotionComment>(response.data, 'comments');
         
         mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully', {
           method: 'getComments',
-          count: comments?.length || 0,
-          hasMore: !!meta?.nextCursor,
+          count: unwrapped.data.length,
+          hasMore: !!unwrapped.meta?.nextCursor,
           taskId
         });
 
         // Return in our standard paginated format
         return {
-          data: comments || [],
+          data: unwrapped.data,
           meta: {
-            nextCursor: meta?.nextCursor,
-            pageSize: meta?.pageSize || (comments?.length || 0)
+            nextCursor: unwrapped.meta?.nextCursor,
+            pageSize: unwrapped.meta?.pageSize || unwrapped.data.length
           }
         };
       } catch (error: unknown) {
@@ -1424,11 +1404,11 @@ export class MotionApiService {
           const queryString = params.toString();
           const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
           
-          return this.requestWithRetry(() => this.client.get(url)) as Promise<AxiosResponse<PaginatedApiResponse<MotionRecurringTask>>>;
+          return this.requestWithRetry(() => this.client.get(url));
         };
 
         // Use pagination utility to fetch all pages
-        const paginatedResult = await fetchAllPages(fetchPage, { 
+        const paginatedResult = await fetchAllPagesNew<MotionRecurringTask>(fetchPage, 'recurring-tasks', { 
           maxPages, 
           logProgress: true 
         });
