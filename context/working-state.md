@@ -1,15 +1,23 @@
 # Working State
 
 ## Current Active Task
-**Task-002: Rewrite Recurring Tasks API** - Started: 2025-08-22
-- Critical: API completely wrong concept - returns task instances not recurrence patterns
-- Priority: Critical | Estimated: 4h
-- Fixing interface structure and response handling for actual API behavior
-- Feature: epic-001-f04-schema-fixes
-- Location: context/features/epic-001-f04-schema-fixes/tasks/current/
-- Branch: feature/task-002-rewrite-recurring-tasks-api
+None - Ready to start next task
 
 ## Recently Completed Tasks
+
+**Task-003: Fix Comments API Schema** - Completed: 2025-08-22
+- Fixed missing creator field and incorrect response wrapper handling
+- Updated MotionComment interface to use creator object instead of authorId  
+- Added proper pagination support with MotionPaginatedResponse types
+- Fixed response formatters and MCP handlers for new schema
+- Priority: Critical | Estimated: 2h | Actual: ~2h
+- Branch: feature/task-003-fix-comments-api (ready for PR)
+
+**Task-002: Rewrite Recurring Tasks API** - Completed: 2025-08-22
+- Fixed completely wrong concept - API returns task instances not recurrence patterns
+- Rewrote interface structure and response handling for actual API behavior
+- Priority: Critical | Estimated: 4h | Actual: ~4h
+- Branch: feature/task-002-rewrite-recurring-tasks-api (ready for PR)
 
 **Task-001: Rewrite Custom Fields API** - Completed: 2025-08-22
 - Fixed completely broken API interface and beta endpoints structure

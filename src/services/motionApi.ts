@@ -14,7 +14,8 @@ import {
   MotionStatus,
   ListResponse,
   MotionApiErrorResponse,
-  MotionApiError
+  MotionApiError,
+  MotionPaginatedResponse
 } from '../types/motion';
 import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER, LIMITS } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
@@ -46,7 +47,7 @@ export class MotionApiService {
   private workspaceCache: SimpleCache<MotionWorkspace[]>;
   private userCache: SimpleCache<MotionUser[]>;
   private projectCache: SimpleCache<MotionProject[]>;
-  private commentCache: SimpleCache<MotionComment[]>;
+  private commentCache: SimpleCache<MotionPaginatedResponse<MotionComment>>;
   private customFieldCache: SimpleCache<MotionCustomField[]>;
   private recurringTaskCache: SimpleCache<MotionRecurringTask[]>;
   private scheduleCache: SimpleCache<MotionSchedule[]>;
@@ -979,14 +980,14 @@ export class MotionApiService {
     }
   }
 
-  async getComments(taskId?: string, projectId?: string, maxPages: number = 3): Promise<MotionComment[]> {
-    // Require at least one parameter to prevent ambiguous 'all' queries
-    if (!taskId && !projectId) {
-      throw new Error('Either taskId or projectId must be provided to fetch comments');
-    }
-    
-    // Use JSON.stringify for deterministic cache key generation
-    const cacheParams = { taskId: taskId || null, projectId: projectId || null };
+  /**
+   * Get comments for a task with proper pagination support
+   * @param taskId Task ID to get comments for
+   * @param cursor Optional cursor for pagination
+   * @returns Paginated response with comments and metadata
+   */
+  async getComments(taskId: string, cursor?: string): Promise<MotionPaginatedResponse<MotionComment>> {
+    const cacheParams = { taskId, cursor: cursor || null };
     const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
     
     return this.commentCache.withCache(cacheKey, async () => {
@@ -994,71 +995,43 @@ export class MotionApiService {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching comments from Motion API', {
           method: 'getComments',
           taskId,
-          projectId,
-          maxPages
+          cursor
         });
 
-        // Create a fetch function for potential pagination
-        const fetchPage = async (cursor?: string) => {
-          const params = new URLSearchParams();
-          if (taskId) params.append('taskId', taskId);
-          if (projectId) params.append('projectId', projectId);
-          if (cursor) params.append('cursor', cursor);
-          
-          const queryString = params.toString();
-          const url = queryString ? `/comments?${queryString}` : '/comments';
-          
-          return this.requestWithRetry(() => this.client.get(url)) as Promise<AxiosResponse<PaginatedApiResponse<MotionComment>>>;
-        };
-
-        try {
-          // Attempt pagination-aware fetch
-          const paginatedResult = await fetchAllPages(fetchPage, { 
-            maxPages,
-            logProgress: false
-          });
-          
-          if (paginatedResult.totalFetched > 0) {
-            mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully with pagination', {
-              method: 'getComments',
-              totalCount: paginatedResult.totalFetched,
-              hasMore: paginatedResult.hasMore,
-              taskId,
-              projectId
-            });
-            return paginatedResult.items;
-          }
-        } catch (paginationError) {
-          mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
-            method: 'getComments',
-            error: paginationError instanceof Error ? paginationError.message : String(paginationError)
-          });
-        }
-
-        // Fallback: simple single-page fetch
-        const response: AxiosResponse<ListResponse<MotionComment>> = await fetchPage();
+        const params = new URLSearchParams({ taskId });
+        if (cursor) params.append('cursor', cursor);
         
-        // Handle both wrapped and unwrapped responses
-        const comments = response.data?.comments || response.data || [];
-        const commentsArray = Array.isArray(comments) ? comments : [];
+        const response = await this.requestWithRetry(() => 
+          this.client.get(`/comments?${params.toString()}`)
+        );
+
+        // The API response structure is { meta: {...}, comments: [...] }
+        const { meta = {}, comments = [] } = response.data || {};
         
-        mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully (single page)', {
+        mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully', {
           method: 'getComments',
-          count: commentsArray.length,
-          taskId,
-          projectId
+          count: comments?.length || 0,
+          hasMore: !!meta?.nextCursor,
+          taskId
         });
 
-        return commentsArray;
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch comments', {
-        method: 'getComments',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        taskId,
-        projectId
-      });
+        // Return in our standard paginated format
+        return {
+          data: comments || [],
+          meta: {
+            nextCursor: meta?.nextCursor,
+            pageSize: meta?.pageSize || (comments?.length || 0)
+          }
+        };
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch comments', {
+          method: 'getComments',
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+          taskId,
+          cursor
+        });
         throw this.formatApiError(error, 'fetch comments');
       }
     });
@@ -1066,38 +1039,30 @@ export class MotionApiService {
 
   async createComment(commentData: CreateCommentData): Promise<MotionComment> {
     try {
-      // Validate that at least one target ID is provided
-      if (!commentData.taskId && !commentData.projectId) {
-        throw new Error('Either taskId or projectId must be supplied for comment creation');
-      }
-
       mcpLog(LOG_LEVELS.DEBUG, 'Creating comment in Motion API', {
         method: 'createComment',
         taskId: commentData.taskId,
-        projectId: commentData.projectId,
         contentLength: commentData.content?.length || 0
       });
 
-      // Only include fields that are present (avoid sending null)
-      const { content, taskId, projectId, authorId } = commentData;
+      // API only accepts taskId and content
       const apiData = {
-        content,
-        ...(taskId && { taskId }),
-        ...(projectId && { projectId }),
-        ...(authorId && { authorId })
+        taskId: commentData.taskId,
+        content: commentData.content
       };
-      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => this.client.post('/comments', apiData));
+      
+      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => 
+        this.client.post('/comments', apiData)
+      );
       
       // Invalidate cache after successful creation
-      const cacheParams = { taskId: commentData.taskId || null, projectId: commentData.projectId || null };
-      const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
-      this.commentCache.invalidate(cacheKey); // Invalidate specific cache
+      const cacheKey = `comments:${JSON.stringify({ taskId: commentData.taskId, cursor: null })}`;
+      this.commentCache.invalidate(cacheKey);
       
       mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
         method: 'createComment',
         commentId: response.data?.id,
-        taskId: commentData.taskId,
-        projectId: commentData.projectId
+        taskId: commentData.taskId
       });
 
       return response.data;
@@ -1107,8 +1072,7 @@ export class MotionApiService {
         error: getErrorMessage(error),
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        taskId: commentData?.taskId,
-        projectId: commentData?.projectId
+        taskId: commentData?.taskId
       });
       throw this.formatApiError(error, 'create comment');
     }

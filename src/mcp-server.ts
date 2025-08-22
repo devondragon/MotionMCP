@@ -671,7 +671,7 @@ class MotionMCPServer {
       },
       {
         name: "motion_comments",
-        description: "Manage comments on tasks and projects",
+        description: "Manage comments on tasks",
         inputSchema: {
           type: "object",
           properties: {
@@ -682,22 +682,18 @@ class MotionMCPServer {
             },
             taskId: {
               type: "string",
-              description: "Task ID to comment on or fetch comments from"
-            },
-            projectId: {
-              type: "string",
-              description: "Project ID to comment on or fetch comments from"
+              description: "Task ID to comment on or fetch comments from (required)"
             },
             content: {
               type: "string",
-              description: "Comment content (required for create)"
+              description: "Comment content (required for create operation)"
             },
-            authorId: {
+            cursor: {
               type: "string",
-              description: "Author user ID (optional)"
+              description: "Pagination cursor for list operation (optional)"
             }
           },
-          required: ["operation"]
+          required: ["operation", "taskId"]
         }
       },
       {
@@ -1349,22 +1345,36 @@ class MotionMCPServer {
       return formatMcpError(new Error("Motion service is not available"));
     }
 
-    const { operation, taskId, projectId, content, authorId } = args;
+    const { operation, taskId, content, cursor } = args;
     
     try {
       switch (operation) {
         case 'list':
-          if (!taskId && !projectId) {
-            return formatMcpError(new Error('Either taskId or projectId is required for list operation'));
-          }
-          if (taskId && projectId) {
-            return formatMcpError(new Error('Provide either taskId or projectId, not both'));
+          if (!taskId) {
+            return formatMcpError(new Error('taskId is required for list operation'));
           }
           
-          const comments = await motionService.getComments(taskId, projectId);
-          return formatCommentList(comments);
+          const commentsResponse = await motionService.getComments(taskId, cursor);
+          
+          // Format the comments list
+          const commentsResult = formatCommentList(commentsResponse.data);
+          
+          // Add pagination info if there's more data
+          if (commentsResponse.meta.nextCursor && commentsResult.content[0] && typeof commentsResult.content[0] === 'object' && 'text' in commentsResult.content[0]) {
+            const textContent = commentsResult.content[0] as { text: string };
+            textContent.text += `\n\n📄 More comments available. Use cursor: ${commentsResponse.meta.nextCursor}`;
+          }
+          
+          return commentsResult;
           
         case 'create':
+          if (!taskId) {
+            return formatMcpError(new Error('taskId is required for create operation'));
+          }
+          if (!content) {
+            return formatMcpError(new Error('content is required for create operation'));
+          }
+          
           // Sanitize and validate comment content
           const sanitizationResult = sanitizeCommentContent(content);
           if (!sanitizationResult.isValid) {
@@ -1375,17 +1385,11 @@ class MotionMCPServer {
           if (sanitizedContent.length > LIMITS.COMMENT_MAX_LENGTH) {
             return formatMcpError(new Error(`Comment content exceeds maximum length of ${LIMITS.COMMENT_MAX_LENGTH} characters`));
           }
-          if (!taskId && !projectId) {
-            return formatMcpError(new Error('Either taskId or projectId is required for create operation'));
-          }
-          if (taskId && projectId) {
-            return formatMcpError(new Error('Provide either taskId or projectId, not both'));
-          }
           
-          const commentData: CreateCommentData = { content: sanitizedContent };
-          if (taskId) commentData.taskId = taskId;
-          if (projectId) commentData.projectId = projectId;
-          if (authorId) commentData.authorId = authorId;
+          const commentData: CreateCommentData = { 
+            taskId, 
+            content: sanitizedContent 
+          };
           
           const newComment = await motionService.createComment(commentData);
           return formatCommentDetail(newComment);

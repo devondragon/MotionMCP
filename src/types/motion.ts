@@ -45,6 +45,22 @@ export interface ChunkReference {
   [key: string]: unknown;
 }
 
+/**
+ * Pagination metadata for Motion API responses
+ */
+export interface MotionPaginationMeta {
+  nextCursor?: string;
+  pageSize: number;
+}
+
+/**
+ * Generic paginated response structure for Motion API
+ */
+export interface MotionPaginatedResponse<T> {
+  data: T[];
+  meta: MotionPaginationMeta;
+}
+
 export interface MotionProject {
   id: string;
   name: string;
@@ -95,19 +111,15 @@ export interface MotionTask {
 
 export interface MotionComment {
   id: string;
+  taskId: string;
   content: string;
-  authorId: string;
-  taskId?: string;
-  projectId?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  creator: AssigneeReference;
 }
 
 export interface CreateCommentData {
+  taskId: string;
   content: string;
-  taskId?: string;
-  projectId?: string;
-  authorId?: string;
 }
 
 export interface MotionUser {
