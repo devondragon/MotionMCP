@@ -88,7 +88,13 @@ export const LIMITS = {
   COMMENT_MAX_LENGTH: 5000,      // Maximum comment length in characters
   COMMENT_DISPLAY_LENGTH: 120,   // Maximum length for display before truncation
   CUSTOM_FIELD_NAME_MAX_LENGTH: 255,  // Maximum custom field name length
-  CUSTOM_FIELD_OPTIONS_MAX_COUNT: 100 // Maximum number of options for select fields
+  CUSTOM_FIELD_OPTIONS_MAX_COUNT: 100, // Maximum number of options for select fields
+  
+  // Pagination limits to prevent resource exhaustion
+  DEFAULT_PAGE_SIZE: 50,         // Default number of items per page
+  MAX_PAGE_SIZE: 200,           // Maximum allowed page size
+  MAX_PAGES: 10,                // Maximum number of pages to fetch
+  MAX_SEARCH_RESULTS: 100       // Maximum search results to return
 } as const;
 
 // Logging levels for MCP compliance

@@ -32,6 +32,7 @@ import {
   LOG_LEVELS,
   LIMITS
 } from './utils';
+import { sanitizeCommentContent } from './utils/sanitize';
 import { InputValidator } from './utils/validator';
 import { McpToolResponse, McpToolDefinition } from './types/mcp';
 import * as ToolArgs from './types/mcp-tool-args';
@@ -783,12 +784,17 @@ class MotionMCPServer {
               type: "string",
               description: "Project ID"
             },
-            recurrence: {
+            assigneeId: {
+              type: "string",
+              description: "User ID to assign the recurring task to (required for create)"
+            },
+            frequency: {
               type: "object",
               properties: {
-                frequency: {
+                type: {
                   type: "string",
-                  enum: ["daily", "weekly", "monthly", "yearly"]
+                  enum: ["daily", "weekly", "monthly", "yearly"],
+                  description: "Frequency type"
                 },
                 interval: {
                   type: "number",
@@ -797,7 +803,7 @@ class MotionMCPServer {
                 daysOfWeek: {
                   type: "array",
                   items: { type: "number" },
-                  description: "0-6 for Sunday-Saturday"
+                  description: "0-6 for Sunday-Saturday (for weekly)"
                 },
                 dayOfMonth: {
                   type: "number",
@@ -805,10 +811,40 @@ class MotionMCPServer {
                 },
                 endDate: {
                   type: "string",
-                  description: "ISO 8601 format"
+                  description: "ISO 8601 format end date"
                 }
               },
-              required: ["frequency"]
+              required: ["type"],
+              description: "Frequency configuration (required for create)"
+            },
+            deadlineType: {
+              type: "string",
+              enum: ["HARD", "SOFT"],
+              description: "Deadline type (default: SOFT)"
+            },
+            duration: {
+              oneOf: [
+                { type: "number" },
+                { type: "string", enum: ["REMINDER"] }
+              ],
+              description: "Task duration in minutes or REMINDER"
+            },
+            startingOn: {
+              type: "string",
+              description: "Start date (ISO 8601 format)"
+            },
+            idealTime: {
+              type: "string",
+              description: "Ideal time in HH:mm format"
+            },
+            schedule: {
+              type: "string",
+              description: "Schedule name (default: Work Hours)"
+            },
+            priority: {
+              type: "string",
+              enum: ["ASAP", "HIGH", "MEDIUM", "LOW"],
+              description: "Task priority (default: MEDIUM)"
             }
           },
           required: ["operation"]
@@ -1066,6 +1102,25 @@ class MotionMCPServer {
       return formatMcpError(new Error("Services not available"));
     }
 
+    // Validate and sanitize limit parameter
+    let limit = args.limit;
+    if (limit !== undefined) {
+      if (typeof limit !== 'number' || limit < 1) {
+        return formatMcpError(new Error('Limit must be a positive number'));
+      }
+      if (limit > LIMITS.MAX_PAGE_SIZE) {
+        limit = LIMITS.MAX_PAGE_SIZE;
+        mcpLog(LOG_LEVELS.WARN, `Requested limit ${args.limit} exceeds maximum, capping at ${LIMITS.MAX_PAGE_SIZE}`, {
+          method: 'handleListTasks',
+          requestedLimit: args.limit,
+          appliedLimit: limit
+        });
+      }
+    } else {
+      // Apply default limit
+      limit = LIMITS.DEFAULT_PAGE_SIZE;
+    }
+
     const workspace = await workspaceResolver.resolveWorkspace(args);
     
     // Resolve project if name provided
@@ -1077,12 +1132,16 @@ class MotionMCPServer {
       }
     }
 
-    const tasks = await motionService.getTasks(workspace.id, projectId);
+    // Calculate appropriate maxPages based on limit to prevent DoS
+    // If user specifies a small limit, don't fetch more pages than necessary
+    const maxPages = limit && limit <= LIMITS.DEFAULT_PAGE_SIZE ? 1 : LIMITS.MAX_PAGES;
+    const tasks = await motionService.getTasks(workspace.id, projectId, maxPages, limit);
     
     return formatTaskList(tasks, {
       workspaceName: workspace.name,
       projectName: args.projectName,
-      status: args.status
+      status: args.status,
+      limit: limit
     });
   }
 
@@ -1207,20 +1266,23 @@ class MotionMCPServer {
     }
 
     const { query, entityTypes = ['projects', 'tasks'] } = args;
-    const limit = 20;
+    // Use configurable limit to prevent resource exhaustion
+    const limit = LIMITS.MAX_SEARCH_RESULTS;
     
     const workspace = await workspaceResolver.resolveWorkspace(args);
     
     let results: Array<any> = [];
     
     if (entityTypes?.includes('tasks')) {
-      const tasks = await motionService.searchTasks(query, workspace.id);
-      results.push(...tasks.slice(0, limit));
+      // Pass limit to prevent fetching unlimited results
+      const tasks = await motionService.searchTasks(query, workspace.id, limit);
+      results.push(...tasks);
     }
     
     if (entityTypes?.includes('projects')) {
-      const projects = await motionService.searchProjects(query, workspace.id);
-      results.push(...projects.slice(0, limit));
+      // Pass limit to prevent fetching unlimited results
+      const projects = await motionService.searchProjects(query, workspace.id, limit);
+      results.push(...projects);
     }
     
     return formatSearchResults(results.slice(0, limit), query, { limit, searchScope: entityTypes?.join(',') || 'both' });
@@ -1303,11 +1365,14 @@ class MotionMCPServer {
           return formatCommentList(comments);
           
         case 'create':
-          const trimmedContent = content?.trim();
-          if (!trimmedContent) {
-            return formatMcpError(new Error('Content is required and cannot be empty for create operation'));
+          // Sanitize and validate comment content
+          const sanitizationResult = sanitizeCommentContent(content);
+          if (!sanitizationResult.isValid) {
+            return formatMcpError(new Error(sanitizationResult.error || 'Invalid comment content'));
           }
-          if (trimmedContent.length > LIMITS.COMMENT_MAX_LENGTH) {
+          
+          const sanitizedContent = sanitizationResult.sanitized;
+          if (sanitizedContent.length > LIMITS.COMMENT_MAX_LENGTH) {
             return formatMcpError(new Error(`Comment content exceeds maximum length of ${LIMITS.COMMENT_MAX_LENGTH} characters`));
           }
           if (!taskId && !projectId) {
@@ -1317,7 +1382,7 @@ class MotionMCPServer {
             return formatMcpError(new Error('Provide either taskId or projectId, not both'));
           }
           
-          const commentData: CreateCommentData = { content: trimmedContent };
+          const commentData: CreateCommentData = { content: sanitizedContent };
           if (taskId) commentData.taskId = taskId;
           if (projectId) commentData.projectId = projectId;
           if (authorId) commentData.authorId = authorId;
@@ -1435,78 +1500,97 @@ class MotionMCPServer {
       return formatMcpError(new Error("Services not available"));
     }
 
-    const { operation, recurringTaskId, workspaceId, name, description, projectId, recurrence } = args;
+    const { operation, recurringTaskId, workspaceId, name, description, projectId, assigneeId, frequency, deadlineType, duration, startingOn, idealTime, schedule, priority } = args;
     
     try {
       switch (operation) {
         case 'list':
+          if (!workspaceId) {
+            return formatMcpError(new Error('Workspace ID is required for list operation'));
+          }
           const recurringTasks = await motionService.getRecurringTasks(workspaceId);
           return formatRecurringTaskList(recurringTasks);
           
         case 'create':
-          if (!name || !recurrence) {
-            return formatMcpError(new Error('Name and recurrence are required for create operation'));
+          if (!name) {
+            return formatMcpError(new Error('Name is required for create operation'));
+          }
+          if (!workspaceId) {
+            return formatMcpError(new Error('Workspace ID is required for create operation'));
+          }
+          if (!assigneeId) {
+            return formatMcpError(new Error('Assignee ID is required for create operation'));
+          }
+          if (!frequency) {
+            return formatMcpError(new Error('Frequency is required for create operation'));
           }
           
-          // Validate recurrence fields
-          if (recurrence.interval !== undefined && (!Number.isInteger(recurrence.interval) || recurrence.interval < 1)) {
-            return formatMcpError(new Error('Recurrence interval must be a positive integer'));
+          // Validate frequency
+          if (!frequency.type || !['daily', 'weekly', 'monthly', 'yearly'].includes(frequency.type)) {
+            return formatMcpError(new Error('Frequency type must be one of: daily, weekly, monthly, yearly'));
           }
-          if (recurrence.daysOfWeek && !recurrence.daysOfWeek.every(day => day >= 0 && day <= 6)) {
-            return formatMcpError(new Error('daysOfWeek must contain values between 0-6 (Sunday-Saturday)'));
+          
+          // Validate frequency-specific fields
+          if (frequency.interval && (!Number.isInteger(frequency.interval) || frequency.interval < 1)) {
+            return formatMcpError(new Error('Frequency interval must be a positive integer'));
           }
-          if (recurrence.dayOfMonth !== undefined && (recurrence.dayOfMonth < 1 || recurrence.dayOfMonth > 31)) {
-            return formatMcpError(new Error('dayOfMonth must be between 1-31'));
+          if (frequency.daysOfWeek && !frequency.daysOfWeek.every(day => Number.isInteger(day) && day >= 0 && day <= 6)) {
+            return formatMcpError(new Error('daysOfWeek must contain integers between 0-6 (Sunday-Saturday)'));
           }
-          if (recurrence.endDate !== undefined) {
-            // Validate endDate is a valid ISO 8601 format and in the future
-            const endDateObj = new Date(recurrence.endDate);
-            if (isNaN(endDateObj.getTime())) {
-              return formatMcpError(new Error('endDate must be a valid ISO 8601 date format'));
+          if (frequency.dayOfMonth && (!Number.isInteger(frequency.dayOfMonth) || frequency.dayOfMonth < 1 || frequency.dayOfMonth > 31)) {
+            return formatMcpError(new Error('dayOfMonth must be an integer between 1-31'));
+          }
+          if (frequency.endDate) {
+            const endDate = new Date(frequency.endDate);
+            if (isNaN(endDate.getTime())) {
+              return formatMcpError(new Error('frequency.endDate must be a valid ISO 8601 date format'));
             }
-            if (endDateObj <= new Date()) {
-              return formatMcpError(new Error('endDate must be in the future'));
+            if (endDate <= new Date()) {
+              return formatMcpError(new Error('frequency.endDate must be in the future'));
             }
           }
           
-          // Cross-field validation for recurrence consistency
-          switch (recurrence.frequency) {
-            case 'weekly':
-              if (!recurrence.daysOfWeek || recurrence.daysOfWeek.length === 0) {
-                return formatMcpError(new Error('daysOfWeek is required for weekly recurrence'));
+          // Validate optional fields
+          if (priority && !['ASAP', 'HIGH', 'MEDIUM', 'LOW'].includes(priority)) {
+            return formatMcpError(new Error('Priority must be one of: ASAP, HIGH, MEDIUM, LOW'));
+          }
+          if (deadlineType && !['HARD', 'SOFT'].includes(deadlineType)) {
+            return formatMcpError(new Error('Deadline type must be one of: HARD, SOFT'));
+          }
+          if (duration !== undefined) {
+            if (typeof duration === 'number') {
+              if (!Number.isInteger(duration) || duration <= 0) {
+                return formatMcpError(new Error('Duration must be a positive integer'));
               }
-              if (recurrence.dayOfMonth !== undefined) {
-                return formatMcpError(new Error('dayOfMonth should not be set for weekly recurrence'));
-              }
-              break;
-            case 'monthly':
-              if (recurrence.dayOfMonth === undefined) {
-                return formatMcpError(new Error('dayOfMonth is required for monthly recurrence'));
-              }
-              if (recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
-                return formatMcpError(new Error('daysOfWeek should not be set for monthly recurrence'));
-              }
-              break;
-            case 'daily':
-            case 'yearly':
-              if (recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
-                return formatMcpError(new Error(`daysOfWeek should not be set for ${recurrence.frequency} recurrence`));
-              }
-              if (recurrence.dayOfMonth !== undefined) {
-                return formatMcpError(new Error(`dayOfMonth should not be set for ${recurrence.frequency} recurrence`));
-              }
-              break;
+            } else if (typeof duration === 'string' && duration !== 'REMINDER') {
+              return formatMcpError(new Error('Duration string must be "REMINDER"'));
+            }
+          }
+          if (startingOn) {
+            const startDate = new Date(startingOn);
+            if (isNaN(startDate.getTime())) {
+              return formatMcpError(new Error('startingOn must be a valid ISO 8601 date format'));
+            }
+          }
+          if (idealTime && !/^\d{2}:\d{2}$/.test(idealTime)) {
+            return formatMcpError(new Error('idealTime must be in HH:mm format'));
           }
           
-          // Resolve workspace
           const workspace = await workspaceResolver.resolveWorkspace({ workspaceId });
           
           const taskData: CreateRecurringTaskData = {
             name,
-            workspaceId: workspace.id, // Ensure workspace is always set
+            workspaceId: workspace.id,
+            assigneeId,
+            frequency,
             ...(description && { description }),
             ...(projectId && { projectId }),
-            recurrence
+            ...(deadlineType && { deadlineType }),
+            ...(duration && { duration }),
+            ...(startingOn && { startingOn }),
+            ...(idealTime && { idealTime }),
+            ...(schedule && { schedule }),
+            ...(priority && { priority })
           };
           
           const newTask = await motionService.createRecurringTask(taskData);
