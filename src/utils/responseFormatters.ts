@@ -266,7 +266,8 @@ export function formatRecurringTaskList(tasks: MotionRecurringTask[]): CallToolR
   }
   
   const taskFormatter = (task: MotionRecurringTask) => {
-    return `- ${task.name} (ID: ${task.id}) [${task.recurrence.frequency}]${task.nextOccurrence ? ` Next: ${task.nextOccurrence}` : ''}`;
+    const projectName = task.project?.name || 'No Project';
+    return `- ${task.name} (ID: ${task.id}) [${task.priority}] (Project: ${projectName})`;
   };
   
   return formatListResponse(tasks, `Found ${tasks.length} recurring task${tasks.length === 1 ? '' : 's'}`, taskFormatter);
@@ -280,10 +281,13 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
     `Recurring task created successfully:`,
     `- ID: ${task.id}`,
     `- Name: ${task.name}`,
-    `- Frequency: ${task.recurrence.frequency}`,
-    `- Workspace: ${task.workspaceId}`,
-    task.projectId ? `- Project: ${task.projectId}` : null,
-    task.nextOccurrence ? `- Next occurrence: ${task.nextOccurrence}` : null
+    `- Priority: ${task.priority}`,
+    task.creator ? `- Creator: ${task.creator.name} (${task.creator.email})` : null,
+    task.workspace ? `- Workspace: ${task.workspace.name} (${task.workspace.id})` : null,
+    task.project ? `- Project: ${task.project.name} (${task.project.id})` : null,
+    task.assignee ? `- Assignee: ${task.assignee.name} (${task.assignee.email})` : null,
+    task.status ? `- Status: ${task.status.name}` : null,
+    task.labels && task.labels.length > 0 ? `- Labels: ${task.labels.map(l => l.name).join(', ')}` : null
   ].filter(Boolean).join('\n');
   
   return formatMcpSuccess(details);

@@ -1302,29 +1302,44 @@ export class MotionApiService {
   /**
    * Fetch recurring tasks from Motion API
    * @param workspaceId - Optional workspace ID to filter recurring tasks
+   * @param cursor - Optional pagination cursor
    * @returns Array of recurring tasks
    */
-  async getRecurringTasks(workspaceId?: string): Promise<MotionRecurringTask[]> {
+  async getRecurringTasks(workspaceId?: string, cursor?: string): Promise<MotionRecurringTask[]> {
     const cacheKey = workspaceId ? `recurring-tasks:workspace:${workspaceId}` : 'recurring-tasks:all';
     
     return this.recurringTaskCache.withCache(cacheKey, async () => {
       try {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching recurring tasks from Motion API', {
           method: 'getRecurringTasks',
-          workspaceId
+          workspaceId,
+          cursor
         });
 
         const params = new URLSearchParams();
         if (workspaceId) params.append('workspaceId', workspaceId);
+        if (cursor) params.append('cursor', cursor);
         
         const queryString = params.toString();
         const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
         
-        const response: AxiosResponse<ListResponse<MotionRecurringTask>> = await this.requestWithRetry(() => this.client.get(url));
+        const response: AxiosResponse<{meta?: {nextCursor?: string}, tasks: MotionRecurringTask[]}> = await this.requestWithRetry(() => this.client.get(url));
         
-        // Handle both wrapped and unwrapped responses
-        const recurringTasks = response.data?.recurringTasks || response.data || [];
-        const tasksArray = Array.isArray(recurringTasks) ? recurringTasks : [];
+        // Handle the API response structure: {meta: {...}, tasks: [...]}
+        const tasks = response.data?.tasks || [];
+        const tasksArray = Array.isArray(tasks) ? tasks : [];
+        
+        // Handle pagination - for now just log if there are more pages
+        const nextCursor = response.data?.meta?.nextCursor;
+        if (nextCursor) {
+          mcpLog(LOG_LEVELS.INFO, 'More recurring tasks available', {
+            method: 'getRecurringTasks',
+            nextCursor,
+            workspaceId
+          });
+          // TODO: Implement automatic pagination to fetch all pages
+          // For now, we return the first page and log that more data is available
+        }
         
         mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully', {
           method: 'getRecurringTasks',
@@ -1356,7 +1371,8 @@ export class MotionApiService {
       mcpLog(LOG_LEVELS.DEBUG, 'Creating recurring task in Motion API', {
         method: 'createRecurringTask',
         name: taskData.name,
-        frequency: taskData.recurrence.frequency,
+        assigneeId: taskData.assigneeId,
+        frequency: taskData.frequency.type,
         workspaceId: taskData.workspaceId
       });
 

@@ -134,33 +134,67 @@ export interface CreateCustomFieldData {
 export interface MotionRecurringTask {
   id: string;
   name: string;
-  description?: string;
-  workspaceId: string;
-  projectId?: string;
-  recurrence: {
-    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
-    interval?: number;
-    daysOfWeek?: number[];  // 0-6 for Sunday-Saturday
-    dayOfMonth?: number;    // 1-31 for monthly recurrence
-    endDate?: string;       // ISO 8601 format
+  creator: {
+    id: string;
+    name: string;
+    email: string;
   };
-  nextOccurrence?: string;
-  createdTime?: string;
-  updatedTime?: string;
+  assignee?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  project: {
+    id: string;
+    name: string;
+    description: string;
+    workspaceId: string;
+    status: {
+      name: string;
+      isDefaultStatus: boolean;
+      isResolvedStatus: boolean;
+    };
+    customFieldValues?: Record<string, unknown>;
+  };
+  workspace: {
+    id: string;
+    name: string;
+    teamId: string;
+    type: string;
+    labels: Array<{name: string}>;
+    statuses: Array<{
+      name: string;
+      isDefaultStatus: boolean;
+      isResolvedStatus: boolean;
+    }>;
+  };
+  status: {
+    name: string;
+    isDefaultStatus: boolean;
+    isResolvedStatus: boolean;
+  };
+  priority: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
+  labels: Array<{name: string}>;
 }
 
 export interface CreateRecurringTaskData {
   name: string;
-  description?: string;
-  workspaceId?: string;
-  projectId?: string;
-  recurrence: {
-    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  workspaceId: string;
+  assigneeId: string;
+  frequency: {
+    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
     interval?: number;
     daysOfWeek?: number[];
     dayOfMonth?: number;
     endDate?: string;
   };
+  description?: string;
+  deadlineType?: 'HARD' | 'SOFT';
+  duration?: number | 'REMINDER';
+  startingOn?: string;
+  idealTime?: string;
+  schedule?: string;
+  priority?: 'HIGH' | 'MEDIUM';
 }
 
 export interface MotionStatus {

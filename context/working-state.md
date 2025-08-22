@@ -1,15 +1,22 @@
 # Working State
 
 ## Current Active Task
-**Task-001: Rewrite Custom Fields API** - Started: 2025-08-22
-- Critical: API completely broken - wrong interface and endpoints
+**Task-002: Rewrite Recurring Tasks API** - Started: 2025-08-22
+- Critical: API completely wrong concept - returns task instances not recurrence patterns
 - Priority: Critical | Estimated: 4h
-- Fixing interface structure and beta API endpoints
+- Fixing interface structure and response handling for actual API behavior
 - Feature: epic-001-f04-schema-fixes
 - Location: context/features/epic-001-f04-schema-fixes/tasks/current/
-- Branch: feature/task-001-rewrite-custom-fields-api
+- Branch: feature/task-002-rewrite-recurring-tasks-api
 
 ## Recently Completed Tasks
+
+**Task-001: Rewrite Custom Fields API** - Completed: 2025-08-22
+- Fixed completely broken API interface and beta endpoints structure
+- Updated response handling for correct beta API paths
+- Implemented workspace-scoped custom fields operations
+- Priority: Critical | Estimated: 4h | Actual: ~4h
+- Branch: feature/task-001-rewrite-custom-fields-api (ready for PR)
 
 ## Recently Completed
 **Task-006: Implement Statuses API** - Completed: 2025-08-15

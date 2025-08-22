@@ -158,15 +158,21 @@ export interface MotionRecurringTasksArgs {
   recurringTaskId?: string;
   workspaceId?: string;
   name?: string;
-  description?: string;
-  projectId?: string;
-  recurrence?: {
-    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  assigneeId?: string;
+  frequency?: {
+    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
     interval?: number;
     daysOfWeek?: number[];
     dayOfMonth?: number;
     endDate?: string;
   };
+  description?: string;
+  deadlineType?: 'HARD' | 'SOFT';
+  duration?: number | 'REMINDER';
+  startingOn?: string;
+  idealTime?: string;
+  schedule?: string;
+  priority?: 'HIGH' | 'MEDIUM';
 }
 
 export interface MotionSchedulesArgs {

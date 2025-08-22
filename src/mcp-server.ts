@@ -783,12 +783,17 @@ class MotionMCPServer {
               type: "string",
               description: "Project ID"
             },
-            recurrence: {
+            assigneeId: {
+              type: "string",
+              description: "User ID to assign the recurring task to (required for create)"
+            },
+            frequency: {
               type: "object",
               properties: {
-                frequency: {
+                type: {
                   type: "string",
-                  enum: ["daily", "weekly", "monthly", "yearly"]
+                  enum: ["daily", "weekly", "monthly", "yearly"],
+                  description: "Frequency type"
                 },
                 interval: {
                   type: "number",
@@ -797,7 +802,7 @@ class MotionMCPServer {
                 daysOfWeek: {
                   type: "array",
                   items: { type: "number" },
-                  description: "0-6 for Sunday-Saturday"
+                  description: "0-6 for Sunday-Saturday (for weekly)"
                 },
                 dayOfMonth: {
                   type: "number",
@@ -805,10 +810,40 @@ class MotionMCPServer {
                 },
                 endDate: {
                   type: "string",
-                  description: "ISO 8601 format"
+                  description: "ISO 8601 format end date"
                 }
               },
-              required: ["frequency"]
+              required: ["type"],
+              description: "Frequency configuration (required for create)"
+            },
+            deadlineType: {
+              type: "string",
+              enum: ["HARD", "SOFT"],
+              description: "Deadline type (default: SOFT)"
+            },
+            duration: {
+              oneOf: [
+                { type: "number" },
+                { type: "string", enum: ["REMINDER"] }
+              ],
+              description: "Task duration in minutes or REMINDER"
+            },
+            startingOn: {
+              type: "string",
+              description: "Start date (ISO 8601 format)"
+            },
+            idealTime: {
+              type: "string",
+              description: "Ideal time in HH:mm format"
+            },
+            schedule: {
+              type: "string",
+              description: "Schedule name (default: Work Hours)"
+            },
+            priority: {
+              type: "string",
+              enum: ["HIGH", "MEDIUM"],
+              description: "Task priority (default: MEDIUM)"
             }
           },
           required: ["operation"]
@@ -1435,7 +1470,7 @@ class MotionMCPServer {
       return formatMcpError(new Error("Services not available"));
     }
 
-    const { operation, recurringTaskId, workspaceId, name, description, projectId, recurrence } = args;
+    const { operation, recurringTaskId, workspaceId, name, description, assigneeId, frequency, deadlineType, duration, startingOn, idealTime, schedule, priority } = args;
     
     try {
       switch (operation) {
@@ -1444,69 +1479,58 @@ class MotionMCPServer {
           return formatRecurringTaskList(recurringTasks);
           
         case 'create':
-          if (!name || !recurrence) {
-            return formatMcpError(new Error('Name and recurrence are required for create operation'));
+          if (!name) {
+            return formatMcpError(new Error('Name is required for create operation'));
+          }
+          if (!workspaceId) {
+            return formatMcpError(new Error('Workspace ID is required for create operation'));
+          }
+          if (!assigneeId) {
+            return formatMcpError(new Error('Assignee ID is required for create operation'));
+          }
+          if (!frequency) {
+            return formatMcpError(new Error('Frequency is required for create operation'));
           }
           
-          // Validate recurrence fields
-          if (recurrence.interval !== undefined && (!Number.isInteger(recurrence.interval) || recurrence.interval < 1)) {
-            return formatMcpError(new Error('Recurrence interval must be a positive integer'));
+          // Validate frequency
+          if (!frequency.type || !['daily', 'weekly', 'monthly', 'yearly'].includes(frequency.type)) {
+            return formatMcpError(new Error('Frequency type must be one of: daily, weekly, monthly, yearly'));
           }
-          if (recurrence.daysOfWeek && !recurrence.daysOfWeek.every(day => day >= 0 && day <= 6)) {
-            return formatMcpError(new Error('daysOfWeek must contain values between 0-6 (Sunday-Saturday)'));
+          
+          // Validate optional fields
+          if (priority && !['HIGH', 'MEDIUM'].includes(priority)) {
+            return formatMcpError(new Error('Priority must be one of: HIGH, MEDIUM'));
           }
-          if (recurrence.dayOfMonth !== undefined && (recurrence.dayOfMonth < 1 || recurrence.dayOfMonth > 31)) {
-            return formatMcpError(new Error('dayOfMonth must be between 1-31'));
+          if (deadlineType && !['HARD', 'SOFT'].includes(deadlineType)) {
+            return formatMcpError(new Error('Deadline type must be one of: HARD, SOFT'));
           }
-          if (recurrence.endDate !== undefined) {
-            // Validate endDate is a valid ISO 8601 format and in the future
-            const endDateObj = new Date(recurrence.endDate);
-            if (isNaN(endDateObj.getTime())) {
-              return formatMcpError(new Error('endDate must be a valid ISO 8601 date format'));
+          if (duration && typeof duration === 'number' && duration < 0) {
+            return formatMcpError(new Error('Duration must be a positive number'));
+          }
+          if (startingOn) {
+            const startDate = new Date(startingOn);
+            if (isNaN(startDate.getTime())) {
+              return formatMcpError(new Error('startingOn must be a valid ISO 8601 date format'));
             }
-            if (endDateObj <= new Date()) {
-              return formatMcpError(new Error('endDate must be in the future'));
-            }
+          }
+          if (idealTime && !/^\d{2}:\d{2}$/.test(idealTime)) {
+            return formatMcpError(new Error('idealTime must be in HH:mm format'));
           }
           
-          // Cross-field validation for recurrence consistency
-          switch (recurrence.frequency) {
-            case 'weekly':
-              if (!recurrence.daysOfWeek || recurrence.daysOfWeek.length === 0) {
-                return formatMcpError(new Error('daysOfWeek is required for weekly recurrence'));
-              }
-              if (recurrence.dayOfMonth !== undefined) {
-                return formatMcpError(new Error('dayOfMonth should not be set for weekly recurrence'));
-              }
-              break;
-            case 'monthly':
-              if (recurrence.dayOfMonth === undefined) {
-                return formatMcpError(new Error('dayOfMonth is required for monthly recurrence'));
-              }
-              if (recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
-                return formatMcpError(new Error('daysOfWeek should not be set for monthly recurrence'));
-              }
-              break;
-            case 'daily':
-            case 'yearly':
-              if (recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
-                return formatMcpError(new Error(`daysOfWeek should not be set for ${recurrence.frequency} recurrence`));
-              }
-              if (recurrence.dayOfMonth !== undefined) {
-                return formatMcpError(new Error(`dayOfMonth should not be set for ${recurrence.frequency} recurrence`));
-              }
-              break;
-          }
-          
-          // Resolve workspace
           const workspace = await workspaceResolver.resolveWorkspace({ workspaceId });
           
           const taskData: CreateRecurringTaskData = {
             name,
-            workspaceId: workspace.id, // Ensure workspace is always set
+            workspaceId: workspace.id,
+            assigneeId,
+            frequency,
             ...(description && { description }),
-            ...(projectId && { projectId }),
-            recurrence
+            ...(deadlineType && { deadlineType }),
+            ...(duration && { duration }),
+            ...(startingOn && { startingOn }),
+            ...(idealTime && { idealTime }),
+            ...(schedule && { schedule }),
+            ...(priority && { priority })
           };
           
           const newTask = await motionService.createRecurringTask(taskData);
