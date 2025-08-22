@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, AxiosError, isAxiosError } from 'axios';
 import { 
   MotionWorkspace, 
   MotionProject, 
@@ -28,14 +28,7 @@ import {
   VALIDATION_CONFIG
 } from '../schemas/motion';
 
-// Type guard for axios errors
-function isAxiosError(error: unknown): error is MotionApiError {
-  return (
-    error instanceof Error &&
-    'response' in error &&
-    typeof (error as any).response === 'object'
-  );
-}
+// Note: Using native axios.isAxiosError instead of custom implementation
 
 // Helper to get error message
 function getErrorMessage(error: unknown): string {
@@ -988,11 +981,11 @@ export class MotionApiService {
 
   /**
    * Fetch custom fields from Motion API
-   * @param workspaceId - Optional workspace ID to filter custom fields
+   * @param workspaceId - Required workspace ID to get custom fields for
    * @returns Array of custom fields
    */
-  async getCustomFields(workspaceId?: string): Promise<MotionCustomField[]> {
-    const cacheKey = workspaceId ? `custom-fields:${workspaceId}` : 'custom-fields:all';
+  async getCustomFields(workspaceId: string): Promise<MotionCustomField[]> {
+    const cacheKey = `custom-fields:${workspaceId}`;
     
     return this.customFieldCache.withCache(cacheKey, async () => {
       try {
@@ -1001,17 +994,12 @@ export class MotionApiService {
           workspaceId
         });
 
-        const params = new URLSearchParams();
-        if (workspaceId) params.append('workspaceId', workspaceId);
+        const url = `/beta/workspaces/${workspaceId}/custom-fields`;
         
-        const queryString = params.toString();
-        const url = queryString ? `/custom-fields?${queryString}` : '/custom-fields';
+        const response: AxiosResponse<MotionCustomField[]> = await this.requestWithRetry(() => this.client.get(url));
         
-        const response: AxiosResponse<ListResponse<MotionCustomField>> = await this.requestWithRetry(() => this.client.get(url));
-        
-        // Handle both wrapped and unwrapped responses
-        const customFields = response.data?.customFields || response.data || [];
-        const fieldsArray = Array.isArray(customFields) ? customFields : [];
+        // Beta API returns direct array, not wrapped
+        const fieldsArray = response.data || [];
         
         mcpLog(LOG_LEVELS.INFO, 'Custom fields fetched successfully', {
           method: 'getCustomFields',
@@ -1035,29 +1023,39 @@ export class MotionApiService {
 
   /**
    * Create a new custom field
+   * @param workspaceId - Required workspace ID to create custom field in
    * @param fieldData - Data for creating the custom field
    * @returns The created custom field
    */
-  async createCustomField(fieldData: CreateCustomFieldData): Promise<MotionCustomField> {
+  async createCustomField(workspaceId: string, fieldData: CreateCustomFieldData): Promise<MotionCustomField> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Creating custom field in Motion API', {
         method: 'createCustomField',
         name: fieldData.name,
-        type: fieldData.type,
-        workspaceId: fieldData.workspaceId
+        field: fieldData.field,
+        workspaceId
       });
 
+      // Transform payload to match Motion API expectations
+      // POST API expects 'type' in request, but returns 'field' in response
+      const apiPayload = { 
+        name: fieldData.name, 
+        type: fieldData.field,  // Motion API POST expects 'type' property in request body
+        ...(fieldData.metadata && { metadata: fieldData.metadata }) 
+      };
+
       const response: AxiosResponse<MotionCustomField> = await this.requestWithRetry(() => 
-        this.client.post('/custom-fields', fieldData)
+        this.client.post(`/beta/workspaces/${workspaceId}/custom-fields`, apiPayload)
       );
       
       // Invalidate cache after successful creation
-      this.customFieldCache.invalidate('custom-fields:');
+      this.customFieldCache.invalidate(`custom-fields:${workspaceId}`);
       
       mcpLog(LOG_LEVELS.INFO, 'Custom field created successfully', {
         method: 'createCustomField',
         fieldId: response.data?.id,
-        name: fieldData.name
+        name: fieldData.name,
+        workspaceId
       });
 
       return response.data;
@@ -1067,7 +1065,8 @@ export class MotionApiService {
         error: getErrorMessage(error),
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        fieldName: fieldData?.name
+        fieldName: fieldData?.name,
+        workspaceId
       });
       throw this.formatApiError(error, 'create custom field');
     }
@@ -1075,26 +1074,29 @@ export class MotionApiService {
 
   /**
    * Delete a custom field
+   * @param workspaceId - Required workspace ID containing the custom field
    * @param fieldId - ID of the custom field to delete
    * @returns Success indicator
    */
-  async deleteCustomField(fieldId: string): Promise<{ success: boolean }> {
+  async deleteCustomField(workspaceId: string, fieldId: string): Promise<{ success: boolean }> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Deleting custom field from Motion API', {
         method: 'deleteCustomField',
-        fieldId
+        fieldId,
+        workspaceId
       });
 
       await this.requestWithRetry(() => 
-        this.client.delete(`/custom-fields/${fieldId}`)
+        this.client.delete(`/beta/workspaces/${workspaceId}/custom-fields/${fieldId}`)
       );
       
       // Invalidate cache after successful deletion
-      this.customFieldCache.invalidate('custom-fields:');
+      this.customFieldCache.invalidate(`custom-fields:${workspaceId}`);
       
       mcpLog(LOG_LEVELS.INFO, 'Custom field deleted successfully', {
         method: 'deleteCustomField',
-        fieldId
+        fieldId,
+        workspaceId
       });
 
       return { success: true };
@@ -1104,7 +1106,8 @@ export class MotionApiService {
         error: getErrorMessage(error),
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        fieldId
+        fieldId,
+        workspaceId
       });
       throw this.formatApiError(error, 'delete custom field');
     }
