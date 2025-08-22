@@ -102,7 +102,7 @@ export interface MotionTask {
   };
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate?: string;
-  duration?: number | 'REMINDER';
+  duration?: number | 'NONE' | 'REMINDER';
   assigneeId?: string;
   labels?: Array<{name: string}>;
   autoScheduled?: Record<string, unknown> | null;
@@ -255,7 +255,7 @@ export interface CreateRecurringTaskData {
   };
   description?: string;
   deadlineType?: 'HARD' | 'SOFT';
-  duration?: number | 'REMINDER';
+  duration?: number | 'NONE' | 'REMINDER';
   startingOn?: string;
   idealTime?: string;
   schedule?: string;

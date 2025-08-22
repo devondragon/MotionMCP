@@ -88,7 +88,7 @@ export function formatTaskList(
   const taskFormatter = (task: MotionTask) => {
     let line = `- ${task.name}`;
     if (task.id) line += ` (ID: ${task.id})`;
-    if (task.status) line += ` [${task.status}]`;
+    if (task.status) line += ` [${typeof task.status === 'string' ? task.status : task.status.name}]`;
     if (task.priority) line += ` {${task.priority}}`;
     if (task.dueDate) {
       const dueDate = new Date(task.dueDate).toLocaleDateString();
@@ -288,7 +288,7 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
     `- Workspace: ${task.workspace.name} (${task.workspace.id})`,
     task.project ? `- Project: ${task.project.name} (${task.project.id})` : `- Project: No project assigned`,
     task.assignee ? `- Assignee: ${task.assignee.name} (${task.assignee.email})` : null,
-    `- Status: ${task.status.name}`,
+    `- Status: ${typeof task.status === 'string' ? task.status : task.status?.name || 'Unknown'}`,
     (task.labels && task.labels.length > 0) ? `- Labels: ${task.labels.map(l => l.name).join(', ')}` : null
   ].filter(Boolean).join('\n');
   

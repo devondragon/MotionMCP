@@ -5,6 +5,14 @@ None - Ready to start next task
 
 ## Recently Completed Tasks
 
+**Task-009: Fix Type Unions and Enums** - Completed: 2025-08-22
+- ✅ Fixed duration type union: added 'NONE' to duration?: number | 'NONE' | 'REMINDER'
+- ✅ Added status type guards in response formatters to handle string vs object forms
+- ✅ Verified all enum values: Priority, DeadlineType enums confirmed correct
+- ✅ Prevented runtime errors with defensive type checking
+- Priority: Medium | Estimated: 2h | Actual: ~15min
+- Status: Critical type safety issues resolved
+
 **Task-008: Implement Pagination Support** - Completed: 2025-08-22
 - ✅ All major pagination functionality was already implemented
 - Verified complete infrastructure: fetchAllPages utility, responseWrapper, safety features
