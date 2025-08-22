@@ -1006,7 +1006,7 @@ export class MotionApiService {
         );
 
         // The API response structure is { meta: {...}, comments: [...] }
-        const { meta, comments } = response.data;
+        const { meta = {}, comments = [] } = response.data || {};
         
         mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully', {
           method: 'getComments',
