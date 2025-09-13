@@ -87,8 +87,7 @@ MOTION_MCP_TOOLS=complete npx motionmcp
 - `motion_recurring_tasks` - Recurring task management (list, create, delete)
 - `motion_statuses` - Status operations (list)
 
-#### (Removed: All mode)
-The legacy "all" mode has been removed. Use "complete" for access to all consolidated tools.
+ 
 
 #### Custom
 Specify exactly which tools you need.
@@ -145,18 +144,15 @@ MOTION_API_KEY=your-key
 
 ### Context & Search
 
-* `get_motion_context` — lightweight context utilities
-* `search_motion_content` — semantic search across tasks and projects
+* `motion_search` — content search, context, and smart search
 
 ### Projects
 
-* Consolidated: `motion_projects` — create, list, get
-* Legacy: `create_motion_project`, `list_motion_projects`, `get_motion_project`
+* `motion_projects` — create, list, get
 
 ### Tasks
 
-* Consolidated: `motion_tasks` — create, list, get, update, delete, move, unassign
-* Legacy: `create_motion_task`, `list_motion_tasks`, `get_motion_task`, `update_motion_task`, `delete_motion_task`
+* `motion_tasks` — create, list, get, update, delete, move, unassign
 
 ### Comments, Custom Fields, Recurring
 
@@ -166,7 +162,7 @@ MOTION_API_KEY=your-key
 
 ### Workspaces, Users, Schedules, Statuses
 
-* `list_motion_workspaces`, `list_motion_users`
+* `motion_workspaces` — list, get, set_default
 * `motion_users` — list (by workspace), current
 * `motion_schedules` — user schedules and time zones
 * `motion_statuses` — available statuses by workspace
@@ -314,7 +310,7 @@ See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
       "args": ["motionmcp"],
       "env": {
         "MOTION_API_KEY": "your_api_key",
-        "MOTION_MCP_TOOLS": "custom:motion_tasks,motion_projects,search_motion_content"
+    "MOTION_MCP_TOOLS": "custom:motion_tasks,motion_projects,motion_search"
       }
     }
   }
@@ -325,7 +321,7 @@ See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
 
 * Logs output to `stderr` in JSON format
 * Check for missing keys, workspace/project names, and permissions
-* Use `list_motion_workspaces` and `list_motion_projects` to validate IDs
+* Use `motion_workspaces` (list) and `motion_projects` (list) to validate IDs
 
 ## Logging Example
 
@@ -333,7 +329,7 @@ See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
 {
   "level": "info",
   "msg": "Task created successfully",
-  "method": "create_motion_task",
+  "method": "createTask",
   "taskId": "task_789",
   "workspace": "Development"
 }

@@ -9,16 +9,17 @@ import { z } from 'zod';
 export const MotionWorkspaceSchema = z.object({
   id: z.string(),
   name: z.string(),
-  teamId: z.string(),
+  teamId: z.string().nullable(),
   type: z.string(),
-  labels: z.array(z.object({
-    name: z.string()
-  })),
+  labels: z.array(z.union([
+    z.string(),
+    z.object({ name: z.string() })
+  ])),
   statuses: z.array(z.object({
     name: z.string(),
     isDefaultStatus: z.boolean(),
     isResolvedStatus: z.boolean()
-  }))
+  })).optional()
 });
 
 // Base Motion Project schema - Updated to match API documentation
@@ -92,16 +93,17 @@ export const MotionTaskSchema = z.object({
   workspace: z.object({
     id: z.string(),
     name: z.string(),
-    teamId: z.string(),
+    teamId: z.string().nullable(),
     type: z.string(),
-    labels: z.array(z.object({
-      name: z.string()
-    })),
+    labels: z.array(z.union([
+      z.string(),
+      z.object({ name: z.string() })
+    ])),
     statuses: z.array(z.object({
       name: z.string(),
       isDefaultStatus: z.boolean(),
       isResolvedStatus: z.boolean()
-    }))
+    })).optional()
   }),
   
   project: z.object({
@@ -199,16 +201,17 @@ export const MotionRecurringTaskSchema = z.object({
   workspace: z.object({
     id: z.string(),
     name: z.string(),
-    teamId: z.string(),
+    teamId: z.string().nullable(),
     type: z.string(),
-    labels: z.array(z.object({
-      name: z.string()
-    })),
+    labels: z.array(z.union([
+      z.string(),
+      z.object({ name: z.string() })
+    ])),
     statuses: z.array(z.object({
       name: z.string(),
       isDefaultStatus: z.boolean(),
       isResolvedStatus: z.boolean()
-    }))
+    })).optional()
   }),
   status: z.object({
     name: z.string(),
@@ -276,7 +279,7 @@ export const CommentsResponseSchema = z.object({
 });
 
 export const WorkspacesResponseSchema = z.object({
-  meta: MotionPaginationMetaSchema,
+  meta: MotionPaginationMetaSchema.optional(),
   workspaces: z.array(MotionWorkspaceSchema)
 });
 

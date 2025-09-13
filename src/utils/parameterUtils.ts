@@ -29,7 +29,10 @@ interface TaskArgs extends WorkspaceArgs {
   status?: string;
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate?: string;
+  duration?: string | number;
+  labels?: string[];
   assigneeId?: string;
+  autoScheduled?: Record<string, unknown> | null;
 }
 
 interface ProjectArgs extends WorkspaceArgs {
@@ -73,7 +76,10 @@ export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
     status: (args.status as string) || undefined,
     priority: (args.priority as 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW') || undefined,
     dueDate: (args.dueDate as string) || undefined,
+    duration: args.duration !== undefined ? args.duration as (string | number) : undefined,
+    labels: Array.isArray(args.labels) ? args.labels as string[] : undefined,
     assigneeId: (args.assigneeId as string) || undefined,
+    autoScheduled: args.autoScheduled !== undefined ? args.autoScheduled as (Record<string, unknown> | null) : undefined,
     ...parseWorkspaceArgs(args)
   };
 }

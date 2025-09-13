@@ -49,7 +49,7 @@ export const DEFAULTS = {
   WORKSPACE_USE_CACHE: true,
   
   // Search defaults
-  SEARCH_LIMIT: 20,
+  SEARCH_LIMIT: 40,
   SEARCH_SCOPE: 'both' as 'both' | 'tasks' | 'projects',
   
   // Suggestion defaults
@@ -131,6 +131,39 @@ export function convertUndefinedToNull<T extends Record<string, any>>(obj: T): T
       (result as any)[key] = null;
     }
   }
+  return result;
+}
+
+/**
+ * Creates a minimal payload by removing null, undefined, and empty values
+ * This prevents API validation errors from unexpected fields
+ * @param obj - The object to minimize
+ * @returns Clean object with only meaningful values
+ */
+export function createMinimalPayload<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: Partial<T> = {};
+
+  for (const key in obj) {
+    const value = obj[key];
+
+    // Skip null, undefined, empty strings, and empty arrays
+    if (value === null || value === undefined || value === '') {
+      continue;
+    }
+
+    // Skip empty arrays
+    if (Array.isArray(value) && value.length === 0) {
+      continue;
+    }
+
+    // Skip empty objects (but preserve objects with properties)
+    if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+      continue;
+    }
+
+    result[key] = value;
+  }
+
   return result;
 }
 

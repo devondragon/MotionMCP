@@ -19,7 +19,7 @@ export interface GetContextArgs {
 
 // Consolidated tool operation types
 export type ProjectOperation = 'create' | 'list' | 'get';
-export type TaskOperation = 'create' | 'list' | 'get' | 'update' | 'delete' | 'move' | 'unassign';
+export type TaskOperation = 'create' | 'list' | 'get' | 'update' | 'delete' | 'move' | 'unassign' | 'list_all_uncompleted';
 
 export interface MotionProjectsArgs {
   operation: ProjectOperation;

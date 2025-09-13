@@ -1,10 +1,10 @@
 export interface MotionWorkspace {
   id: string;
   name: string;
-  teamId: string;
+  teamId: string | null;
   type: string;
-  labels: Array<{name: string}>;
-  statuses: Array<{
+  labels: Array<string | {name: string}>;
+  statuses?: Array<{
     name: string;
     isDefaultStatus: boolean;
     isResolvedStatus: boolean;
@@ -28,7 +28,7 @@ export interface ProjectReference {
 export interface WorkspaceReference {
   id: string;
   name: string;
-  teamId: string; // Added required teamId field
+  teamId: string | null; // Updated to accept null
   type?: string;
 }
 
@@ -111,7 +111,7 @@ export interface MotionTask {
   dueDate?: string;
   duration?: number | 'NONE' | 'REMINDER';
   assigneeId?: string;
-  labels?: Array<{name: string}>;
+  labels?: Array<string | {name: string}>;
   autoScheduled?: Record<string, unknown> | null;
   completed?: boolean;
   completedTime?: string;
@@ -145,7 +145,7 @@ export interface MotionTask {
   workspace: {
     id: string;
     name: string;
-    teamId: string; // Added required teamId field
+    teamId: string | null; // Updated to accept null
     type: string;
   };
   
@@ -230,10 +230,10 @@ export interface MotionRecurringTask {
   workspace: {
     id: string;
     name: string;
-    teamId: string;
+    teamId: string | null;
     type: string;
-    labels: Array<{name: string}>;
-    statuses: Array<{
+    labels: Array<string | {name: string}>;
+    statuses?: Array<{
       name: string;
       isDefaultStatus: boolean;
       isResolvedStatus: boolean;
@@ -245,7 +245,7 @@ export interface MotionRecurringTask {
     isResolvedStatus: boolean;
   };
   priority: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
-  labels: Array<{name: string}>;
+  labels: Array<string | {name: string}>;
 }
 
 export interface CreateRecurringTaskData {
