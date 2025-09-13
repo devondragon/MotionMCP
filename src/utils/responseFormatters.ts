@@ -149,6 +149,43 @@ export function formatDetailResponse<T extends Record<string, any>>(
   return formatMcpSuccess(responseText);
 }
 
+/**
+ * Format single task detail response with comprehensive information
+ */
+export function formatTaskDetail(task: MotionTask): CallToolResult {
+  const details = [
+    `Task: ${task.name}`,
+    `ID: ${task.id}`,
+    task.description ? `Description: ${task.description}` : null,
+    `Status: ${typeof task.status === 'string' ? task.status : task.status?.name || 'Unknown'}`,
+    `Priority: ${task.priority || 'Not set'}`,
+    `Completed: ${task.completed ? 'Yes' : 'No'}`,
+    task.dueDate ? `Due Date: ${new Date(task.dueDate).toLocaleString()}` : 'Due Date: Not set',
+    task.createdTime ? `Created: ${new Date(task.createdTime).toLocaleString()}` : null,
+    task.updatedTime ? `Last Updated: ${new Date(task.updatedTime).toLocaleString()}` : null,
+    task.completedTime ? `Completed: ${new Date(task.completedTime).toLocaleString()}` : null,
+    `Workspace: ${task.workspace?.name || 'Unknown'} (${task.workspace?.id || 'N/A'})`,
+    task.project ? `Project: ${task.project.name} (${task.project.id})` : 'Project: No project assigned',
+    task.assignees && task.assignees.length > 0
+      ? `Assignees: ${task.assignees.map(a => `${a.name} (${a.email})`).join(', ')}`
+      : 'Assignees: None',
+    task.creator ? `Creator: ${task.creator.name} (${task.creator.email})` : null,
+    (task.labels && task.labels.length > 0)
+      ? `Labels: ${task.labels.map(l => typeof l === 'string' ? l : l.name).join(', ')}`
+      : null,
+    task.duration ? `Duration: ${typeof task.duration === 'number' ? `${task.duration} minutes` : task.duration}` : null,
+    task.deadlineType ? `Deadline Type: ${task.deadlineType}` : null,
+    task.scheduledStart ? `Scheduled Start: ${new Date(task.scheduledStart).toLocaleString()}` : null,
+    task.scheduledEnd ? `Scheduled End: ${new Date(task.scheduledEnd).toLocaleString()}` : null,
+    task.parentRecurringTaskId ? `Recurring Task ID: ${task.parentRecurringTaskId}` : null,
+    task.chunks && task.chunks.length > 0
+      ? `Scheduled Chunks: ${task.chunks.length} time block(s)`
+      : null
+  ].filter(Boolean).join('\n');
+
+  return formatMcpSuccess(details);
+}
+
 interface SearchOptions {
   limit?: number;
   searchScope?: string;

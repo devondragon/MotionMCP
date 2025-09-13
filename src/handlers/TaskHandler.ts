@@ -6,7 +6,7 @@ import {
   formatMcpSuccess,
   parseTaskArgs,
   formatTaskList,
-  formatDetailResponse
+  formatTaskDetail
 } from '../utils';
 
 interface CreateTaskParams {
@@ -205,7 +205,7 @@ export class TaskHandler extends BaseHandler {
     }
 
     const taskDetails = await this.motionService.getTask(params.taskId);
-    return formatDetailResponse(taskDetails, `Task details for "${taskDetails.name}"`);
+    return formatTaskDetail(taskDetails);
   }
 
   private async handleUpdate(params: UpdateTaskParams): Promise<McpToolResponse> {
