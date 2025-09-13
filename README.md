@@ -87,12 +87,8 @@ MOTION_MCP_TOOLS=complete npx motionmcp
 - `motion_recurring_tasks` - Recurring task management (list, create, delete)
 - `motion_statuses` - Status operations (list)
 
-#### All (deprecated)
-Legacy mode including any remaining individual tools for backward compatibility.
-
-```bash
-MOTION_MCP_TOOLS=all npx motionmcp
-```
+#### (Removed: All mode)
+The legacy "all" mode has been removed. Use "complete" for access to all consolidated tools.
 
 #### Custom
 Specify exactly which tools you need.

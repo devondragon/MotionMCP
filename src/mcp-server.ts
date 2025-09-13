@@ -86,7 +86,7 @@ class MotionMCPServer {
   }
 
   private validateToolsConfig(): void {
-    const validConfigs = ['minimal', 'essential', 'complete', 'all'];
+    const validConfigs = ['minimal', 'essential', 'complete'];
     
     // Check if it's a valid preset or custom configuration
     if (!validConfigs.includes(this.toolsConfig) && !this.toolsConfig.startsWith('custom:')) {
@@ -673,10 +673,6 @@ class MotionMCPServer {
           toolsMap.get('motion_statuses')
         ].filter((tool): tool is McpToolDefinition => tool !== undefined);
       
-      case 'all':
-        // Return all tools (for backward compatibility)
-        return allTools;
-      
       default:
         // Handle custom configuration (already validated in validateToolsConfig)
         if (this.toolsConfig.startsWith('custom:')) {
@@ -695,41 +691,102 @@ class MotionMCPServer {
   
   // Consolidated handlers for resource-based tools
   private async handleMotionProjects(args: MotionProjectsArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+
     const { operation, ...params } = args;
     
-    switch(operation) {
-      case 'create':
-        return this.handleCreateProject(params as ToolArgs.CreateProjectArgs);
-      case 'list':
-        return this.handleListProjects(params as ToolArgs.ListProjectsArgs);
-      case 'get':
-        if (!params.projectId) {
-          return formatMcpError(new Error("Project ID is required for get operation"));
-        }
-        return this.handleGetProject({ projectId: params.projectId });
-      default:
-        return formatMcpError(new Error(`Unknown operation: ${operation}`));
+    try {
+      switch(operation) {
+        case 'create':
+          if (!params.name) {
+            return formatMcpError(new Error("Project name is required for create operation"));
+          }
+          const projectData = parseProjectArgs(params as unknown as Record<string, unknown>);
+          const workspace = await workspaceResolver.resolveWorkspace({
+            workspaceId: projectData.workspaceId,
+            workspaceName: projectData.workspaceName
+          });
+          const project = await motionService.createProject({
+            ...projectData,
+            workspaceId: workspace.id
+          });
+          return formatMcpSuccess(`Successfully created project "${project.name}" (ID: ${project.id})`);
+
+        case 'list':
+          const listWorkspace = await workspaceResolver.resolveWorkspace({
+            workspaceId: params.workspaceId,
+            workspaceName: params.workspaceName
+          });
+          const projects = await motionService.getProjects(listWorkspace.id);
+          return formatProjectList(projects, listWorkspace.name);
+
+        case 'get':
+          if (!params.projectId) {
+            return formatMcpError(new Error("Project ID is required for get operation"));
+          }
+          const projectDetails = await motionService.getProject(params.projectId);
+          return formatDetailResponse(projectDetails, `Project details for "${projectDetails.name}"`);
+
+        default:
+          return formatMcpError(new Error(`Unknown operation: ${operation}`));
+      }
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
   private async handleMotionTasks(args: MotionTasksArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+
     const { operation, ...params } = args;
+    
+    try {
     
     switch(operation) {
       case 'create':
-        return this.handleCreateTask(params as ToolArgs.CreateTaskArgs);
+        if (!params.name) {
+          return formatMcpError(new Error("Task name is required for create operation"));
+        }
+        const taskData = parseTaskArgs(params as unknown as Record<string, unknown>);
+        const workspace = await workspaceResolver.resolveWorkspace(taskData);
+        const task = await motionService.createTask({
+          ...taskData,
+          workspaceId: workspace.id
+        });
+        return formatMcpSuccess(`Successfully created task "${task.name}" (ID: ${task.id})`);
       case 'list':
-        return this.handleListTasks(params as ToolArgs.ListTasksArgs);
+        const listWorkspace = await workspaceResolver.resolveWorkspace({
+          workspaceId: params.workspaceId,
+          workspaceName: params.workspaceName
+        });
+        const tasks = await motionService.getTasks({
+          workspaceId: listWorkspace.id,
+          projectId: params.projectId,
+          status: params.status,
+          assigneeId: params.assigneeId,
+          limit: params.limit
+        });
+        return formatTaskList(tasks, listWorkspace.name);
       case 'get':
         if (!params.taskId) {
           return formatMcpError(new Error("Task ID is required for get operation"));
         }
-        return this.handleGetTask({ taskId: params.taskId });
+        const taskDetails = await motionService.getTask(params.taskId);
+        return formatDetailResponse(taskDetails, `Task details for "${taskDetails.name}"`);
       case 'update':
         if (!params.taskId) {
           return formatMcpError(new Error("Task ID is required for update operation"));
         }
-        return this.handleUpdateTask(params as ToolArgs.UpdateTaskArgs);
+        const updatedTask = await motionService.updateTask(params.taskId, params);
+        return formatMcpSuccess(`Successfully updated task "${updatedTask.name}" (ID: ${updatedTask.id})`);
       case 'delete':
         if (!params.taskId) {
           return formatMcpError(new Error("Task ID is required for delete operation"));
@@ -754,6 +811,9 @@ class MotionMCPServer {
         return this.handleUnassignTask({ taskId: params.taskId });
       default:
         return formatMcpError(new Error(`Unknown operation: ${operation}`));
+    }
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
     }
   }
   

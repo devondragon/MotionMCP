@@ -49,7 +49,7 @@ The server supports different tool exposure levels via `MOTION_MCP_TOOLS` enviro
   - All minimal tools plus motion_users, motion_search, motion_comments, motion_schedules
 - `complete`: All consolidated tools - 10 tools
   - All essential tools plus motion_custom_fields, motion_recurring_tasks, motion_statuses  
-- `all`: Deprecated legacy mode for backward compatibility
+- (removed: 'all' mode - no longer supported)
 - `custom:tool1,tool2`: Specify exact tools needed (e.g., `custom:motion_tasks,motion_projects,motion_search`)
 
 ### Consolidated Tools

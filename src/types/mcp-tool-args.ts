@@ -1,77 +1,9 @@
 /**
- * Type definitions for MCP tool handler arguments
- * These interfaces match the inputSchema definitions in mcp-server.ts
+ * Type definitions for consolidated MCP tool arguments
+ * All individual tool types removed - only consolidated tools remain
  */
 
-export interface CreateProjectArgs {
-  name: string;
-  description?: string;
-  workspaceId?: string;
-  workspaceName?: string;
-  color?: string;
-  status?: string;
-}
-
-export interface ListProjectsArgs {
-  workspaceId?: string;
-  workspaceName?: string;
-}
-
-export interface GetProjectArgs {
-  projectId: string;
-}
-
-
-export interface CreateTaskArgs {
-  name: string;
-  description?: string;
-  workspaceId?: string;
-  workspaceName?: string;
-  projectId?: string;
-  projectName?: string;
-  status?: string;
-  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
-  dueDate?: string;
-  assigneeId?: string;
-}
-
-export interface ListTasksArgs {
-  workspaceId?: string;
-  workspaceName?: string;
-  projectId?: string;
-  projectName?: string;
-  status?: string;
-  assigneeId?: string;
-  limit?: number;
-}
-
-export interface GetTaskArgs {
-  taskId: string;
-}
-
-export interface UpdateTaskArgs {
-  taskId: string;
-  name?: string;
-  description?: string;
-  status?: string;
-  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
-  dueDate?: string;
-  assigneeId?: string;
-}
-
-export interface DeleteTaskArgs {
-  taskId: string;
-}
-
-export interface ListWorkspacesArgs {
-  // No parameters for this tool
-}
-
-export interface ListUsersArgs {
-  workspaceId?: string;
-  workspaceName?: string;
-}
-
+// Core utility types for search and context operations (used by motion_search)
 export interface SearchContentArgs {
   query: string;
   workspaceId?: string;
@@ -85,8 +17,7 @@ export interface GetContextArgs {
   includeRelated?: boolean;
 }
 
-
-// Consolidated tool types
+// Consolidated tool operation types
 export type ProjectOperation = 'create' | 'list' | 'get';
 export type TaskOperation = 'create' | 'list' | 'get' | 'update' | 'delete' | 'move' | 'unassign';
 
@@ -214,18 +145,8 @@ export interface MotionSearchArgs {
   workspaceName?: string;
 }
 
-// Union type of all tool arguments for type safety
+// Union type of all consolidated tool arguments for type safety
 export type AllToolArgs = 
-  | CreateProjectArgs
-  | ListProjectsArgs
-  | GetProjectArgs
-  | CreateTaskArgs
-  | ListTasksArgs
-  | GetTaskArgs
-  | UpdateTaskArgs
-  | DeleteTaskArgs
-  | ListWorkspacesArgs
-  | ListUsersArgs
   | SearchContentArgs
   | GetContextArgs
   | MotionProjectsArgs
