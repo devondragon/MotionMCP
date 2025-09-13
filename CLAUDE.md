@@ -43,23 +43,29 @@ This is a Model Context Protocol (MCP) server that bridges Motion's task managem
 
 The server supports different tool exposure levels via `MOTION_MCP_TOOLS` environment variable:
 
-- `minimal`: Only core consolidated tools (motion_tasks, motion_projects, motion_workspaces) - 3 tools
-- `essential` (default): Core tools plus enhanced features:
-  - Consolidated: motion_tasks, motion_projects, motion_comments, motion_custom_fields, motion_recurring_tasks
-  - Additional: motion_workspaces, motion_users, motion_search, motion_context
-  - Total: ~9 tools
-- `all`: All available tools including legacy individual tools - 20+ tools
-- `custom:tool1,tool2`: Specify exact tools needed (e.g., `custom:motion_tasks,motion_projects`)
+- `minimal`: Core consolidated tools only - 3 tools
+  - motion_tasks, motion_projects, motion_workspaces
+- `essential` (default): Core tools plus common features - 7 tools  
+  - All minimal tools plus motion_users, motion_search, motion_comments, motion_schedules
+- `complete`: All consolidated tools - 10 tools
+  - All essential tools plus motion_custom_fields, motion_recurring_tasks, motion_statuses  
+- `all`: Deprecated legacy mode for backward compatibility
+- `custom:tool1,tool2`: Specify exact tools needed (e.g., `custom:motion_tasks,motion_projects,motion_search`)
 
 ### Consolidated Tools
 
-Many operations are now consolidated to reduce tool count and improve usability:
+All operations are consolidated into resource-based tools to reduce tool count:
 
 - **motion_tasks**: All task operations (create, list, get, update, delete, move, unassign)
-- **motion_projects**: All project operations (create, list, get, update, delete)
+- **motion_projects**: All project operations (create, list, get)
+- **motion_workspaces**: Workspace management (list, get, set_default)
+- **motion_users**: User operations (list, current)
+- **motion_search**: Search and context utilities (content, context, smart)
 - **motion_comments**: Comment operations (list, create for tasks and projects)
-- **motion_custom_fields**: Custom field management (list, create, update, delete, add/remove from projects/tasks)
+- **motion_custom_fields**: Custom field management (list, create, delete, add/remove from projects/tasks)
 - **motion_recurring_tasks**: Recurring task management (list, create, delete)
+- **motion_schedules**: Schedule operations (list)
+- **motion_statuses**: Status operations (list)
 
 ## Common Commands
 

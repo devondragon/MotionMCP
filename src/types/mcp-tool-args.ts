@@ -187,6 +187,33 @@ export interface MotionStatusesArgs {
   workspaceId?: string;
 }
 
+// New consolidated tool argument types
+export type WorkspaceOperation = 'list' | 'get' | 'set_default';
+export interface MotionWorkspacesArgs {
+  operation: WorkspaceOperation;
+  workspaceId?: string;
+}
+
+export type SearchOperation = 'content' | 'context' | 'smart';
+export interface MotionSearchArgs {
+  operation: SearchOperation;
+  // Content search params
+  query?: string;
+  searchScope?: 'tasks' | 'projects' | 'both';
+  limit?: number;
+  // Context params
+  includeProjects?: boolean;
+  includeTasks?: boolean;
+  includeUsers?: boolean;
+  // Smart search params
+  entityType?: 'project' | 'task';
+  entityId?: string;
+  includeRelated?: boolean;
+  // Common params
+  workspaceId?: string;
+  workspaceName?: string;
+}
+
 // Union type of all tool arguments for type safety
 export type AllToolArgs = 
   | CreateProjectArgs
@@ -208,4 +235,6 @@ export type AllToolArgs =
   | MotionCustomFieldsArgs
   | MotionRecurringTasksArgs
   | MotionSchedulesArgs
-  | MotionStatusesArgs;
+  | MotionStatusesArgs
+  | MotionWorkspacesArgs
+  | MotionSearchArgs;

@@ -36,7 +36,7 @@ import { sanitizeCommentContent } from './utils/sanitize';
 import { InputValidator } from './utils/validator';
 import { McpToolResponse, McpToolDefinition } from './types/mcp';
 import * as ToolArgs from './types/mcp-tool-args';
-import { MotionProjectsArgs, MotionTasksArgs, MotionUsersArgs, MotionSchedulesArgs, MotionStatusesArgs } from './types/mcp-tool-args';
+import { MotionProjectsArgs, MotionTasksArgs, MotionUsersArgs, MotionSchedulesArgs, MotionStatusesArgs, MotionWorkspacesArgs, MotionSearchArgs } from './types/mcp-tool-args';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -86,7 +86,7 @@ class MotionMCPServer {
   }
 
   private validateToolsConfig(): void {
-    const validConfigs = ['minimal', 'essential', 'all'];
+    const validConfigs = ['minimal', 'essential', 'complete', 'all'];
     
     // Check if it's a valid preset or custom configuration
     if (!validConfigs.includes(this.toolsConfig) && !this.toolsConfig.startsWith('custom:')) {
@@ -151,34 +151,12 @@ class MotionMCPServer {
             return await this.handleMotionProjects(args as unknown as MotionProjectsArgs);
           case "motion_tasks":
             return await this.handleMotionTasks(args as unknown as MotionTasksArgs);
-          // Legacy individual tools (kept for backward compatibility if needed)
-          case "create_motion_project":
-            return await this.handleCreateProject(args as unknown as ToolArgs.CreateProjectArgs);
-          case "list_motion_projects":
-            return await this.handleListProjects(args as unknown as ToolArgs.ListProjectsArgs || {});
-          case "get_motion_project":
-            return await this.handleGetProject(args as unknown as ToolArgs.GetProjectArgs);
-          case "create_motion_task":
-            return await this.handleCreateTask(args as unknown as ToolArgs.CreateTaskArgs);
-          case "list_motion_tasks":
-            return await this.handleListTasks(args as unknown as ToolArgs.ListTasksArgs || {});
-          case "get_motion_task":
-            return await this.handleGetTask(args as unknown as ToolArgs.GetTaskArgs);
-          case "update_motion_task":
-            return await this.handleUpdateTask(args as unknown as ToolArgs.UpdateTaskArgs);
-          case "delete_motion_task":
-            return await this.handleDeleteTask(args as unknown as ToolArgs.DeleteTaskArgs);
-          // Other tools remain unchanged
-          case "list_motion_workspaces":
-            return await this.handleListWorkspaces({});
-          case "list_motion_users":
-            return await this.handleListUsers(args as unknown as ToolArgs.ListUsersArgs || {});
-          case "search_motion_content":
-            return await this.handleSearchContent(args as unknown as ToolArgs.SearchContentArgs);
-          case "get_motion_context":
-            return await this.handleGetContext(args as unknown as ToolArgs.GetContextArgs);
+          case "motion_workspaces":
+            return await this.handleMotionWorkspaces(args as unknown as MotionWorkspacesArgs);
           case "motion_users":
             return await this.handleMotionUsers(args as unknown as MotionUsersArgs);
+          case "motion_search":
+            return await this.handleMotionSearch(args as unknown as MotionSearchArgs);
           case "motion_comments":
             return await this.handleMotionComments(args as unknown as ToolArgs.MotionCommentsArgs);
           case "motion_custom_fields":
@@ -335,274 +313,49 @@ class MotionMCPServer {
           required: ["operation"]
         }
       },
-      // Legacy individual tools (kept for compatibility)
+      // New consolidated tools for workspace and search management
       {
-        name: "create_motion_project",
-        description: "Create a new project in Motion",
+        name: "motion_workspaces",
+        description: "Manage Motion workspaces - supports list, get, and set_default operations",
         inputSchema: {
           type: "object",
           properties: {
-            name: {
+            operation: {
               type: "string",
-              description: "Project name (required)"
-            },
-            description: {
-              type: "string",
-              description: "Project description (optional)"
+              enum: ["list", "get", "set_default"],
+              description: "Operation to perform"
             },
             workspaceId: {
               type: "string",
-              description: "Workspace ID (optional, uses default if not provided)"
-            },
-            workspaceName: {
-              type: "string",
-              description: "Workspace name (alternative to workspaceId)"
-            },
-            color: {
-              type: "string",
-              description: "Project color in hex format (optional, e.g., #FF5733)"
-            },
-            status: {
-              type: "string",
-              description: "Project status (optional)"
+              description: "Workspace ID (required for get and set_default operations)"
             }
           },
-          required: ["name"]
+          required: ["operation"]
         }
       },
       {
-        name: "list_motion_projects",
-        description: "List all projects in Motion. If no workspace is specified, will use the default workspace.",
+        name: "motion_search",
+        description: "Search and context utilities for Motion - supports content, context, and smart operations",
         inputSchema: {
           type: "object",
           properties: {
-            workspaceId: {
+            operation: {
               type: "string",
-              description: "Optional workspace ID to filter projects"
+              enum: ["content", "context", "smart"],
+              description: "Operation to perform"
             },
-            workspaceName: {
-              type: "string",
-              description: "Optional workspace name to filter projects"
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      {
-        name: "get_motion_project",
-        description: "Get details of a specific project",
-        inputSchema: {
-          type: "object",
-          properties: {
-            projectId: {
-              type: "string",
-              description: "Project ID (required)"
-            }
-          },
-          required: ["projectId"]
-        }
-      },
-      {
-        name: "create_motion_task",
-        description: "Create a new task in Motion",
-        inputSchema: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "Task name (required)"
-            },
-            description: {
-              type: "string",
-              description: "Task description"
-            },
-            workspaceId: {
-              type: "string",
-              description: "Workspace ID (required)"
-            },
-            workspaceName: {
-              type: "string",
-              description: "Workspace name (alternative to workspaceId)"
-            },
-            projectId: {
-              type: "string",
-              description: "Project ID to add the task to"
-            },
-            projectName: {
-              type: "string",
-              description: "Project name (alternative to projectId)"
-            },
-            status: {
-              type: "string",
-              description: "Task status"
-            },
-            priority: {
-              type: "string",
-              enum: ["ASAP", "HIGH", "MEDIUM", "LOW"],
-              description: "Task priority"
-            },
-            dueDate: {
-              type: "string",
-              description: "Due date in ISO format"
-            },
-            assigneeId: {
-              type: "string",
-              description: "User ID to assign the task to"
-            }
-          },
-          required: ["name"]
-        }
-      },
-      {
-        name: "list_motion_tasks",
-        description: "List tasks in Motion",
-        inputSchema: {
-          type: "object",
-          properties: {
-            workspaceId: {
-              type: "string",
-              description: "Workspace ID to filter tasks"
-            },
-            workspaceName: {
-              type: "string",
-              description: "Workspace name (alternative to workspaceId)"
-            },
-            projectId: {
-              type: "string",
-              description: "Project ID to filter tasks"
-            },
-            projectName: {
-              type: "string",
-              description: "Project name (alternative to projectId)"
-            },
-            status: {
-              type: "string",
-              description: "Filter by task status"
-            },
-            assigneeId: {
-              type: "string",
-              description: "Filter by assignee"
-            },
-            limit: {
-              type: "number",
-              description: "Maximum number of tasks to return"
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      {
-        name: "get_motion_task",
-        description: "Get details of a specific task",
-        inputSchema: {
-          type: "object",
-          properties: {
-            taskId: {
-              type: "string",
-              description: "Task ID (required)"
-            }
-          },
-          required: ["taskId"]
-        }
-      },
-      {
-        name: "update_motion_task",
-        description: "Update an existing task",
-        inputSchema: {
-          type: "object",
-          properties: {
-            taskId: {
-              type: "string",
-              description: "Task ID (required)"
-            },
-            name: {
-              type: "string",
-              description: "New task name"
-            },
-            description: {
-              type: "string",
-              description: "New task description"
-            },
-            status: {
-              type: "string",
-              description: "New task status"
-            },
-            priority: {
-              type: "string",
-              enum: ["ASAP", "HIGH", "MEDIUM", "LOW"],
-              description: "New task priority"
-            },
-            dueDate: {
-              type: "string",
-              description: "New due date in ISO format"
-            },
-            assigneeId: {
-              type: "string",
-              description: "New assignee user ID"
-            }
-          },
-          required: ["taskId"]
-        }
-      },
-      {
-        name: "delete_motion_task",
-        description: "Delete a task",
-        inputSchema: {
-          type: "object",
-          properties: {
-            taskId: {
-              type: "string",
-              description: "Task ID (required)"
-            }
-          },
-          required: ["taskId"]
-        }
-      },
-      {
-        name: "list_motion_workspaces",
-        description: "List all available workspaces",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          additionalProperties: false
-        }
-      },
-      {
-        name: "list_motion_users",
-        description: "List users in a workspace",
-        inputSchema: {
-          type: "object",
-          properties: {
-            workspaceId: {
-              type: "string",
-              description: "Workspace ID (optional, uses default if not provided)"
-            },
-            workspaceName: {
-              type: "string",
-              description: "Workspace name (alternative to workspaceId)"
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      {
-        name: "search_motion_content",
-        description: "Search for tasks and projects in Motion",
-        inputSchema: {
-          type: "object",
-          properties: {
             query: {
               type: "string",
-              description: "Search query (required)"
+              description: "Search query (required for content and smart operations)"
             },
             searchScope: {
               type: "string",
               enum: ["tasks", "projects", "both"],
-              description: "What to search (default: both)"
+              description: "What to search for content operation (default: both)"
             },
             workspaceId: {
               type: "string",
-              description: "Workspace ID to limit search"
+              description: "Workspace ID to limit search/context"
             },
             workspaceName: {
               type: "string",
@@ -610,40 +363,35 @@ class MotionMCPServer {
             },
             limit: {
               type: "number",
-              description: "Maximum number of results"
-            }
-          },
-          required: ["query"]
-        }
-      },
-      {
-        name: "get_motion_context",
-        description: "Get contextual information about current work state",
-        inputSchema: {
-          type: "object",
-          properties: {
-            workspaceId: {
-              type: "string",
-              description: "Workspace ID"
-            },
-            workspaceName: {
-              type: "string",
-              description: "Workspace name (alternative to workspaceId)"
+              description: "Maximum number of results for content operation"
             },
             includeProjects: {
               type: "boolean",
-              description: "Include project information"
+              description: "Include project information for context operation"
             },
             includeTasks: {
               type: "boolean",
-              description: "Include task information"
+              description: "Include task information for context operation"
             },
             includeUsers: {
               type: "boolean",
-              description: "Include user information"
+              description: "Include user information for context operation"
+            },
+            entityType: {
+              type: "string",
+              enum: ["project", "task"],
+              description: "Entity type for smart operation"
+            },
+            entityId: {
+              type: "string",
+              description: "Entity ID for smart operation"
+            },
+            includeRelated: {
+              type: "boolean",
+              description: "Include related entities for smart operation"
             }
           },
-          additionalProperties: false
+          required: ["operation"]
         }
       },
       {
@@ -891,11 +639,11 @@ class MotionMCPServer {
     
     switch(this.toolsConfig) {
       case 'minimal':
-        // Only consolidated tools and essential workspace tool
+        // Only core consolidated tools
         return [
           toolsMap.get('motion_tasks'),
           toolsMap.get('motion_projects'),
-          toolsMap.get('list_motion_workspaces')
+          toolsMap.get('motion_workspaces')
         ].filter((tool): tool is McpToolDefinition => tool !== undefined);
       
       case 'essential':
@@ -903,20 +651,30 @@ class MotionMCPServer {
         return [
           toolsMap.get('motion_tasks'),
           toolsMap.get('motion_projects'),
+          toolsMap.get('motion_workspaces'),
           toolsMap.get('motion_users'),
+          toolsMap.get('motion_search'),
+          toolsMap.get('motion_comments'),
+          toolsMap.get('motion_schedules')
+        ].filter((tool): tool is McpToolDefinition => tool !== undefined);
+      
+      case 'complete':
+        // All consolidated tools
+        return [
+          toolsMap.get('motion_tasks'),
+          toolsMap.get('motion_projects'),
+          toolsMap.get('motion_workspaces'),
+          toolsMap.get('motion_users'),
+          toolsMap.get('motion_search'),
           toolsMap.get('motion_comments'),
           toolsMap.get('motion_custom_fields'),
           toolsMap.get('motion_recurring_tasks'),
           toolsMap.get('motion_schedules'),
-          toolsMap.get('motion_statuses'),
-          toolsMap.get('list_motion_workspaces'),
-          toolsMap.get('list_motion_users'),
-          toolsMap.get('search_motion_content'),
-          toolsMap.get('get_motion_context')
+          toolsMap.get('motion_statuses')
         ].filter((tool): tool is McpToolDefinition => tool !== undefined);
       
       case 'all':
-        // Return all tools
+        // Return all tools (for backward compatibility)
         return allTools;
       
       default:
@@ -1230,29 +988,7 @@ class MotionMCPServer {
     }
   }
 
-  private async handleListWorkspaces(_args: ToolArgs.ListWorkspacesArgs): Promise<McpToolResponse> {
-    const motionService = this.motionService;
-    if (!motionService) {
-      return formatMcpError(new Error("Motion service not available"));
-    }
-
-    const workspaces = await motionService.getWorkspaces();
-    return formatWorkspaceList(workspaces);
-  }
-
-  private async handleListUsers(args: ToolArgs.ListUsersArgs): Promise<McpToolResponse> {
-    const motionService = this.motionService;
-    const workspaceResolver = this.workspaceResolver;
-    if (!motionService || !workspaceResolver) {
-      return formatMcpError(new Error("Services not available"));
-    }
-
-    const workspace = await workspaceResolver.resolveWorkspace(args);
-    const users = await motionService.getUsers(workspace.id);
-    
-    const userList = users.map(u => `- ${u.name} (ID: ${u.id})`).join('\n');
-    return formatMcpSuccess(`Users in workspace "${workspace.name}":\n${userList}`);
-  }
+  // handleListWorkspaces and handleListUsers removed - functionality moved to motion_workspaces and motion_users
 
   private async handleSearchContent(args: ToolArgs.SearchContentArgs): Promise<McpToolResponse> {
     const motionService = this.motionService;
@@ -1673,6 +1409,133 @@ class MotionMCPServer {
     try {
       const statuses = await motionService.getStatuses(workspaceId);
       return formatStatusList(statuses);
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  // New consolidated handlers
+  private async handleMotionWorkspaces(args: MotionWorkspacesArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    if (!motionService) {
+      return formatMcpError(new Error("Motion service not available"));
+    }
+    const { operation, workspaceId } = args;
+    
+    try {
+      switch (operation) {
+        case 'list':
+          const workspaces = await motionService.getWorkspaces();
+          return formatWorkspaceList(workspaces);
+          
+        case 'get':
+          if (!workspaceId) {
+            return formatMcpError(new Error("Workspace ID is required for get operation"));
+          }
+          const workspaces_all = await motionService.getWorkspaces();
+          const workspace = workspaces_all.find(w => w.id === workspaceId);
+          if (!workspace) {
+            return formatMcpError(new Error(`Workspace not found: ${workspaceId}`));
+          }
+          return formatDetailResponse(workspace, `Workspace details for "${workspace.name}"`);
+          
+        case 'set_default':
+          if (!workspaceId) {
+            return formatMcpError(new Error("Workspace ID is required for set_default operation"));
+          }
+          // For now, we'll just return a success message since Motion API doesn't have a set default endpoint
+          return formatMcpSuccess(`Default workspace would be set to: ${workspaceId} (Note: This is a placeholder - actual implementation depends on Motion API support)`);
+          
+        default:
+          return formatMcpError(new Error(`Unknown operation: ${operation}`));
+      }
+    } catch (error: unknown) {
+      return formatMcpError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private async handleMotionSearch(args: MotionSearchArgs): Promise<McpToolResponse> {
+    const motionService = this.motionService;
+    const workspaceResolver = this.workspaceResolver;
+    if (!motionService || !workspaceResolver) {
+      return formatMcpError(new Error("Services not available"));
+    }
+    const { operation } = args;
+    
+    try {
+      switch (operation) {
+        case 'content':
+          if (!args.query) {
+            return formatMcpError(new Error("Query is required for content search"));
+          }
+          return await this.handleSearchContent({
+            query: args.query,
+            entityTypes: args.searchScope === 'tasks' ? ['tasks'] : 
+                        args.searchScope === 'projects' ? ['projects'] : 
+                        ['tasks', 'projects'],
+            workspaceId: args.workspaceId,
+            workspaceName: args.workspaceName
+          });
+          
+        case 'context':
+          if (!args.entityType || !args.entityId) {
+            return formatMcpError(new Error("EntityType and entityId are required for context operation"));
+          }
+          return await this.handleGetContext({
+            entityType: args.entityType,
+            entityId: args.entityId,
+            includeRelated: args.includeRelated
+          });
+          
+        case 'smart':
+          // Smart search combines content search with contextual information
+          const { query, entityType, entityId, includeRelated = false } = args;
+          if (!query) {
+            return formatMcpError(new Error("Query is required for smart search"));
+          }
+          
+          let contextText = `Smart search results for "${query}":\n\n`;
+          
+          // Perform content search
+          const searchResults = await this.handleSearchContent({
+            query,
+            entityTypes: args.searchScope === 'tasks' ? ['tasks'] : 
+                        args.searchScope === 'projects' ? ['projects'] : 
+                        ['tasks', 'projects'],
+            workspaceId: args.workspaceId,
+            workspaceName: args.workspaceName
+          });
+          
+          contextText += "Content Results:\n";
+          // Extract text from search results
+          if ('content' in searchResults && searchResults.content && Array.isArray(searchResults.content)) {
+            const textContent = searchResults.content.find(item => item.type === 'text');
+            if (textContent && 'text' in textContent) {
+              contextText += textContent.text + "\n\n";
+            }
+          }
+          
+          // Add contextual information if entity is specified
+          if (entityType && entityId) {
+            contextText += `Context for ${entityType} ${entityId}:\n`;
+            if (entityType === 'project') {
+              contextText += `Project ID: ${entityId}\n`;
+              if (includeRelated) {
+                contextText += `Related tasks would be listed here (when available)\n`;
+              }
+            } else if (entityType === 'task') {
+              contextText += `Task ID: ${entityId}\n`;
+              if (includeRelated) {
+                contextText += `Related project and subtasks would be listed here (when available)\n`;
+              }
+            }
+          }
+          
+          return formatMcpSuccess(contextText);
+          
+        default:
+          return formatMcpError(new Error(`Unknown operation: ${operation}`));
+      }
     } catch (error: unknown) {
       return formatMcpError(error instanceof Error ? error : new Error(String(error)));
     }

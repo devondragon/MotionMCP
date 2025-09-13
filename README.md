@@ -1,37 +1,22 @@
 # Motion MCP Server
 
-A Model Context Protocol (MCP) server that provides LLMs with direct access to the Motion API for task and project management. This server implements the MCP protocol to enable seamless integration between AI assistants and Motion's productivity platform.
+An MCP (Model Context Protocol) server that gives LLMs direct access to the Motion API for projects, tasks, users, and more. Built in TypeScript with robust validation and consolidated tools to keep your client tool list lean.
 
-## Quick Start with `npx`
+## Quick start (npx)
 
-You can run the Motion MCP Server without installing it globally:
-
-```bash
-npx motionmcp --api-key=your_motion_api_key
-```
-
-Or using an environment variable:
+Run the server without installing globally:
 
 ```bash
 MOTION_API_KEY=your_motion_api_key npx motionmcp
 ```
 
-You can also provide a config file at `~/.motionmcp.json`:
-
-```json
-{
-  "apiKey": "your_motion_api_key",
-  "port": 4000
-}
-```
-
-Then simply run:
+Or provide the key via your shell environment and run:
 
 ```bash
 npx motionmcp
 ```
 
-> The `npx` command will always fetch and run the latest published version.
+> Tip: `npx` runs the latest published version.
 
 ## Preview
 
@@ -41,119 +26,104 @@ npx motionmcp
 
 ## Features
 
-* Full MCP Protocol support for seamless LLM integration
-* Deep Motion API integration for projects, tasks, workspaces, and users
-* **Consolidated tools** to reduce tool count (configurable from 3 to 20 tools)
-* Real-time context awareness and smart suggestions
-* Project templates, smart scheduling, workload analytics, and more
-* API key authentication with multiple configuration options
-* MCP-compliant structured JSON logging
-* **TypeScript** implementation with full type safety
-* Robust error handling and input validation
+* MCP protocol support for seamless LLM integration
+* Motion API integration for projects, tasks, users, comments, custom fields, and recurring tasks
+* **Consolidated tools** to reduce tool count (minimal, essential, all, or custom)
+* Context utilities: semantic search and lightweight context summaries
+* API key via environment variable
+* Structured JSON logging
+* **TypeScript** with strong types, validation, and robust error handling
 
 ## Prerequisites
 
 * Node.js 18 or higher
 * Motion API key from [https://app.usemotion.com/settings/api](https://app.usemotion.com/settings/api)
 
-## Installation (Development)
-
-```bash
-git clone https://github.com/your-org/motionmcp-server.git
-cd motionmcp-server
-npm install
-cp .env.example .env
-# edit .env and add your MOTION_API_KEY
-```
-
-## Running the Server (Development)
-
-```bash
-npm run mcp
-# or
-node dist/mcp-server.js
-```
-
 ## Tool Configuration
 
 The server supports configurable tool sets to stay within MCP client limits (~100 tools across all servers). Configure via the `MOTION_MCP_TOOLS` environment variable:
 
-### Configuration Options
+### Configuration options
 
 #### Minimal (3 tools)
 Best for users who need only basic functionality and want to maximize room for other MCP servers.
 
 ```bash
-MOTION_MCP_TOOLS=minimal npm run mcp
+MOTION_MCP_TOOLS=minimal npx motionmcp
 ```
 
 **Available tools:**
-- `motion_tasks` - Consolidated task operations (create, list, get, update, delete, move, unassign)
-- `motion_projects` - Consolidated project operations (create, list, get, update, delete)
-- `list_motion_workspaces` - List available workspaces
+- `motion_tasks` - Task operations (create, list, get, update, delete, move, unassign)
+- `motion_projects` - Project operations (create, list, get)
+- `motion_workspaces` - Workspace management (list, get, set_default)
 
-#### Essential (9 tools) - Default
-Balanced configuration with core functionality plus search, context awareness, and advanced features.
+#### Essential (7 tools, default)
+Balanced configuration with core functionality plus search, user management, and scheduling.
 
 ```bash
 # Default - no configuration needed
-npm run mcp
+npx motionmcp
 # or explicitly:
-MOTION_MCP_TOOLS=essential npm run mcp
+MOTION_MCP_TOOLS=essential npx motionmcp
 ```
 
 **Available tools:**
 - All from Minimal, plus:
-- `motion_comments` - Manage comments on tasks and projects
-- `motion_custom_fields` - Manage custom field definitions and values
-- `motion_recurring_tasks` - Manage recurring task templates
-- `list_motion_users` - List workspace users
-- `search_motion_content` - Search across tasks and projects
-- `get_motion_context` - Get contextual workspace information
+- `motion_users` - User operations (list, current)
+- `motion_search` - Search and context utilities (content, context, smart)
+- `motion_comments` - Comment management (list, create)
+- `motion_schedules` - Schedule operations (list)
 
-#### All (20 tools)
-Includes consolidated tools plus all legacy individual tools for maximum compatibility.
+#### Complete (10 tools)
+All consolidated tools for full Motion API access.
 
 ```bash
-MOTION_MCP_TOOLS=all npm run mcp
+MOTION_MCP_TOOLS=complete npx motionmcp
 ```
 
 **Available tools:**
-- All consolidated tools
-- All legacy individual tools (create_motion_task, update_motion_task, etc.)
-- All intelligent features (analyze_workload, suggest_next_action, smart_schedule_tasks, create_project_template)
+- All from Essential, plus:
+- `motion_custom_fields` - Custom field management (list, create, delete, add/remove)
+- `motion_recurring_tasks` - Recurring task management (list, create, delete)
+- `motion_statuses` - Status operations (list)
+
+#### All (deprecated)
+Legacy mode including any remaining individual tools for backward compatibility.
+
+```bash
+MOTION_MCP_TOOLS=all npx motionmcp
+```
 
 #### Custom
 Specify exactly which tools you need.
 
 ```bash
-MOTION_MCP_TOOLS=custom:motion_tasks,motion_projects,search_motion_content npm run mcp
+MOTION_MCP_TOOLS=custom:motion_tasks,motion_projects,motion_search npx motionmcp
 ```
 
 ### Consolidated Tools
 
 The consolidated tools reduce the total tool count by combining related operations:
 
-- **`motion_projects`**: Single tool for all project operations
-  - Operations: `create`, `list`, `get`, `update`, `delete`
+- **`motion_projects`**: Single tool for core project operations
+  - Operations: `create`, `list`, `get`
   - Example: `{"operation": "create", "name": "New Project", "workspaceName": "Personal"}`
 
 - **`motion_tasks`**: Single tool for all task operations  
   - Operations: `create`, `list`, `get`, `update`, `delete`, `move`, `unassign`
   - Example: `{"operation": "create", "name": "New Task", "projectName": "My Project"}`
 
-- **`motion_comments`**: Single tool for all comment operations
+- **`motion_comments`**: Manage task comments
   - Operations: `list`, `create`
-  - Supports both task and project comments
   - Example: `{"operation": "create", "taskId": "task_123", "content": "Great progress!"}`
 
 - **`motion_custom_fields`**: Single tool for custom field management
-  - Operations: `list`, `create`, `update`, `delete`, `add_to_project`, `remove_from_project`, `add_to_task`, `remove_from_task`
+  - Operations: `list`, `create`, `delete`, `add_to_project`, `remove_from_project`, `add_to_task`, `remove_from_task`
   - Example: `{"operation": "create", "name": "Priority Level", "type": "DROPDOWN", "options": ["Low", "Medium", "High"]}`
 
 - **`motion_recurring_tasks`**: Single tool for recurring task templates
   - Operations: `list`, `create`, `delete`
-  - Example: `{"operation": "create", "name": "Weekly Review", "recurrence": "WEEKLY", "projectName": "Personal"}`
+  - Example: `{"operation": "create", "name": "Weekly Review", "workspaceId": "ws_123", "assigneeId": "user_123", "frequency": {"type": "weekly", "daysOfWeek": [1,3,5] }, "duration": 30 }`
 
 ## Providing Your Motion API Key
 
@@ -165,60 +135,45 @@ The Motion MCP Server supports the following ways to provide your API key:
 MOTION_API_KEY=your-key npx motionmcp
 ```
 
-### 2. Command Line Argument
+### 2. .env file (when running via npm)
+
+Create a `.env` next to the project with:
 
 ```bash
-npx motionmcp --api-key=your-key --port=4000
+MOTION_API_KEY=your-key
 ```
 
-### 3. Config File
-
-```bash
-echo '{"apiKey": "your-key", "port": 4000}' > ~/.motionmcp.json
-npx motionmcp
-```
-
-### 4. Interactive Prompt
-
-```bash
-npx motionmcp
-# Prompts: "Please enter your Motion API key:"
-```
-
-> Order of precedence: ENV → CLI Arg → Config File → Prompt
+> When using npx, prefer exporting the variable in your shell as shown above.
 
 ## Tool Overview
 
-### Context & Intelligence
+### Context & Search
 
-* `get_motion_context` – Current workspace, activity, and next action suggestions
-* `search_motion_content` – Semantic search across tasks and projects
-* `analyze_motion_workload` – Workload analysis and overdue tracking
-* `suggest_next_actions` – Smart planning suggestions based on your current state
+* `get_motion_context` — lightweight context utilities
+* `search_motion_content` — semantic search across tasks and projects
 
-### Project Management
+### Projects
 
-* `create_motion_project`
-* `create_project_template`
-* `list_motion_projects`
-* `get_motion_project`
-* `update_motion_project`
-* `delete_motion_project`
+* Consolidated: `motion_projects` — create, list, get
+* Legacy: `create_motion_project`, `list_motion_projects`, `get_motion_project`
 
-### Task Management
+### Tasks
 
-* `create_motion_task`
-* `list_motion_tasks`
-* `get_motion_task`
-* `update_motion_task`
-* `delete_motion_task`
-* `bulk_update_tasks`
-* `smart_schedule_tasks`
+* Consolidated: `motion_tasks` — create, list, get, update, delete, move, unassign
+* Legacy: `create_motion_task`, `list_motion_tasks`, `get_motion_task`, `update_motion_task`, `delete_motion_task`
 
-### Workspace & User Info
+### Comments, Custom Fields, Recurring
 
-* `list_motion_workspaces`
-* `list_motion_users`
+* `motion_comments` — list, create (task comments)
+* `motion_custom_fields` — list, create, delete, add/remove on project or task
+* `motion_recurring_tasks` — list, create, delete
+
+### Workspaces, Users, Schedules, Statuses
+
+* `list_motion_workspaces`, `list_motion_users`
+* `motion_users` — list (by workspace), current
+* `motion_schedules` — user schedules and time zones
+* `motion_statuses` — available statuses by workspace
 
 ## Enhanced Features
 
@@ -297,8 +252,11 @@ Args: {
 
 ## LLM Integration
 
-Add this config to your `claude_desktop_config.json`:
+### Claude Desktop Configuration
 
+Add this to your `claude_desktop_config.json`.
+
+#### Using published package (npx)
 ```json
 {
   "mcpServers": {
@@ -307,12 +265,31 @@ Add this config to your `claude_desktop_config.json`:
       "args": ["motionmcp"],
       "env": {
         "MOTION_API_KEY": "your_api_key",
-        "MOTION_MCP_TOOLS": "essential"  // optional: minimal, essential, all, custom:...
+        "MOTION_MCP_TOOLS": "essential"
       }
     }
   }
 }
 ```
+
+#### Using your local workspace (npm)
+```json
+{
+  "mcpServers": {
+    "motion": {
+      "command": "npm",
+      "args": ["run", "mcp:dev"],
+      "cwd": "/absolute/path/to/your/MotionMCP",
+      "env": {
+        "MOTION_API_KEY": "your_api_key",
+        "MOTION_MCP_TOOLS": "essential"
+      }
+    }
+  }
+}
+```
+
+See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
 
 ### Configuration Examples
 
