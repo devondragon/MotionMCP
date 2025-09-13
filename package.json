@@ -7,11 +7,13 @@
     "motionmcp": "./dist/mcp-server.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "type": "commonjs",
   "engines": {
     "node": ">=18"
@@ -21,13 +23,13 @@
     "ajv": "^8.17.1",
     "axios": "^1.9.0",
     "dotenv": "^16.5.0",
-    "winston": "^3.17.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^24.2.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   },
   "scripts": {
     "build": "tsc",
@@ -35,7 +37,7 @@
     "mcp:dev": "ts-node src/mcp-server.ts",
     "watch": "tsc --watch",
     "type-check": "tsc --noEmit",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",
     "prepublishOnly": "npm run type-check && npm run build"
