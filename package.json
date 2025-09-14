@@ -1,7 +1,7 @@
 {
   "name": "motionmcp",
   "version": "2.0.0",
-  "description": "",
+  "description": "MCP server for Motion API integration - manage projects, tasks, and workspaces from LLMs",
   "main": "dist/mcp-server.js",
   "bin": {
     "motionmcp": "./dist/mcp-server.js"
@@ -11,9 +11,17 @@
     "README.md",
     "LICENSE"
   ],
-  "keywords": [],
-  "author": "",
+  "keywords": ["mcp", "model-context-protocol", "motion", "api", "task-management", "project-management", "llm", "ai"],
+  "author": "Devon Hillard devon@digitalsanctuary.com",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devondragon/MotionMCP.git"
+  },
+  "homepage": "https://github.com/devondragon/MotionMCP",
+  "bugs": {
+    "url": "https://github.com/devondragon/MotionMCP/issues"
+  },
   "type": "commonjs",
   "engines": {
     "node": ">=18"
