@@ -337,7 +337,7 @@ See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
 
 ## License
 
-ISC License
+Apache-2.0 License
 
 ---
 
