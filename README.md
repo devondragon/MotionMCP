@@ -1,4 +1,4 @@
-![NPM Version](https://img.shields.io/npm/v/:motionmcp)
+![NPM Version](https://img.shields.io/npm/v/motionmcp)
 
 # Motion MCP Server
 
