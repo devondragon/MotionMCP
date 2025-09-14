@@ -1,3 +1,5 @@
+![NPM Version](https://img.shields.io/npm/v/:motionmcp)
+
 # Motion MCP Server
 
 An MCP (Model Context Protocol) server that gives LLMs direct access to the Motion API for projects, tasks, users, and more. Built in TypeScript with robust validation and consolidated tools to keep your client tool list lean.
