@@ -47,6 +47,10 @@ export function formatProjectList(
   
   const projectFormatter = (project: MotionProject) => {
     if (showIds) {
+      // For cross-workspace listings, show workspace info too
+      if (workspaceName === 'All Workspaces' && project.workspaceId) {
+        return `- ${project.name} (ID: ${project.id}) [Workspace: ${project.workspaceId}]`;
+      }
       return `- ${project.name} (ID: ${project.id})`;
     }
     return `- ${project.name}`;
@@ -63,7 +67,7 @@ export function formatProjectList(
   }
   
   if (includeWorkspaceNote && !workspaceId) {
-    responseText += `\n\nNote: This shows projects from the default workspace. You can specify a different workspace using the workspaceId or workspaceName parameter, or use list_motion_workspaces to see all available workspaces.`;
+    responseText += `\n\nNote: This shows projects from the default workspace. You can specify a different workspace using the workspaceId or workspaceName parameter, or use motion_workspaces (operation: list) to see all available workspaces.`;
   }
   
   return formatMcpSuccess(responseText);
@@ -74,16 +78,17 @@ interface TaskListContext {
   projectName?: string;
   status?: string;
   limit?: number;
+  allWorkspaces?: boolean;
 }
 
 /**
  * Format task list response
  */
 export function formatTaskList(
-  tasks: MotionTask[], 
+  tasks: MotionTask[],
   context: TaskListContext = {}
 ): CallToolResult {
-  const { workspaceName, projectName, status, limit } = context;
+  const { workspaceName, projectName, status, limit, allWorkspaces } = context;
   
   const taskFormatter = (task: MotionTask) => {
     let line = `- ${task.name}`;
@@ -98,7 +103,11 @@ export function formatTaskList(
   };
   
   let title = `Found ${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`;
-  if (workspaceName) title += ` in workspace "${workspaceName}"`;
+  if (allWorkspaces) {
+    title += ` across all workspaces`;
+  } else {
+    if (workspaceName) title += ` in workspace "${workspaceName}"`;
+  }
   if (projectName) title += ` in project "${projectName}"`;
   if (status) title += ` with status "${status}"`;
   if (limit) title += ` (limit: ${limit})`;
@@ -138,6 +147,43 @@ export function formatDetailResponse<T extends Record<string, any>>(
   });
   
   return formatMcpSuccess(responseText);
+}
+
+/**
+ * Format single task detail response with comprehensive information
+ */
+export function formatTaskDetail(task: MotionTask): CallToolResult {
+  const details = [
+    `Task: ${task.name}`,
+    `ID: ${task.id}`,
+    task.description ? `Description: ${task.description}` : null,
+    `Status: ${typeof task.status === 'string' ? task.status : task.status?.name || 'Unknown'}`,
+    `Priority: ${task.priority || 'Not set'}`,
+    `Completed: ${task.completed ? 'Yes' : 'No'}`,
+    task.dueDate ? `Due Date: ${new Date(task.dueDate).toLocaleString()}` : 'Due Date: Not set',
+    task.createdTime ? `Created: ${new Date(task.createdTime).toLocaleString()}` : null,
+    task.updatedTime ? `Last Updated: ${new Date(task.updatedTime).toLocaleString()}` : null,
+    task.completedTime ? `Completed: ${new Date(task.completedTime).toLocaleString()}` : null,
+    `Workspace: ${task.workspace?.name || 'Unknown'} (${task.workspace?.id || 'N/A'})`,
+    task.project ? `Project: ${task.project.name} (${task.project.id})` : 'Project: No project assigned',
+    task.assignees && task.assignees.length > 0
+      ? `Assignees: ${task.assignees.map(a => `${a.name} (${a.email})`).join(', ')}`
+      : 'Assignees: None',
+    task.creator ? `Creator: ${task.creator.name} (${task.creator.email})` : null,
+    (task.labels && task.labels.length > 0)
+      ? `Labels: ${task.labels.map(l => typeof l === 'string' ? l : l.name).join(', ')}`
+      : null,
+    task.duration ? `Duration: ${typeof task.duration === 'number' ? `${task.duration} minutes` : task.duration}` : null,
+    task.deadlineType ? `Deadline Type: ${task.deadlineType}` : null,
+    task.scheduledStart ? `Scheduled Start: ${new Date(task.scheduledStart).toLocaleString()}` : null,
+    task.scheduledEnd ? `Scheduled End: ${new Date(task.scheduledEnd).toLocaleString()}` : null,
+    task.parentRecurringTaskId ? `Recurring Task ID: ${task.parentRecurringTaskId}` : null,
+    task.chunks && task.chunks.length > 0
+      ? `Scheduled Chunks: ${task.chunks.length} time block(s)`
+      : null
+  ].filter(Boolean).join('\n');
+
+  return formatMcpSuccess(details);
 }
 
 interface SearchOptions {
@@ -289,7 +335,7 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
     task.project ? `- Project: ${task.project.name} (${task.project.id})` : `- Project: No project assigned`,
     task.assignee ? `- Assignee: ${task.assignee.name} (${task.assignee.email})` : null,
     `- Status: ${typeof task.status === 'string' ? task.status : task.status?.name || 'Unknown'}`,
-    (task.labels && task.labels.length > 0) ? `- Labels: ${task.labels.map(l => l.name).join(', ')}` : null
+    (task.labels && task.labels.length > 0) ? `- Labels: ${task.labels.map(l => typeof l === 'string' ? l : l.name).join(', ')}` : null
   ].filter(Boolean).join('\n');
   
   return formatMcpSuccess(details);
@@ -358,4 +404,3 @@ export function formatStatusList(statuses: MotionStatus[]): CallToolResult {
   
   return formatListResponse(statuses, `Found ${statuses.length} status${statuses.length === 1 ? '' : 'es'}`, statusFormatter);
 }
-

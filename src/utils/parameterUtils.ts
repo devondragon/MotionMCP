@@ -29,7 +29,10 @@ interface TaskArgs extends WorkspaceArgs {
   status?: string;
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate?: string;
+  duration?: string | number;
+  labels?: string[];
   assigneeId?: string;
+  autoScheduled?: Record<string, unknown> | null;
 }
 
 interface ProjectArgs extends WorkspaceArgs {
@@ -62,6 +65,56 @@ export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs 
 }
 
 /**
+ * Parse autoScheduled parameter to handle various input formats
+ * @param value - The autoScheduled value from MCP request
+ * @returns Proper autoScheduled value for Motion API
+ */
+function parseAutoScheduledParam(value: unknown): Record<string, unknown> | null | undefined {
+  // If undefined, leave as undefined (field not provided)
+  if (value === undefined) {
+    return undefined;
+  }
+
+  // If null, keep as null (explicitly disable auto-scheduling)
+  if (value === null) {
+    return null;
+  }
+
+  // If it's already an object, use it as-is
+  if (typeof value === 'object' && value !== null) {
+    return value as Record<string, unknown>;
+  }
+
+  // If it's a non-empty string, treat as schedule name
+  if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    // If it's 'false', disable auto-scheduling
+    if (trimmed === 'false') {
+      return null;
+    }
+    // If it's 'true' or empty string, enable with no schedule (will trigger validation error)
+    if (trimmed === 'true' || trimmed === '') {
+      return {}; // Empty object enables auto-scheduling but will require schedule validation
+    }
+    // Otherwise, treat as schedule name
+    return { schedule: trimmed };
+  }
+
+  // If it's 'true' or true, enable auto-scheduling (will trigger validation for schedule)
+  if (value === 'true' || value === true) {
+    return {}; // Empty object enables auto-scheduling but will require schedule validation
+  }
+
+  // If it's 'false' or false, disable auto-scheduling
+  if (value === 'false' || value === false) {
+    return null;
+  }
+
+  // For any other value, treat as undefined (not provided)
+  return undefined;
+}
+
+/**
  * Parse task creation/update arguments from MCP request
  */
 export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
@@ -73,7 +126,10 @@ export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
     status: (args.status as string) || undefined,
     priority: (args.priority as 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW') || undefined,
     dueDate: (args.dueDate as string) || undefined,
+    duration: args.duration !== undefined ? args.duration as (string | number) : undefined,
+    labels: Array.isArray(args.labels) ? args.labels as string[] : undefined,
     assigneeId: (args.assigneeId as string) || undefined,
+    autoScheduled: parseAutoScheduledParam(args.autoScheduled),
     ...parseWorkspaceArgs(args)
   };
 }

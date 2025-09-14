@@ -72,7 +72,10 @@ export class WorkspaceResolver {
           resolvedWorkspace = { 
             id: workspaceId, 
             name: 'Unknown Workspace',
-            type: WORKSPACE_TYPES.UNKNOWN
+            teamId: 'unknown',
+            type: WORKSPACE_TYPES.UNKNOWN,
+            labels: [],
+            statuses: []
           };
         }
       }

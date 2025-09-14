@@ -17,7 +17,7 @@ import {
   MotionApiError,
   MotionPaginatedResponse
 } from '../types/motion';
-import { LOG_LEVELS, convertUndefinedToNull, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER, LIMITS } from '../utils/constants';
+import { LOG_LEVELS, createMinimalPayload, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER, LIMITS } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { fetchAllPages as fetchAllPagesNew } from '../utils/paginationNew';
@@ -47,6 +47,7 @@ export class MotionApiService {
   private workspaceCache: SimpleCache<MotionWorkspace[]>;
   private userCache: SimpleCache<MotionUser[]>;
   private projectCache: SimpleCache<MotionProject[]>;
+  private singleProjectCache: SimpleCache<MotionProject>;
   private commentCache: SimpleCache<MotionPaginatedResponse<MotionComment>>;
   private customFieldCache: SimpleCache<MotionCustomField[]>;
   private recurringTaskCache: SimpleCache<MotionRecurringTask[]>;
@@ -122,6 +123,7 @@ export class MotionApiService {
     this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES * CACHE_TTL_MS_MULTIPLIER);
     this.userCache = new SimpleCache(CACHE_TTL.USERS * CACHE_TTL_MS_MULTIPLIER);
     this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER);
+    this.singleProjectCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER);
     this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS * CACHE_TTL_MS_MULTIPLIER);
     this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * CACHE_TTL_MS_MULTIPLIER);
     this.recurringTaskCache = new SimpleCache(CACHE_TTL.RECURRING_TASKS * CACHE_TTL_MS_MULTIPLIER);
@@ -315,32 +317,76 @@ export class MotionApiService {
     });
   }
 
-  async getProject(projectId: string): Promise<MotionProject> {
+  async getAllProjects(): Promise<MotionProject[]> {
     try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Fetching single project from Motion API', {
-        method: 'getProject',
-        projectId
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from all workspaces', {
+        method: 'getAllProjects'
       });
 
-      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.get(`/projects/${projectId}`));
+      const allWorkspaces = await this.getWorkspaces();
+      const allProjects: MotionProject[] = [];
 
-      mcpLog(LOG_LEVELS.INFO, 'Successfully fetched project', {
-        method: 'getProject',
-        projectId,
-        projectName: response.data.name
+      for (const workspace of allWorkspaces) {
+        try {
+          const workspaceProjects = await this.getProjects(workspace.id);
+          allProjects.push(...workspaceProjects);
+        } catch (workspaceError: unknown) {
+          // Log error but continue with other workspaces
+          mcpLog(LOG_LEVELS.WARN, 'Failed to fetch projects from workspace', {
+            method: 'getAllProjects',
+            workspaceId: workspace.id,
+            workspaceName: workspace.name,
+            error: getErrorMessage(workspaceError)
+          });
+        }
+      }
+
+      mcpLog(LOG_LEVELS.INFO, 'All projects fetched successfully', {
+        method: 'getAllProjects',
+        totalProjects: allProjects.length,
+        workspaceCount: allWorkspaces.length
       });
 
-      return response.data;
+      return allProjects;
     } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch project', {
-        method: 'getProject',
-        projectId,
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects from all workspaces', {
+        method: 'getAllProjects',
+        error: getErrorMessage(error)
       });
-      throw this.formatApiError(error, 'fetch project');
+      throw this.formatApiError(error, 'fetch all projects');
     }
+  }
+
+  async getProject(projectId: string): Promise<MotionProject> {
+    const cacheKey = `project:${projectId}`;
+
+    return this.singleProjectCache.withCache(cacheKey, async () => {
+      try {
+        mcpLog(LOG_LEVELS.DEBUG, 'Fetching single project from Motion API', {
+          method: 'getProject',
+          projectId
+        });
+
+        const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.get(`/projects/${projectId}`));
+
+        mcpLog(LOG_LEVELS.INFO, 'Successfully fetched project', {
+          method: 'getProject',
+          projectId,
+          projectName: response.data.name
+        });
+
+        return response.data;
+      } catch (error: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch project', {
+          method: 'getProject',
+          projectId,
+          error: getErrorMessage(error),
+          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+        });
+        throw this.formatApiError(error, 'fetch project');
+      }
+    });
   }
 
   async createProject(projectData: Partial<MotionProject>): Promise<MotionProject> {
@@ -355,9 +401,16 @@ export class MotionApiService {
         throw new Error('Workspace ID is required to create a project');
       }
 
-      // Convert undefined to null for API compatibility
-      const apiData = convertUndefinedToNull(projectData);
-      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.post('/projects', apiData));
+      // Create minimal payload by removing empty/null values to avoid validation errors
+      const minimalPayload = createMinimalPayload(projectData);
+
+      // Debug logging: log the exact payload being sent to API
+      mcpLog(LOG_LEVELS.DEBUG, 'API payload for project creation', {
+        method: 'createProject',
+        payload: JSON.stringify(minimalPayload, null, 2)
+      });
+
+      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.post('/projects', minimalPayload));
       
       // Invalidate cache after successful creation
       this.projectCache.invalidate(`projects:workspace:${projectData.workspaceId}`);
@@ -374,7 +427,8 @@ export class MotionApiService {
         method: 'createProject',
         error: getErrorMessage(error),
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        fullErrorResponse: isAxiosError(error) ? JSON.stringify(error.response?.data, null, 2) : undefined
       });
       throw this.formatApiError(error, 'create project');
     }
@@ -388,9 +442,9 @@ export class MotionApiService {
         updates: Object.keys(updates)
       });
 
-      // Convert undefined to null for API compatibility
-      const apiUpdates = convertUndefinedToNull(updates);
-      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.patch(`/projects/${projectId}`, apiUpdates));
+      // Create minimal payload by removing empty/null values to avoid validation errors
+      const minimalUpdates = createMinimalPayload(updates);
+      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => this.client.patch(`/projects/${projectId}`, minimalUpdates));
       
       // Invalidate cache after successful update
       this.projectCache.invalidate(`projects:workspace:${response.data.workspaceId}`);
@@ -573,9 +627,16 @@ export class MotionApiService {
         throw new Error('Workspace ID is required to create a task');
       }
 
-      // Convert undefined to null for API compatibility
-      const apiData = convertUndefinedToNull(taskData);
-      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.post('/tasks', apiData));
+      // Create minimal payload by removing empty/null values to avoid validation errors
+      const minimalPayload = createMinimalPayload(taskData);
+
+      // Debug logging: log the exact payload being sent to API
+      mcpLog(LOG_LEVELS.DEBUG, 'API payload for task creation', {
+        method: 'createTask',
+        payload: JSON.stringify(minimalPayload, null, 2)
+      });
+
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.post('/tasks', minimalPayload));
       
       // Invalidate task-related caches after successful creation
       // Note: Task cache would need to be implemented separately if needed
@@ -592,7 +653,8 @@ export class MotionApiService {
         method: 'createTask',
         error: getErrorMessage(error),
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        fullErrorResponse: isAxiosError(error) ? JSON.stringify(error.response?.data, null, 2) : undefined
       });
       throw this.formatApiError(error, 'create task');
     }
@@ -606,9 +668,9 @@ export class MotionApiService {
         updates: Object.keys(updates)
       });
 
-      // Convert undefined to null for API compatibility
-      const apiUpdates = convertUndefinedToNull(updates);
-      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.patch(`/tasks/${taskId}`, apiUpdates));
+      // Create minimal payload by removing empty/null values to avoid validation errors
+      const minimalUpdates = createMinimalPayload(updates);
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.patch(`/tasks/${taskId}`, minimalUpdates));
       
       mcpLog(LOG_LEVELS.INFO, 'Task updated successfully', {
         method: 'updateTask',
@@ -850,6 +912,177 @@ export class MotionApiService {
 
   // Additional methods for intelligent features
 
+  /**
+   * Resolves a project identifier (either projectId or projectName) to a MotionProject
+   * Searches across all workspaces if not found in the specified workspace
+   * @param identifier Object containing either projectId or projectName
+   * @param workspaceId Workspace to start searching in
+   * @returns Resolved MotionProject with workspace info, or undefined if not found
+   */
+  async resolveProjectIdentifier(
+    identifier: { projectId?: string; projectName?: string },
+    workspaceId: string
+  ): Promise<MotionProject | undefined> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Resolving project identifier', {
+        method: 'resolveProjectIdentifier',
+        projectId: identifier.projectId,
+        projectName: identifier.projectName,
+        workspaceId
+      });
+
+      // If projectId is provided, try to get it directly
+      if (identifier.projectId) {
+        try {
+          const project = await this.getProject(identifier.projectId);
+          mcpLog(LOG_LEVELS.INFO, 'Project resolved by ID', {
+            method: 'resolveProjectIdentifier',
+            projectId: identifier.projectId,
+            projectName: project.name,
+            workspaceId: project.workspaceId
+          });
+          return project;
+        } catch (error: unknown) {
+          mcpLog(LOG_LEVELS.WARN, 'Failed to resolve project by ID', {
+            method: 'resolveProjectIdentifier',
+            projectId: identifier.projectId,
+            error: getErrorMessage(error)
+          });
+          // Fall through to projectName resolution if projectId fails
+        }
+      }
+
+      // If projectName is provided (or projectId failed), resolve by name across workspaces
+      if (identifier.projectName) {
+        const project = await this.getProjectByName(identifier.projectName, workspaceId);
+        if (project) {
+          mcpLog(LOG_LEVELS.INFO, 'Project resolved by name across workspaces', {
+            method: 'resolveProjectIdentifier',
+            projectName: identifier.projectName,
+            projectId: project.id,
+            foundInWorkspaceId: project.workspaceId
+          });
+          return project;
+        }
+      }
+
+      mcpLog(LOG_LEVELS.WARN, 'Failed to resolve project identifier', {
+        method: 'resolveProjectIdentifier',
+        projectId: identifier.projectId,
+        projectName: identifier.projectName,
+        workspaceId
+      });
+
+      return undefined;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Error resolving project identifier', {
+        method: 'resolveProjectIdentifier',
+        projectId: identifier.projectId,
+        projectName: identifier.projectName,
+        error: getErrorMessage(error)
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Resolves a user identifier (either userId or userName/email) to a MotionUser
+   * Searches across all workspaces if not found in the specified workspace
+   * @param identifier Object containing either userId or userName
+   * @param workspaceId Workspace to start searching in (optional)
+   * @returns Resolved MotionUser with workspace info, or undefined if not found
+   */
+  async resolveUserIdentifier(
+    identifier: { userId?: string; userName?: string },
+    workspaceId?: string
+  ): Promise<MotionUser | undefined> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Resolving user identifier', {
+        method: 'resolveUserIdentifier',
+        userId: identifier.userId,
+        userName: identifier.userName,
+        workspaceId
+      });
+
+      // If userId is provided, search by ID across all workspaces
+      if (identifier.userId) {
+        const allWorkspaces = await this.getWorkspaces();
+
+        for (const workspace of allWorkspaces) {
+          try {
+            const users = await this.getUsers(workspace.id);
+            const user = users.find(u => u.id === identifier.userId);
+            if (user) {
+              mcpLog(LOG_LEVELS.INFO, 'User resolved by ID', {
+                method: 'resolveUserIdentifier',
+                userId: identifier.userId,
+                userName: user.name,
+                foundInWorkspaceId: workspace.id
+              });
+              return user;
+            }
+          } catch (workspaceError: unknown) {
+            mcpLog(LOG_LEVELS.WARN, 'Failed to search workspace for user by ID', {
+              method: 'resolveUserIdentifier',
+              userId: identifier.userId,
+              workspaceId: workspace.id,
+              error: getErrorMessage(workspaceError)
+            });
+          }
+        }
+      }
+
+      // If userName is provided, search by name/email across all workspaces
+      if (identifier.userName) {
+        const allWorkspaces = await this.getWorkspaces();
+        const searchTerm = identifier.userName.toLowerCase();
+
+        for (const workspace of allWorkspaces) {
+          try {
+            const users = await this.getUsers(workspace.id);
+            const user = users.find(u =>
+              u.name?.toLowerCase().includes(searchTerm) ||
+              u.email?.toLowerCase().includes(searchTerm)
+            );
+            if (user) {
+              mcpLog(LOG_LEVELS.INFO, 'User resolved by name/email', {
+                method: 'resolveUserIdentifier',
+                userName: identifier.userName,
+                userId: user.id,
+                foundInWorkspaceId: workspace.id
+              });
+              return user;
+            }
+          } catch (workspaceError: unknown) {
+            mcpLog(LOG_LEVELS.WARN, 'Failed to search workspace for user by name', {
+              method: 'resolveUserIdentifier',
+              userName: identifier.userName,
+              workspaceId: workspace.id,
+              error: getErrorMessage(workspaceError)
+            });
+          }
+        }
+      }
+
+      mcpLog(LOG_LEVELS.WARN, 'Failed to resolve user identifier', {
+        method: 'resolveUserIdentifier',
+        userId: identifier.userId,
+        userName: identifier.userName,
+        workspaceId
+      });
+
+      return undefined;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Error resolving user identifier', {
+        method: 'resolveUserIdentifier',
+        userId: identifier.userId,
+        userName: identifier.userName,
+        error: getErrorMessage(error)
+      });
+      throw error;
+    }
+  }
+
   async getProjectByName(projectName: string, workspaceId: string): Promise<MotionProject | undefined> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Finding project by name', {
@@ -858,24 +1091,74 @@ export class MotionApiService {
         workspaceId
       });
 
+      // First, search in the specified workspace
       const projects = await this.getProjects(workspaceId);
       const project = projects.find(p => p.name === projectName);
 
       if (project) {
-        mcpLog(LOG_LEVELS.INFO, 'Project found by name', {
+        mcpLog(LOG_LEVELS.INFO, 'Project found by name in specified workspace', {
           method: 'getProjectByName',
           projectName,
-          projectId: project.id
+          projectId: project.id,
+          workspaceId
         });
-      } else {
-        mcpLog(LOG_LEVELS.WARN, 'Project not found by name', {
-          method: 'getProjectByName',
-          projectName,
-          availableProjects: projects.map(p => p.name)
-        });
+        return project;
       }
 
-      return project || undefined;
+      // If not found in specified workspace, search across all other workspaces
+      mcpLog(LOG_LEVELS.DEBUG, 'Project not found in specified workspace, searching all workspaces', {
+        method: 'getProjectByName',
+        projectName,
+        specifiedWorkspaceId: workspaceId
+      });
+
+      const allWorkspaces = await this.getWorkspaces();
+      const otherWorkspaces = allWorkspaces.filter(w => w.id !== workspaceId);
+
+      for (const workspace of otherWorkspaces) {
+        try {
+          mcpLog(LOG_LEVELS.DEBUG, 'Searching workspace for project', {
+            method: 'getProjectByName',
+            projectName,
+            searchingWorkspaceId: workspace.id,
+            searchingWorkspaceName: workspace.name
+          });
+
+          const workspaceProjects = await this.getProjects(workspace.id);
+          const foundProject = workspaceProjects.find(p => p.name === projectName);
+
+          if (foundProject) {
+            mcpLog(LOG_LEVELS.INFO, 'Project found by name in different workspace', {
+              method: 'getProjectByName',
+              projectName,
+              projectId: foundProject.id,
+              foundInWorkspaceId: workspace.id,
+              foundInWorkspaceName: workspace.name,
+              originalWorkspaceId: workspaceId
+            });
+            return foundProject;
+          }
+        } catch (workspaceError: unknown) {
+          // Log error but continue searching other workspaces
+          mcpLog(LOG_LEVELS.WARN, 'Failed to search workspace for project', {
+            method: 'getProjectByName',
+            projectName,
+            workspaceId: workspace.id,
+            workspaceName: workspace.name,
+            error: getErrorMessage(workspaceError)
+          });
+        }
+      }
+
+      // Project not found in any workspace
+      mcpLog(LOG_LEVELS.WARN, 'Project not found by name in any workspace', {
+        method: 'getProjectByName',
+        projectName,
+        searchedWorkspaces: [workspaceId, ...otherWorkspaces.map(w => w.id)],
+        totalWorkspacesSearched: allWorkspaces.length
+      });
+
+      return undefined;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to find project by name', {
         method: 'getProjectByName',
@@ -897,22 +1180,92 @@ export class MotionApiService {
 
       // Apply search limit to prevent resource exhaustion
       const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
-      const tasks = await this.getTasks(workspaceId, undefined, LIMITS.MAX_PAGES, effectiveLimit);
       const lowerQuery = query.toLowerCase();
-      
-      const matchingTasks = tasks.filter(task => 
+      let allMatchingTasks: MotionTask[] = [];
+
+      // First, search in the specified workspace
+      const primaryTasks = await this.getTasks(workspaceId, undefined, LIMITS.MAX_PAGES, effectiveLimit);
+      const primaryMatches = primaryTasks.filter(task =>
         task.name?.toLowerCase().includes(lowerQuery) ||
         task.description?.toLowerCase().includes(lowerQuery)
-      ).slice(0, effectiveLimit); // Additional safety limit
+      );
 
-      mcpLog(LOG_LEVELS.INFO, 'Task search completed', {
+      allMatchingTasks.push(...primaryMatches);
+
+      mcpLog(LOG_LEVELS.DEBUG, 'Primary workspace search completed', {
         method: 'searchTasks',
         query,
-        resultsCount: matchingTasks.length,
-        limit: effectiveLimit
+        primaryWorkspaceId: workspaceId,
+        primaryMatches: primaryMatches.length
       });
 
-      return matchingTasks;
+      // If we haven't reached the limit, search other workspaces
+      if (allMatchingTasks.length < effectiveLimit) {
+        try {
+          const allWorkspaces = await this.getWorkspaces();
+          const otherWorkspaces = allWorkspaces.filter(w => w.id !== workspaceId);
+
+          for (const workspace of otherWorkspaces) {
+            if (allMatchingTasks.length >= effectiveLimit) break;
+
+            try {
+              mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for tasks', {
+                method: 'searchTasks',
+                query,
+                searchingWorkspaceId: workspace.id,
+                searchingWorkspaceName: workspace.name
+              });
+
+              const workspaceTasks = await this.getTasks(workspace.id, undefined, LIMITS.MAX_PAGES, effectiveLimit);
+              const workspaceMatches = workspaceTasks.filter(task =>
+                task.name?.toLowerCase().includes(lowerQuery) ||
+                task.description?.toLowerCase().includes(lowerQuery)
+              );
+
+              allMatchingTasks.push(...workspaceMatches);
+
+              if (workspaceMatches.length > 0) {
+                mcpLog(LOG_LEVELS.DEBUG, 'Found additional matches in workspace', {
+                  method: 'searchTasks',
+                  query,
+                  workspaceId: workspace.id,
+                  workspaceName: workspace.name,
+                  matches: workspaceMatches.length
+                });
+              }
+            } catch (workspaceError: unknown) {
+              // Log error but continue searching other workspaces
+              mcpLog(LOG_LEVELS.WARN, 'Failed to search workspace for tasks', {
+                method: 'searchTasks',
+                query,
+                workspaceId: workspace.id,
+                workspaceName: workspace.name,
+                error: getErrorMessage(workspaceError)
+              });
+            }
+          }
+        } catch (workspaceListError: unknown) {
+          mcpLog(LOG_LEVELS.WARN, 'Failed to get workspace list for cross-workspace search', {
+            method: 'searchTasks',
+            query,
+            error: getErrorMessage(workspaceListError)
+          });
+        }
+      }
+
+      // Apply final limit and return results
+      const finalResults = allMatchingTasks.slice(0, effectiveLimit);
+
+      mcpLog(LOG_LEVELS.INFO, 'Task search completed across all workspaces', {
+        method: 'searchTasks',
+        query,
+        totalMatches: allMatchingTasks.length,
+        returnedResults: finalResults.length,
+        limit: effectiveLimit,
+        crossWorkspaceSearch: allMatchingTasks.length > primaryMatches.length
+      });
+
+      return finalResults;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to search tasks', {
         method: 'searchTasks',
@@ -934,22 +1287,92 @@ export class MotionApiService {
 
       // Apply search limit to prevent resource exhaustion
       const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
-      const projects = await this.getProjects(workspaceId, LIMITS.MAX_PAGES);
       const lowerQuery = query.toLowerCase();
-      
-      const matchingProjects = projects.filter(project => 
+      let allMatchingProjects: MotionProject[] = [];
+
+      // First, search in the specified workspace
+      const primaryProjects = await this.getProjects(workspaceId, LIMITS.MAX_PAGES);
+      const primaryMatches = primaryProjects.filter(project =>
         project.name?.toLowerCase().includes(lowerQuery) ||
         project.description?.toLowerCase().includes(lowerQuery)
-      ).slice(0, effectiveLimit); // Additional safety limit
+      );
 
-      mcpLog(LOG_LEVELS.INFO, 'Project search completed', {
+      allMatchingProjects.push(...primaryMatches);
+
+      mcpLog(LOG_LEVELS.DEBUG, 'Primary workspace search completed', {
         method: 'searchProjects',
         query,
-        resultsCount: matchingProjects.length,
-        limit: effectiveLimit
+        primaryWorkspaceId: workspaceId,
+        primaryMatches: primaryMatches.length
       });
 
-      return matchingProjects;
+      // If we haven't reached the limit, search other workspaces
+      if (allMatchingProjects.length < effectiveLimit) {
+        try {
+          const allWorkspaces = await this.getWorkspaces();
+          const otherWorkspaces = allWorkspaces.filter(w => w.id !== workspaceId);
+
+          for (const workspace of otherWorkspaces) {
+            if (allMatchingProjects.length >= effectiveLimit) break;
+
+            try {
+              mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for projects', {
+                method: 'searchProjects',
+                query,
+                searchingWorkspaceId: workspace.id,
+                searchingWorkspaceName: workspace.name
+              });
+
+              const workspaceProjects = await this.getProjects(workspace.id, LIMITS.MAX_PAGES);
+              const workspaceMatches = workspaceProjects.filter(project =>
+                project.name?.toLowerCase().includes(lowerQuery) ||
+                project.description?.toLowerCase().includes(lowerQuery)
+              );
+
+              allMatchingProjects.push(...workspaceMatches);
+
+              if (workspaceMatches.length > 0) {
+                mcpLog(LOG_LEVELS.DEBUG, 'Found additional matches in workspace', {
+                  method: 'searchProjects',
+                  query,
+                  workspaceId: workspace.id,
+                  workspaceName: workspace.name,
+                  matches: workspaceMatches.length
+                });
+              }
+            } catch (workspaceError: unknown) {
+              // Log error but continue searching other workspaces
+              mcpLog(LOG_LEVELS.WARN, 'Failed to search workspace for projects', {
+                method: 'searchProjects',
+                query,
+                workspaceId: workspace.id,
+                workspaceName: workspace.name,
+                error: getErrorMessage(workspaceError)
+              });
+            }
+          }
+        } catch (workspaceListError: unknown) {
+          mcpLog(LOG_LEVELS.WARN, 'Failed to get workspace list for cross-workspace search', {
+            method: 'searchProjects',
+            query,
+            error: getErrorMessage(workspaceListError)
+          });
+        }
+      }
+
+      // Apply final limit and return results
+      const finalResults = allMatchingProjects.slice(0, effectiveLimit);
+
+      mcpLog(LOG_LEVELS.INFO, 'Project search completed across all workspaces', {
+        method: 'searchProjects',
+        query,
+        totalMatches: allMatchingProjects.length,
+        returnedResults: finalResults.length,
+        limit: effectiveLimit,
+        crossWorkspaceSearch: allMatchingProjects.length > primaryMatches.length
+      });
+
+      return finalResults;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to search projects', {
         method: 'searchProjects',
@@ -1025,14 +1448,11 @@ export class MotionApiService {
         contentLength: commentData.content?.length || 0
       });
 
-      // API only accepts taskId and content
-      const apiData = {
-        taskId: commentData.taskId,
-        content: commentData.content
-      };
-      
-      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() => 
-        this.client.post('/comments', apiData)
+      // Create minimal payload by removing empty/null values to avoid validation errors
+      const minimalPayload = createMinimalPayload(commentData);
+
+      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() =>
+        this.client.post('/comments', minimalPayload)
       );
       
       // Invalidate cache after successful creation
@@ -1117,14 +1537,17 @@ export class MotionApiService {
 
       // Transform payload to match Motion API expectations
       // POST API expects 'type' in request, but returns 'field' in response
-      const apiPayload = { 
-        name: fieldData.name, 
+      const apiPayload = {
+        name: fieldData.name,
         type: fieldData.field,  // Motion API POST expects 'type' property in request body
-        ...(fieldData.metadata && { metadata: fieldData.metadata }) 
+        ...(fieldData.metadata && { metadata: fieldData.metadata })
       };
 
-      const response: AxiosResponse<MotionCustomField> = await this.requestWithRetry(() => 
-        this.client.post(`/beta/workspaces/${workspaceId}/custom-fields`, apiPayload)
+      // Create minimal payload by removing empty/null values to avoid validation errors
+      const minimalPayload = createMinimalPayload(apiPayload);
+
+      const response: AxiosResponse<MotionCustomField> = await this.requestWithRetry(() =>
+        this.client.post(`/beta/workspaces/${workspaceId}/custom-fields`, minimalPayload)
       );
       
       // Invalidate cache after successful creation
@@ -1450,10 +1873,10 @@ export class MotionApiService {
         workspaceId: taskData.workspaceId
       });
 
-      // Convert undefined to null for API compatibility
-      const apiData = convertUndefinedToNull(taskData);
-      const response: AxiosResponse<MotionRecurringTask> = await this.requestWithRetry(() => 
-        this.client.post('/recurring-tasks', apiData)
+      // Create minimal payload by removing empty/null values to avoid validation errors
+      const minimalPayload = createMinimalPayload(taskData);
+      const response: AxiosResponse<MotionRecurringTask> = await this.requestWithRetry(() =>
+        this.client.post('/recurring-tasks', minimalPayload)
       );
       
       // Invalidate cache after successful creation
@@ -1512,6 +1935,39 @@ export class MotionApiService {
         recurringTaskId
       });
       throw this.formatApiError(error, 'delete recurring task');
+    }
+  }
+
+  /**
+   * Get available schedule names for auto-scheduling
+   * @param workspaceId - Optional workspace ID to filter schedules (currently unused by Motion API)
+   * @returns Array of schedule names
+   */
+  async getAvailableScheduleNames(workspaceId?: string): Promise<string[]> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching available schedule names', {
+        method: 'getAvailableScheduleNames',
+        workspaceId
+      });
+
+      // Fetch all schedules without filters to get available schedule templates
+      const schedules = await this.getSchedules();
+      const scheduleNames = schedules.map(schedule => schedule.name).filter(Boolean);
+
+      mcpLog(LOG_LEVELS.INFO, 'Available schedule names fetched successfully', {
+        method: 'getAvailableScheduleNames',
+        count: scheduleNames.length,
+        scheduleNames
+      });
+
+      return scheduleNames;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch available schedule names', {
+        method: 'getAvailableScheduleNames',
+        error: getErrorMessage(error),
+        workspaceId
+      });
+      throw this.formatApiError(error, 'fetch available schedule names');
     }
   }
 
@@ -1640,5 +2096,96 @@ export class MotionApiService {
         throw this.formatApiError(error, 'fetch statuses');
       }
     });
+  }
+
+  /**
+   * Get all uncompleted tasks across all workspaces and projects
+   * Filters tasks where status.isResolvedStatus is false or undefined
+   */
+  async getAllUncompletedTasks(limit?: number): Promise<MotionTask[]> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching all uncompleted tasks across workspaces', {
+        method: 'getAllUncompletedTasks',
+        limit
+      });
+
+      // Apply limit to prevent resource exhaustion
+      const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
+      const allUncompletedTasks: MotionTask[] = [];
+
+      try {
+        // Get all workspaces
+        const workspaces = await this.getWorkspaces();
+
+        mcpLog(LOG_LEVELS.DEBUG, 'Searching for uncompleted tasks across workspaces', {
+          method: 'getAllUncompletedTasks',
+          totalWorkspaces: workspaces.length
+        });
+
+        // Fetch tasks from each workspace
+        for (const workspace of workspaces) {
+          if (allUncompletedTasks.length >= effectiveLimit) {
+            break; // Stop if we've reached the limit
+          }
+
+          try {
+            // Get all tasks from this workspace (all projects)
+            const workspaceTasks = await this.getTasks(workspace.id, undefined, LIMITS.MAX_PAGES, effectiveLimit);
+
+            // Filter for uncompleted tasks
+            const uncompletedTasks = workspaceTasks.filter(task => {
+              // Task is uncompleted if status is missing or isResolvedStatus is false
+              if (!task.status) return true; // No status = not resolved
+              if (typeof task.status === 'string') return true; // Simple string status = assume not resolved
+              return !task.status.isResolvedStatus; // Object status with isResolvedStatus false
+            });
+
+            allUncompletedTasks.push(...uncompletedTasks);
+
+            if (uncompletedTasks.length > 0) {
+              mcpLog(LOG_LEVELS.DEBUG, 'Found uncompleted tasks in workspace', {
+                method: 'getAllUncompletedTasks',
+                workspaceId: workspace.id,
+                workspaceName: workspace.name,
+                uncompletedTasks: uncompletedTasks.length,
+                totalTasks: workspaceTasks.length
+              });
+            }
+          } catch (workspaceError: unknown) {
+            // Log error but continue with other workspaces
+            mcpLog(LOG_LEVELS.WARN, 'Failed to fetch tasks from workspace', {
+              method: 'getAllUncompletedTasks',
+              workspaceId: workspace.id,
+              workspaceName: workspace.name,
+              error: getErrorMessage(workspaceError)
+            });
+          }
+        }
+      } catch (workspaceListError: unknown) {
+        mcpLog(LOG_LEVELS.ERROR, 'Failed to get workspace list', {
+          method: 'getAllUncompletedTasks',
+          error: getErrorMessage(workspaceListError)
+        });
+        throw workspaceListError;
+      }
+
+      // Apply final limit and return results
+      const finalResults = allUncompletedTasks.slice(0, effectiveLimit);
+
+      mcpLog(LOG_LEVELS.INFO, 'All uncompleted tasks fetched successfully', {
+        method: 'getAllUncompletedTasks',
+        totalFound: allUncompletedTasks.length,
+        returned: finalResults.length,
+        limit: effectiveLimit
+      });
+
+      return finalResults;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch all uncompleted tasks', {
+        method: 'getAllUncompletedTasks',
+        error: getErrorMessage(error)
+      });
+      throw error;
+    }
   }
 }

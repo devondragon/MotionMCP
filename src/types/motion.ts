@@ -1,7 +1,14 @@
 export interface MotionWorkspace {
   id: string;
   name: string;
+  teamId: string | null;
   type: string;
+  labels: Array<string | {name: string}>;
+  statuses?: Array<{
+    name: string;
+    isDefaultStatus: boolean;
+    isResolvedStatus: boolean;
+  }>;
 }
 
 // Minimal interfaces for nested object references
@@ -21,7 +28,7 @@ export interface ProjectReference {
 export interface WorkspaceReference {
   id: string;
   name: string;
-  teamId: string; // Added required teamId field
+  teamId: string | null; // Updated to accept null
   type?: string;
 }
 
@@ -68,7 +75,7 @@ export interface MotionPaginatedResponse<T> {
 export interface MotionProject {
   id: string;
   name: string;
-  description?: string; // Optional in CREATE, may be empty string in responses
+  description: string; // Required according to API documentation
   workspaceId: string;
   color?: string;
   status?: string | {
@@ -104,7 +111,7 @@ export interface MotionTask {
   dueDate?: string;
   duration?: number | 'NONE' | 'REMINDER';
   assigneeId?: string;
-  labels?: Array<{name: string}>;
+  labels?: Array<string | {name: string}>;
   autoScheduled?: Record<string, unknown> | null;
   completed?: boolean;
   completedTime?: string;
@@ -138,7 +145,7 @@ export interface MotionTask {
   workspace: {
     id: string;
     name: string;
-    teamId: string; // Added required teamId field
+    teamId: string | null; // Updated to accept null
     type: string;
   };
   
@@ -223,10 +230,10 @@ export interface MotionRecurringTask {
   workspace: {
     id: string;
     name: string;
-    teamId: string;
+    teamId: string | null;
     type: string;
-    labels: Array<{name: string}>;
-    statuses: Array<{
+    labels: Array<string | {name: string}>;
+    statuses?: Array<{
       name: string;
       isDefaultStatus: boolean;
       isResolvedStatus: boolean;
@@ -238,7 +245,7 @@ export interface MotionRecurringTask {
     isResolvedStatus: boolean;
   };
   priority: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
-  labels: Array<{name: string}>;
+  labels: Array<string | {name: string}>;
 }
 
 export interface CreateRecurringTaskData {
