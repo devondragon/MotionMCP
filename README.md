@@ -4,16 +4,29 @@ An MCP (Model Context Protocol) server that gives LLMs direct access to the Moti
 
 ## Quick start (npx)
 
-Run the server without installing globally:
+1. **Get your Motion API key** from [https://app.usemotion.com/settings/api](https://app.usemotion.com/settings/api)
+
+2. **Add to Claude Desktop** - Update your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "motion": {
+      "command": "npx",
+      "args": ["motionmcp"],
+      "env": {
+        "MOTION_API_KEY": "your_api_key",
+        "MOTION_MCP_TOOLS": "essential"
+      }
+    }
+  }
+}
+```
+
+3. **Test the server** - Or run directly from command line:
 
 ```bash
 MOTION_API_KEY=your_motion_api_key npx motionmcp
-```
-
-Or provide the key via your shell environment and run:
-
-```bash
-npx motionmcp
 ```
 
 > Tip: `npx` runs the latest published version.
@@ -37,7 +50,6 @@ npx motionmcp
 ## Prerequisites
 
 * Node.js 18 or higher
-* Motion API key from [https://app.usemotion.com/settings/api](https://app.usemotion.com/settings/api)
 
 ## Tool Configuration
 
@@ -242,48 +254,7 @@ Args: {
 }
 ```
 
-## LLM Integration
-
-### Claude Desktop Configuration
-
-Add this to your `claude_desktop_config.json`.
-
-#### Using published package (npx)
-```json
-{
-  "mcpServers": {
-    "motion": {
-      "command": "npx",
-      "args": ["motionmcp"],
-      "env": {
-        "MOTION_API_KEY": "your_api_key",
-        "MOTION_MCP_TOOLS": "essential"
-      }
-    }
-  }
-}
-```
-
-#### Using your local workspace (npm)
-```json
-{
-  "mcpServers": {
-    "motion": {
-      "command": "npm",
-      "args": ["run", "mcp:dev"],
-      "cwd": "/absolute/path/to/your/MotionMCP",
-      "env": {
-        "MOTION_API_KEY": "your_api_key",
-        "MOTION_MCP_TOOLS": "essential"
-      }
-    }
-  }
-}
-```
-
-See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
-
-### Configuration Examples
+## Advanced Claude Desktop Configuration
 
 **Minimal setup (3 tools only):**
 ```json
@@ -310,12 +281,31 @@ See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
       "args": ["motionmcp"],
       "env": {
         "MOTION_API_KEY": "your_api_key",
-    "MOTION_MCP_TOOLS": "custom:motion_tasks,motion_projects,motion_search"
+        "MOTION_MCP_TOOLS": "custom:motion_tasks,motion_projects,motion_search"
       }
     }
   }
 }
 ```
+
+**Using your local workspace (npm):**
+```json
+{
+  "mcpServers": {
+    "motion": {
+      "command": "npm",
+      "args": ["run", "mcp:dev"],
+      "cwd": "/absolute/path/to/your/MotionMCP",
+      "env": {
+        "MOTION_API_KEY": "your_api_key",
+        "MOTION_MCP_TOOLS": "essential"
+      }
+    }
+  }
+}
+```
+
+See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
 
 ## Debugging
 
