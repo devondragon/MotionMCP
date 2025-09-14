@@ -1939,6 +1939,39 @@ export class MotionApiService {
   }
 
   /**
+   * Get available schedule names for auto-scheduling
+   * @param workspaceId - Optional workspace ID to filter schedules (currently unused by Motion API)
+   * @returns Array of schedule names
+   */
+  async getAvailableScheduleNames(workspaceId?: string): Promise<string[]> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching available schedule names', {
+        method: 'getAvailableScheduleNames',
+        workspaceId
+      });
+
+      // Fetch all schedules without filters to get available schedule templates
+      const schedules = await this.getSchedules();
+      const scheduleNames = schedules.map(schedule => schedule.name).filter(Boolean);
+
+      mcpLog(LOG_LEVELS.INFO, 'Available schedule names fetched successfully', {
+        method: 'getAvailableScheduleNames',
+        count: scheduleNames.length,
+        scheduleNames
+      });
+
+      return scheduleNames;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch available schedule names', {
+        method: 'getAvailableScheduleNames',
+        error: getErrorMessage(error),
+        workspaceId
+      });
+      throw this.formatApiError(error, 'fetch available schedule names');
+    }
+  }
+
+  /**
    * Fetch schedules from Motion API
    * @param userId - Optional user ID to filter schedules
    * @param startDate - Optional start date (ISO 8601) to filter schedules

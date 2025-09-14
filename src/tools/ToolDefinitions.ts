@@ -131,10 +131,29 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       autoScheduled: {
         oneOf: [
-          { type: "object" },
-          { type: "null" }
+          {
+            type: "object",
+            properties: {
+              schedule: {
+                type: "string",
+                description: "Name of the schedule to use for auto-scheduling (e.g., 'Work Hours')"
+              },
+              startDate: {
+                type: "string",
+                description: "Optional start date for auto-scheduling (ISO 8601 format)"
+              },
+              deadlineType: {
+                type: "string",
+                enum: ["HARD", "SOFT", "NONE"],
+                description: "Deadline type for auto-scheduling (default: SOFT)"
+              }
+            },
+            required: ["schedule"]
+          },
+          { type: "null" },
+          { type: "string", description: "Schedule name (shorthand for {schedule: 'name'})" }
         ],
-        description: "Auto-scheduling configuration"
+        description: "Auto-scheduling configuration. Requires a schedule name. Use motion_schedules to see available schedules. Examples: 'Work Hours' or {schedule: 'Work Hours', deadlineType: 'SOFT'}"
       },
       targetProjectId: {
         type: "string",

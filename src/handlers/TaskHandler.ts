@@ -143,6 +143,9 @@ export class TaskHandler extends BaseHandler {
 
     const convertedLabels = taskData.labels?.map(name => ({ name }));
 
+    // Validate auto-scheduling configuration
+    await this.validateAutoScheduling(taskData.autoScheduled, targetWorkspaceId);
+
     const task = await this.motionService.createTask({
       name: taskData.name,
       description: taskData.description,
@@ -280,5 +283,98 @@ export class TaskHandler extends BaseHandler {
       limit: params.limit,
       allWorkspaces: true
     });
+  }
+
+  /**
+   * Validate auto-scheduling configuration and provide helpful error messages
+   * @param autoScheduled - The autoScheduled configuration
+   * @param workspaceId - The workspace ID for context
+   * @throws Error if validation fails with helpful guidance
+   */
+  private async validateAutoScheduling(
+    autoScheduled: Record<string, unknown> | null | undefined,
+    workspaceId: string
+  ): Promise<void> {
+    // If auto-scheduling is not enabled, no validation needed
+    if (!autoScheduled || autoScheduled === null) {
+      return;
+    }
+
+    // If it's an object, check if schedule is provided
+    if (typeof autoScheduled === 'object' && autoScheduled !== null) {
+      const schedule = autoScheduled.schedule as string | undefined;
+
+      // If no schedule provided, show available schedules
+      if (!schedule) {
+        try {
+          const availableSchedules = await this.motionService.getAvailableScheduleNames(workspaceId);
+
+          if (availableSchedules.length === 0) {
+            throw new Error(
+              'Auto-scheduling requires a schedule, but no schedules are available. Please create a schedule in Motion first.'
+            );
+          }
+
+          const scheduleList = availableSchedules
+            .map((name, i) => `${i + 1}. "${name}"`)
+            .join('\n');
+
+          throw new Error(
+            `Auto-scheduling requires a schedule. Available schedules:\n${scheduleList}\n\nExample usage:\n• Set autoScheduled to {"schedule": "${availableSchedules[0]}"}\n• Or pass schedule name directly: autoScheduled = "${availableSchedules[0]}"`
+          );
+        } catch (error) {
+          // If we can't fetch schedules, provide a generic error
+          if (error instanceof Error && error.message.includes('Auto-scheduling requires a schedule')) {
+            throw error; // Re-throw our formatted error
+          }
+          throw new Error(
+            'Auto-scheduling requires a schedule, but unable to fetch available schedules. Please specify a schedule name in autoScheduled parameter.'
+          );
+        }
+      }
+
+      // Validate that the provided schedule exists
+      try {
+        const availableSchedules = await this.motionService.getAvailableScheduleNames(workspaceId);
+
+        // Case-insensitive matching
+        const normalizedSchedule = schedule.toLowerCase().trim();
+        const matchingSchedule = availableSchedules.find(
+          s => s.toLowerCase().trim() === normalizedSchedule
+        );
+
+        if (!matchingSchedule) {
+          // Provide suggestions for similar names
+          const suggestions = availableSchedules.filter(s =>
+            s.toLowerCase().includes(normalizedSchedule) ||
+            normalizedSchedule.includes(s.toLowerCase())
+          );
+
+          const scheduleList = availableSchedules
+            .map((name, i) => `${i + 1}. "${name}"`)
+            .join('\n');
+
+          let errorMessage = `Schedule "${schedule}" not found.`;
+
+          if (suggestions.length > 0) {
+            errorMessage += ` Did you mean: ${suggestions.map(s => `"${s}"`).join(', ')}?`;
+          }
+
+          errorMessage += `\n\nAvailable schedules:\n${scheduleList}`;
+
+          throw new Error(errorMessage);
+        }
+
+        // Update the schedule with the exact match (fixes casing)
+        autoScheduled.schedule = matchingSchedule;
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error; // Re-throw validation errors
+        }
+        throw new Error(
+          `Unable to validate schedule "${schedule}". Please check that the schedule exists in Motion.`
+        );
+      }
+    }
   }
 }
