@@ -17,7 +17,7 @@ import {
   MotionApiError,
   MotionPaginatedResponse
 } from '../types/motion';
-import { LOG_LEVELS, createMinimalPayload, RETRY_CONFIG, CACHE_TTL, CACHE_TTL_MS_MULTIPLIER, LIMITS } from '../utils/constants';
+import { LOG_LEVELS, createMinimalPayload, RETRY_CONFIG, CACHE_TTL, LIMITS, ValidPriority } from '../utils/constants';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { fetchAllPages as fetchAllPagesNew } from '../utils/paginationNew';
@@ -38,6 +38,18 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+interface GetTasksOptions {
+  workspaceId: string;
+  projectId?: string;
+  status?: string;
+  assigneeId?: string;
+  priority?: ValidPriority;
+  dueDate?: string;
+  labels?: string[];
+  limit?: number;
+  maxPages?: number;
 }
 
 export class MotionApiService {
@@ -120,15 +132,15 @@ export class MotionApiService {
     });
 
     // Initialize cache instances with TTL from constants (converted to ms)
-    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES * CACHE_TTL_MS_MULTIPLIER);
-    this.userCache = new SimpleCache(CACHE_TTL.USERS * CACHE_TTL_MS_MULTIPLIER);
-    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER);
-    this.singleProjectCache = new SimpleCache(CACHE_TTL.PROJECTS * CACHE_TTL_MS_MULTIPLIER);
-    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS * CACHE_TTL_MS_MULTIPLIER);
-    this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS * CACHE_TTL_MS_MULTIPLIER);
-    this.recurringTaskCache = new SimpleCache(CACHE_TTL.RECURRING_TASKS * CACHE_TTL_MS_MULTIPLIER);
-    this.scheduleCache = new SimpleCache(CACHE_TTL.SCHEDULES * CACHE_TTL_MS_MULTIPLIER);
-    this.statusCache = new SimpleCache(CACHE_TTL.WORKSPACES * CACHE_TTL_MS_MULTIPLIER); // 10 minutes, like workspaces
+    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES);
+    this.userCache = new SimpleCache(CACHE_TTL.USERS);
+    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS);
+    this.singleProjectCache = new SimpleCache(CACHE_TTL.PROJECTS);
+    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS);
+    this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS);
+    this.recurringTaskCache = new SimpleCache(CACHE_TTL.RECURRING_TASKS);
+    this.scheduleCache = new SimpleCache(CACHE_TTL.SCHEDULES);
+    this.statusCache = new SimpleCache(CACHE_TTL.WORKSPACES); // 10 minutes, like workspaces
 
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -496,12 +508,29 @@ export class MotionApiService {
     }
   }
 
-  async getTasks(workspaceId: string, projectId?: string, maxPages: number = 5, limit?: number): Promise<MotionTask[]> {
+  async getTasks(options: GetTasksOptions): Promise<MotionTask[]> {
+    const {
+      workspaceId,
+      projectId,
+      status,
+      assigneeId,
+      priority,
+      dueDate,
+      labels,
+      limit,
+      maxPages = 5
+    } = options;
+
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching tasks from Motion API', {
         method: 'getTasks',
         workspaceId,
         projectId,
+        status,
+        assigneeId,
+        priority,
+        dueDate,
+        labelsCount: labels?.length,
         maxPages
       });
 
@@ -511,6 +540,25 @@ export class MotionApiService {
         params.append('workspaceId', workspaceId);
         if (projectId) {
           params.append('projectId', projectId);
+        }
+        if (status) {
+          params.append('status', status);
+        }
+        if (assigneeId) {
+          params.append('assigneeId', assigneeId);
+        }
+        if (priority) {
+          params.append('priority', priority);
+        }
+        if (dueDate) {
+          params.append('dueDate', dueDate);
+        }
+        if (labels && labels.length > 0) {
+          for (const label of labels) {
+            if (label) {
+              params.append('labels', label);
+            }
+          }
         }
         if (cursor) {
           params.append('cursor', cursor);
@@ -526,7 +574,8 @@ export class MotionApiService {
         // Attempt pagination-aware fetch with new response wrapper
         const paginatedResult = await fetchAllPagesNew<MotionTask>(fetchPage, 'tasks', { 
           maxPages,
-          logProgress: false  // Less verbose for tasks
+          logProgress: false,  // Less verbose for tasks
+          ...(limit ? { maxItems: limit } : {})
         });
         
         if (paginatedResult.totalFetched > 0) {
@@ -1184,7 +1233,11 @@ export class MotionApiService {
       let allMatchingTasks: MotionTask[] = [];
 
       // First, search in the specified workspace
-      const primaryTasks = await this.getTasks(workspaceId, undefined, LIMITS.MAX_PAGES, effectiveLimit);
+      const primaryTasks = await this.getTasks({
+        workspaceId,
+        limit: effectiveLimit,
+        maxPages: LIMITS.MAX_PAGES
+      });
       const primaryMatches = primaryTasks.filter(task =>
         task.name?.toLowerCase().includes(lowerQuery) ||
         task.description?.toLowerCase().includes(lowerQuery)
@@ -1216,7 +1269,11 @@ export class MotionApiService {
                 searchingWorkspaceName: workspace.name
               });
 
-              const workspaceTasks = await this.getTasks(workspace.id, undefined, LIMITS.MAX_PAGES, effectiveLimit);
+              const workspaceTasks = await this.getTasks({
+                workspaceId: workspace.id,
+                limit: effectiveLimit,
+                maxPages: LIMITS.MAX_PAGES
+              });
               const workspaceMatches = workspaceTasks.filter(task =>
                 task.name?.toLowerCase().includes(lowerQuery) ||
                 task.description?.toLowerCase().includes(lowerQuery)
@@ -2130,7 +2187,11 @@ export class MotionApiService {
 
           try {
             // Get all tasks from this workspace (all projects)
-            const workspaceTasks = await this.getTasks(workspace.id, undefined, LIMITS.MAX_PAGES, effectiveLimit);
+            const workspaceTasks = await this.getTasks({
+              workspaceId: workspace.id,
+              limit: effectiveLimit,
+              maxPages: LIMITS.MAX_PAGES
+            });
 
             // Filter for uncompleted tasks
             const uncompletedTasks = workspaceTasks.filter(task => {

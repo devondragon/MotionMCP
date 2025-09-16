@@ -100,6 +100,26 @@ export const tasksToolDefinition: McpToolDefinition = {
         type: "string",
         description: "Filter by assignee (for list)"
       },
+      assignee: {
+        type: "string",
+        description: "Filter by assignee name, email, or 'me' shortcut (for list). Resolved to an ID automatically"
+      },
+      priority: {
+        type: "string",
+        description: "Filter by priority level (for list): ASAP, HIGH, MEDIUM, LOW",
+        enum: ["ASAP", "HIGH", "MEDIUM", "LOW"]
+      },
+      dueDate: {
+        type: "string",
+        description: "Filter by due date (for list). Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
+      },
+      labels: {
+        type: "array",
+        items: {
+          type: "string"
+        },
+        description: "Filter by labels (for list). Array of label names"
+      },
       name: {
         type: "string",
         description: "Task name (required for create)"
@@ -108,26 +128,12 @@ export const tasksToolDefinition: McpToolDefinition = {
         type: "string",
         description: "Task description"
       },
-      priority: {
-        type: "string",
-        enum: ["ASAP", "HIGH", "MEDIUM", "LOW"],
-        description: "Task priority"
-      },
-      dueDate: {
-        type: "string",
-        description: "ISO 8601 format"
-      },
       duration: {
         oneOf: [
           { type: "string", enum: ["NONE", "REMINDER"] },
           { type: "number", minimum: 0 }
         ],
         description: "Minutes (as number) or 'NONE'/'REMINDER' (as string)"
-      },
-      labels: {
-        type: "array",
-        items: { type: "string" },
-        description: "Task labels"
       },
       autoScheduled: {
         oneOf: [

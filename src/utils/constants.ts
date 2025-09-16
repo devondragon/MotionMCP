@@ -12,6 +12,8 @@ export const ERROR_CODES = {
   // Validation errors
   INVALID_PARAMETERS: 'INVALID_PARAMETERS',
   MISSING_REQUIRED_PARAM: 'MISSING_REQUIRED_PARAM',
+  INVALID_PRIORITY: 'INVALID_PRIORITY',
+  INVALID_DATE_FORMAT: 'INVALID_DATE_FORMAT',
   
   // API related errors
   MOTION_API_ERROR: 'MOTION_API_ERROR',
@@ -79,9 +81,6 @@ export const CACHE_TTL = {
   RECURRING_TASKS: 300, // 5 minutes (same as projects)
   SCHEDULES: 300      // 5 minutes (schedule data changes frequently)
 } as const;
-
-// Cache TTL conversion factor
-export const CACHE_TTL_MS_MULTIPLIER = 1000; // Convert seconds to milliseconds
 
 // Content limits and validation
 export const LIMITS = {
@@ -176,4 +175,46 @@ export function convertNullToUndefined<T extends Record<string, any>>(obj: T): T
     }
   }
   return result;
+}
+
+// Valid priority levels for Motion tasks
+export const VALID_PRIORITIES = ['ASAP', 'HIGH', 'MEDIUM', 'LOW'] as const;
+export type ValidPriority = typeof VALID_PRIORITIES[number];
+
+// Helper to validate priority values
+export function isValidPriority(priority: string): priority is ValidPriority {
+  return VALID_PRIORITIES.includes(priority as ValidPriority);
+}
+
+// Helper to parse and validate date formats
+export function parseFilterDate(dateInput: string): string | null {
+  if (!dateInput) return null;
+
+  // Handle relative dates
+  const today = new Date();
+  const normalizedInput = dateInput.toLowerCase().trim();
+
+  switch (normalizedInput) {
+    case 'today':
+      return today.toISOString().split('T')[0];
+    case 'tomorrow':
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      return tomorrow.toISOString().split('T')[0];
+    case 'yesterday':
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      return yesterday.toISOString().split('T')[0];
+  }
+
+  // Validate YYYY-MM-DD format
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (datePattern.test(dateInput)) {
+    const parsedDate = new Date(dateInput + 'T00:00:00Z');
+    if (!isNaN(parsedDate.getTime())) {
+      return dateInput;
+    }
+  }
+
+  return null;
 }

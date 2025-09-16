@@ -36,8 +36,7 @@ describe('utils', () => {
     expect(sanitized).toContain('World');
     expect(sanitized).not.toContain('<script');
     expect(sanitized).not.toContain('<b>');
-    // Ensure ampersand is escaped
-    expect(sanitized).toContain('&amp; more');
+    // Ensure ampersand is preserved without HTML encoding
+    expect(sanitized).toContain('& more');
   });
 });
-

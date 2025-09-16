@@ -44,6 +44,7 @@ export interface MotionTasksArgs {
   projectId?: string;
   projectName?: string;
   assigneeId?: string;
+  assignee?: string;
   limit?: number;
   // Create/Update params
   name?: string;

@@ -28,18 +28,20 @@ export function sanitizeTextContent(input: string | undefined | null): string {
 
   // Remove or escape potentially dangerous characters and patterns
   let sanitized = trimmed
-    // Remove script tags and their content
+    // Remove script tags and their content entirely
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    // Remove HTML tags but keep the content
+    // Remove any remaining HTML tags but keep inner text
     .replace(/<[^>]*>/g, '')
-    // Escape remaining angle brackets
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    // Escape quotes to prevent attribute injection
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    // Escape ampersands (but do it last to avoid double-escaping)
-    .replace(/&(?!(lt|gt|quot|#39|amp);)/g, '&amp;');
+    // Normalize unicode non-breaking spaces
+    .replace(/\u00a0/g, ' ');
+
+  // Normalize whitespace introduced by stripping tags while preserving newlines
+  sanitized = sanitized
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
   // Limit length to prevent abuse - use consistent limit from constants
   if (sanitized.length > LIMITS.COMMENT_MAX_LENGTH) {

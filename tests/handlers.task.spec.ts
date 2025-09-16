@@ -52,7 +52,10 @@ describe('TaskHandler', () => {
     const handler = new TaskHandler(ctx);
     const res = await handler.handle({ operation: 'list', workspaceName: 'Dev', limit: 10 } as any);
 
-    expect(ctx.motionService.getTasks).toHaveBeenCalledWith('w1', undefined, 5, 10);
+    expect(ctx.motionService.getTasks).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: 'w1',
+      limit: 10
+    }));
     const text = (res.content?.[0] as any)?.text || '';
     expect(text).toContain('Found 2 tasks');
     expect(text).toContain('(ID: t1)');
@@ -69,4 +72,3 @@ describe('TaskHandler', () => {
     expect(text).toContain('Successfully updated task');
   });
 });
-

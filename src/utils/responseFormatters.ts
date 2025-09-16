@@ -77,6 +77,9 @@ interface TaskListContext {
   workspaceName?: string;
   projectName?: string;
   status?: string;
+  assigneeName?: string;
+  priority?: string;
+  dueDate?: string;
   limit?: number;
   allWorkspaces?: boolean;
 }
@@ -88,7 +91,7 @@ export function formatTaskList(
   tasks: MotionTask[],
   context: TaskListContext = {}
 ): CallToolResult {
-  const { workspaceName, projectName, status, limit, allWorkspaces } = context;
+  const { workspaceName, projectName, status, assigneeName, priority, dueDate, limit, allWorkspaces } = context;
   
   const taskFormatter = (task: MotionTask) => {
     let line = `- ${task.name}`;
@@ -110,6 +113,15 @@ export function formatTaskList(
   }
   if (projectName) title += ` in project "${projectName}"`;
   if (status) title += ` with status "${status}"`;
+  if (assigneeName) title += ` for assignee "${assigneeName}"`;
+  if (priority) title += ` with priority "${priority}"`;
+  if (dueDate) {
+    const parsedDueDate = new Date(dueDate);
+    const dueDateText = Number.isNaN(parsedDueDate.getTime())
+      ? dueDate
+      : parsedDueDate.toLocaleDateString();
+    title += ` due by ${dueDateText}`;
+  }
   if (limit) title += ` (limit: ${limit})`;
   
   return formatListResponse(tasks, title, taskFormatter);

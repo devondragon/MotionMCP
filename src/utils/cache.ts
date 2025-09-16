@@ -8,19 +8,19 @@ interface CacheItem<T> {
 
 export class SimpleCache<T = any> {
   private cache: Map<string, CacheItem<T>>;
-  private ttl: number;
+  private ttlMs: number;
   private maxSize: number;
   private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(ttlSeconds: number = 300, maxSize: number = 1000, options: { autoCleanup?: boolean } = {}) {
     this.cache = new Map();
-    this.ttl = ttlSeconds * 1000;
+    this.ttlMs = ttlSeconds * 1000;
     this.maxSize = maxSize;
 
     // Set up automatic cleanup if requested
     if (options.autoCleanup !== false) { // Default to true for automatic cleanup
       // Run cleanup periodically at half the TTL interval for efficiency
-      this.cleanupInterval = setInterval(() => this.cleanup(), Math.max(30000, this.ttl / 2));
+      this.cleanupInterval = setInterval(() => this.cleanup(), Math.max(30000, this.ttlMs / 2));
       
       // Allow process to exit even if interval is active
       if (typeof this.cleanupInterval.unref === 'function') {
@@ -56,7 +56,7 @@ export class SimpleCache<T = any> {
 
     this.cache.set(key, {
       value,
-      expiry: Date.now() + this.ttl
+      expiry: Date.now() + this.ttlMs
     });
   }
 
@@ -130,7 +130,7 @@ export class SimpleCache<T = any> {
     return {
       size: this.cache.size,
       maxSize: this.maxSize,
-      ttlSeconds: this.ttl / 1000
+      ttlSeconds: this.ttlMs / 1000
     };
   }
 

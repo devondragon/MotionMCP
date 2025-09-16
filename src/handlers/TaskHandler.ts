@@ -8,6 +8,7 @@ import {
   formatTaskList,
   formatTaskDetail
 } from '../utils';
+import { isValidPriority, parseFilterDate, ValidPriority } from '../utils/constants';
 
 interface CreateTaskParams {
   name?: string;
@@ -30,6 +31,10 @@ interface ListTaskParams {
   projectName?: string;
   status?: string;
   assigneeId?: string;
+  assignee?: string;
+  priority?: string;
+  dueDate?: string;
+  labels?: string[];
   limit?: number;
 }
 
@@ -187,17 +192,79 @@ export class TaskHandler extends BaseHandler {
       }
     }
 
-    const tasks = await this.motionService.getTasks(
-      workspace.id,
-      resolvedProjectId,
-      5, // maxPages
-      params.limit
-    );
+    // Validate priority if provided
+    if (params.priority && !isValidPriority(params.priority)) {
+      return this.handleError(new Error(
+        `Invalid priority "${params.priority}". Valid values are: ASAP, HIGH, MEDIUM, LOW`
+      ));
+    }
+
+    // Validate and parse due date if provided
+    let validatedDueDate: string | undefined;
+    if (params.dueDate) {
+      const parsedDate = parseFilterDate(params.dueDate);
+      if (!parsedDate) {
+        return this.handleError(new Error(
+          `Invalid date format "${params.dueDate}". Use YYYY-MM-DD format or relative dates like 'today', 'tomorrow'`
+        ));
+      }
+      validatedDueDate = parsedDate;
+    }
+
+    // Validate labels if provided
+    if (params.labels && (!Array.isArray(params.labels) || params.labels.some(label => !label || typeof label !== 'string'))) {
+      return this.handleError(new Error('Labels must be an array of non-empty strings'));
+    }
+
+    let resolvedAssigneeId = params.assigneeId;
+    let assigneeDisplay: string | undefined = params.assignee;
+
+    const normalizeDisplayFromUser = (user: { name?: string; email?: string; id: string }) => {
+      return user.name || user.email || user.id;
+    };
+
+    const resolveCurrentUser = async () => {
+      const currentUser = await this.motionService.getCurrentUser();
+      resolvedAssigneeId = currentUser.id;
+      assigneeDisplay = normalizeDisplayFromUser(currentUser);
+    };
+
+    if (resolvedAssigneeId) {
+      if (resolvedAssigneeId.toLowerCase() === 'me') {
+        await resolveCurrentUser();
+      }
+    } else if (params.assignee) {
+      const assigneeInput = params.assignee.trim();
+      if (assigneeInput.toLowerCase() === 'me') {
+        await resolveCurrentUser();
+      } else {
+        const user = await this.motionService.resolveUserIdentifier({ userName: assigneeInput }, workspace.id);
+        if (!user) {
+          return this.handleError(new Error(`Assignee "${assigneeInput}" not found in any workspace`));
+        }
+        resolvedAssigneeId = user.id;
+        assigneeDisplay = normalizeDisplayFromUser(user);
+      }
+    }
+
+    const tasks = await this.motionService.getTasks({
+      workspaceId: workspace.id,
+      projectId: resolvedProjectId,
+      status: params.status,
+      assigneeId: resolvedAssigneeId,
+      priority: params.priority as ValidPriority | undefined,
+      dueDate: validatedDueDate,
+      labels: params.labels,
+      limit: params.limit
+    });
 
     return formatTaskList(tasks, {
       workspaceName: workspace.name,
       projectName: resolvedProjectName,
       status: params.status,
+      assigneeName: assigneeDisplay || resolvedAssigneeId,
+      priority: params.priority,
+      dueDate: params.dueDate,
       limit: params.limit
     });
   }
