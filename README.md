@@ -5,6 +5,8 @@
 
 An MCP (Model Context Protocol) server that gives LLMs direct access to the Motion API for projects, tasks, users, and more. Built in TypeScript with robust validation and consolidated tools to keep your client tool list lean.
 
+**Current version:** 2.1.0
+
 ## Quick start (npx)
 
 1. **Get your Motion API key** from [https://app.usemotion.com/settings/api](https://app.usemotion.com/settings/api)

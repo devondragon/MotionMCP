@@ -12,7 +12,8 @@
       "Bash(npm run mcp:dev:*)",
       "Bash(find:*)",
       "WebFetch(domain:docs.usemotion.com)",
-      "Bash(timeout 3s env MOTION_MCP_TOOLS=complete npm run mcp)"
+      "Bash(timeout 3s env MOTION_MCP_TOOLS=complete npm run mcp)",
+      "Bash(npm run type-check:*)"
     ],
     "deny": [],
     "ask": [],
