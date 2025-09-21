@@ -6,7 +6,7 @@
  * ensuring consistent parameter handling.
  */
 
-import { DEFAULTS } from './constants';
+import { DEFAULTS, parseFilterDate } from './constants';
 import { ValidationError } from './errorHandling';
 import { sanitizeName, sanitizeDescription } from './sanitize';
 
@@ -132,6 +132,42 @@ export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
     autoScheduled: parseAutoScheduledParam(args.autoScheduled),
     ...parseWorkspaceArgs(args)
   };
+}
+
+/**
+ * Normalize date-only due dates so Motion stores them on the intended calendar day.
+ * Converts relative inputs (today/tomorrow/yesterday) or YYYY-MM-DD values
+ * to the end of that day in UTC. Leaves timestamps with explicit offsets intact.
+ */
+export function normalizeDueDateForApi(dueDate?: string | null): string | undefined {
+  if (!dueDate) {
+    return undefined;
+  }
+
+  const trimmed = dueDate.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const normalizedDate = parseFilterDate(trimmed);
+  if (normalizedDate) {
+    return `${normalizedDate}T23:59:59.000Z`;
+  }
+
+  const hasTimezoneOffset = /[zZ]|[+-]\d{2}:\d{2}$/.test(trimmed);
+  if (hasTimezoneOffset) {
+    return trimmed;
+  }
+
+  // If the string looks like a datetime without timezone info (e.g. 'YYYY-MM-DDTHH:mm:ss')
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/.test(trimmed)) {
+    // Treat as end-of-day UTC for the given date
+    const datePart = trimmed.split('T')[0];
+    return `${datePart}T23:59:59.000Z`;
+  }
+
+  // Otherwise, just return the original string (unparseable or unexpected format)
+  return trimmed;
 }
 
 /**
@@ -264,4 +300,3 @@ export function parseAndValidateWorkspace(
   
   return workspaceParams;
 }
-

@@ -13,7 +13,10 @@
       "Bash(find:*)",
       "WebFetch(domain:docs.usemotion.com)",
       "Bash(timeout 3s env MOTION_MCP_TOOLS=complete npm run mcp)",
-      "Bash(npm run type-check:*)"
+      "Bash(npm run type-check:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(npm test)"
     ],
     "deny": [],
     "ask": [],
