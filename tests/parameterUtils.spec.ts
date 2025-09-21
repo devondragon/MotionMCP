@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseWorkspaceArgs, parseTaskArgs, validateRequiredParams, validateParameterTypes } from '../src/utils/parameterUtils';
+import {
+  parseWorkspaceArgs,
+  parseTaskArgs,
+  validateRequiredParams,
+  validateParameterTypes,
+  normalizeDueDateForApi
+} from '../src/utils/parameterUtils';
 
 describe('parameterUtils', () => {
   it('parseWorkspaceArgs trims workspaceName', () => {
@@ -23,5 +29,17 @@ describe('parameterUtils', () => {
   it('validateParameterTypes throws for wrong types', () => {
     expect(() => validateParameterTypes({ lim: '10' }, { lim: 'number' })).toThrow(/Type validation failed/);
   });
-});
 
+  it('normalizeDueDateForApi converts date-only strings to end-of-day UTC', () => {
+    expect(normalizeDueDateForApi('2024-05-10')).toBe('2024-05-10T23:59:59.000Z');
+  });
+
+  it('normalizeDueDateForApi keeps timestamps with timezone offsets intact', () => {
+    expect(normalizeDueDateForApi('2024-05-10T12:30:00-04:00')).toBe('2024-05-10T12:30:00-04:00');
+  });
+
+  it('normalizeDueDateForApi expands relative dates', () => {
+    const result = normalizeDueDateForApi('today');
+    expect(result).toMatch(/T23:59:59\.000Z$/);
+  });
+});

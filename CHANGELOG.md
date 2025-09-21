@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2025-09-21
+
+### 🐛 Bug Fixes
+
+#### Due Date Normalization
+- **Fixed Due Date Display Issue**: Resolved bug where due dates appeared one day early in some timezones
+- **Added `normalizeDueDateForApi` Utility**: New function that normalizes date-only strings to end-of-day UTC timestamps
+- **Consistent Date Handling**: Applied normalization to both task creation and task updates
+- **Preserved Timezone Data**: Existing timestamps with timezone offsets remain unchanged
+
+#### Implementation Details
+- Date-only inputs (e.g., `2024-05-10`) are now converted to `2024-05-10T23:59:59.000Z`
+- Relative dates (`today`, `tomorrow`, `yesterday`) are properly normalized to end-of-day UTC
+- Timestamps with explicit timezone offsets are preserved unchanged
+- Enhanced tool documentation to clarify date normalization behavior
+
+#### Testing & Validation
+- Added comprehensive test coverage for date normalization scenarios
+- Verified edge case handling (null, undefined, invalid dates)
+- Updated task handler tests to verify normalization is applied
+
 ## [2.1.0] - 2024-09-16
 ## Version 2.1.0 - Enhanced Task Filtering & Validation
 
