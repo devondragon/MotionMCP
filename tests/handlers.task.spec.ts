@@ -31,15 +31,21 @@ function makeContext(overrides: Partial<HandlerContext> = {}): HandlerContext {
 }
 
 describe('TaskHandler', () => {
-  it('creates a task using resolved workspace', async () => {
+  it('creates a task using resolved workspace and normalizes due dates', async () => {
     const ctx = makeContext();
     const handler = new TaskHandler(ctx);
-    const res = await handler.handle({ operation: 'create', name: 'Hello', workspaceName: 'Dev' } as any);
+    const res = await handler.handle({
+      operation: 'create',
+      name: 'Hello',
+      workspaceName: 'Dev',
+      dueDate: '2024-05-10'
+    } as any);
 
     expect(ctx.workspaceResolver.resolveWorkspace).toHaveBeenCalled();
     expect(ctx.motionService.createTask).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Hello',
       workspaceId: 'w1',
+      dueDate: '2024-05-10T23:59:59.000Z'
     }));
 
     const text = (res.content?.[0] as any)?.text || '';
@@ -62,12 +68,20 @@ describe('TaskHandler', () => {
     expect(text).toContain('(ID: t2)');
   });
 
-  it('updates a task and returns success text', async () => {
+  it('updates a task, normalizes due dates, and returns success text', async () => {
     const ctx = makeContext();
     const handler = new TaskHandler(ctx);
-    const res = await handler.handle({ operation: 'update', taskId: 't1', name: 'New' } as any);
+    const res = await handler.handle({
+      operation: 'update',
+      taskId: 't1',
+      name: 'New',
+      dueDate: '2024-06-01'
+    } as any);
 
-    expect(ctx.motionService.updateTask).toHaveBeenCalledWith('t1', expect.objectContaining({ name: 'New' }));
+    expect(ctx.motionService.updateTask).toHaveBeenCalledWith('t1', expect.objectContaining({
+      name: 'New',
+      dueDate: '2024-06-01T23:59:59.000Z'
+    }));
     const text = (res.content?.[0] as any)?.text || '';
     expect(text).toContain('Successfully updated task');
   });

@@ -6,7 +6,7 @@
  * ensuring consistent parameter handling.
  */
 
-import { DEFAULTS } from './constants';
+import { DEFAULTS, parseFilterDate } from './constants';
 import { ValidationError } from './errorHandling';
 import { sanitizeName, sanitizeDescription } from './sanitize';
 
@@ -132,6 +132,39 @@ export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
     autoScheduled: parseAutoScheduledParam(args.autoScheduled),
     ...parseWorkspaceArgs(args)
   };
+}
+
+/**
+ * Normalize date-only due dates so Motion stores them on the intended calendar day.
+ * Converts relative inputs (today/tomorrow/yesterday) or YYYY-MM-DD values
+ * to the end of that day in UTC. Leaves timestamps with explicit offsets intact.
+ */
+export function normalizeDueDateForApi(dueDate?: string | null): string | undefined {
+  if (!dueDate) {
+    return undefined;
+  }
+
+  const trimmed = dueDate.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const normalizedDate = parseFilterDate(trimmed);
+  if (normalizedDate) {
+    return `${normalizedDate}T23:59:59.000Z`;
+  }
+
+  const hasTimezoneOffset = /[zZ]|[+-]\d{2}:\d{2}$/.test(trimmed);
+  if (hasTimezoneOffset) {
+    return trimmed;
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+
+  return trimmed;
 }
 
 /**
@@ -264,4 +297,3 @@ export function parseAndValidateWorkspace(
   
   return workspaceParams;
 }
-

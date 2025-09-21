@@ -111,7 +111,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       dueDate: {
         type: "string",
-        description: "Filter by due date (for list). Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
+        description: "Due date (for create/update) or filter (for list). Date-only values are stored as end-of-day UTC. Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
       },
       labels: {
         type: "array",

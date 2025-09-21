@@ -6,7 +6,8 @@ import {
   formatMcpSuccess,
   parseTaskArgs,
   formatTaskList,
-  formatTaskDetail
+  formatTaskDetail,
+  normalizeDueDateForApi
 } from '../utils';
 import { isValidPriority, parseFilterDate, ValidPriority } from '../utils/constants';
 
@@ -157,7 +158,7 @@ export class TaskHandler extends BaseHandler {
       projectId: resolvedProjectId,
       status: taskData.status,
       priority: taskData.priority,
-      dueDate: taskData.dueDate,
+      dueDate: normalizeDueDateForApi(taskData.dueDate),
       duration: convertedDuration,
       labels: convertedLabels,
       assigneeId: taskData.assigneeId,
@@ -289,7 +290,9 @@ export class TaskHandler extends BaseHandler {
     if (params.description !== undefined) updateData.description = params.description;
     if (params.status !== undefined) updateData.status = params.status;
     if (params.priority !== undefined) updateData.priority = params.priority as any;
-    if (params.dueDate !== undefined) updateData.dueDate = params.dueDate;
+    if (params.dueDate !== undefined) {
+      updateData.dueDate = normalizeDueDateForApi(params.dueDate);
+    }
     if (params.duration !== undefined) {
       // Convert string duration to number or keep special values
       if (typeof params.duration === 'string') {
