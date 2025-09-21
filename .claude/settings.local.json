@@ -16,7 +16,8 @@
       "Bash(npm run type-check:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
-      "Bash(npm test)"
+      "Bash(npm test)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": [],
