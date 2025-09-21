@@ -159,11 +159,14 @@ export function normalizeDueDateForApi(dueDate?: string | null): string | undefi
     return trimmed;
   }
 
-  const parsed = new Date(trimmed);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString();
+  // If the string looks like a datetime without timezone info (e.g. 'YYYY-MM-DDTHH:mm:ss')
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/.test(trimmed)) {
+    // Treat as end-of-day UTC for the given date
+    const datePart = trimmed.split('T')[0];
+    return `${datePart}T23:59:59.000Z`;
   }
 
+  // Otherwise, just return the original string (unparseable or unexpected format)
   return trimmed;
 }
 
