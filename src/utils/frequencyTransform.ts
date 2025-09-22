@@ -162,7 +162,7 @@ function transformMonthlyPattern(daysOfWeek?: number[], dayOfMonth?: number, wee
         return 'monthly_any_week_day_of_month';
       }
       // Multiple specific days without weekOfMonth is not supported
-      throw new Error('Unsupported multi-day monthly pattern without weekOfMonth. Please specify weekOfMonth or select a supported pattern.');
+      throw new Error('Unsupported multi-day monthly pattern without weekOfMonth. Supported patterns include: monthly_1-31 (e.g., monthly_15), monthly_first_MO, monthly_last_TU, monthly_any_week_day_of_month, monthly_any_day_first_week, etc. Please specify weekOfMonth or see https://docs.usemotion.com/cookbooks/frequency/ for more options.');
     }
   }
 
@@ -212,7 +212,11 @@ function transformQuarterlyPattern(daysOfWeek?: number[], weekOfMonth?: string, 
 
   // Explicitly reject unsupported multi-day selections
   if (daysOfWeek && daysOfWeek.length > 1 && !isWeekdaysPattern(daysOfWeek)) {
-    throw new Error('Unsupported multi-day selection for quarterly patterns: ' + JSON.stringify(daysOfWeek));
+    throw new Error(
+      'Unsupported multi-day selection for quarterly patterns: ' + JSON.stringify(daysOfWeek) +
+      '. Quarterly patterns only support a single day-of-week (e.g., "quarterly_first_MO"), weekdays (Mon-Fri, "quarterly_any_week_day_first_week"), or any day ("quarterly_any_day_first_week"). ' +
+      'Please refer to the Motion API documentation for supported quarterly patterns: https://docs.usemotion.com/cookbooks/frequency/#quarterly-patterns'
+    );
   }
 
   // Default pattern

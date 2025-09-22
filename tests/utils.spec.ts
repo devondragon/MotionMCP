@@ -133,6 +133,10 @@ describe('utils', () => {
       it('throws errors for invalid configurations', () => {
         expect(() => transformFrequencyToApiString({ type: 'custom' } as any)).toThrow('customPattern is required when type is "custom"');
         expect(() => transformFrequencyToApiString({ type: 'custom', customPattern: '' })).toThrow('customPattern is required when type is "custom"');
+
+        // Test improved error messages for unsupported patterns
+        expect(() => transformFrequencyToApiString({ type: 'monthly', daysOfWeek: [1, 3, 5] })).toThrow(/Supported patterns include.*monthly_1-31.*monthly_first_MO/);
+        expect(() => transformFrequencyToApiString({ type: 'quarterly', daysOfWeek: [1, 3, 5] })).toThrow(/Quarterly patterns only support.*single day-of-week.*quarterly_first_MO/);
       });
     });
 
