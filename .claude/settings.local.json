@@ -17,7 +17,10 @@
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
       "Bash(npm test)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm test:*)",
+      "mcp__zen__analyze"
     ],
     "deny": [],
     "ask": [],

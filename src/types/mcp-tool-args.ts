@@ -3,6 +3,8 @@
  * All individual tool types removed - only consolidated tools remain
  */
 
+import { FrequencyObject } from './motion';
+
 // Core utility types for search and context operations (used by motion_search)
 export interface SearchContentArgs {
   query: string;
@@ -93,13 +95,7 @@ export interface MotionRecurringTasksArgs {
   name?: string;
   projectId?: string;
   assigneeId?: string;
-  frequency?: {
-    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
-    interval?: number;
-    daysOfWeek?: number[];
-    dayOfMonth?: number;
-    endDate?: string;
-  };
+  frequency?: FrequencyObject;
   description?: string;
   deadlineType?: 'HARD' | 'SOFT';
   duration?: number | 'REMINDER';

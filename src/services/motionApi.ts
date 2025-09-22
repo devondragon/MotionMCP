@@ -18,6 +18,7 @@ import {
   MotionPaginatedResponse
 } from '../types/motion';
 import { LOG_LEVELS, createMinimalPayload, RETRY_CONFIG, CACHE_TTL, LIMITS, ValidPriority } from '../utils/constants';
+import { transformFrequencyToApiString, validateFrequencyObject } from '../utils/frequencyTransform';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { fetchAllPages as fetchAllPagesNew } from '../utils/paginationNew';
@@ -1922,16 +1923,34 @@ export class MotionApiService {
    */
   async createRecurringTask(taskData: CreateRecurringTaskData): Promise<MotionRecurringTask> {
     try {
+      // Validate frequency object before transformation
+      const freqValidation = validateFrequencyObject(taskData.frequency);
+      if (!freqValidation.valid) {
+        throw new Error(`Invalid frequency object: ${freqValidation.reason || 'Unknown reason'}`);
+      }
+
+      // Transform frequency object to API string format
+      const frequencyString = transformFrequencyToApiString(taskData.frequency);
+
       mcpLog(LOG_LEVELS.DEBUG, 'Creating recurring task in Motion API', {
         method: 'createRecurringTask',
         name: taskData.name,
         assigneeId: taskData.assigneeId,
-        frequency: taskData.frequency.type,
+        frequency: frequencyString,
+        originalFrequency: taskData.frequency,
         workspaceId: taskData.workspaceId
       });
 
+      // Create payload with transformed frequency while preserving other frequency fields
+      const apiPayload = {
+        ...taskData,
+        frequency: frequencyString,
+        // Preserve endDate and other fields that should be sent separately to the API
+        ...(taskData.frequency.endDate && { endDate: taskData.frequency.endDate })
+      };
+
       // Create minimal payload by removing empty/null values to avoid validation errors
-      const minimalPayload = createMinimalPayload(taskData);
+      const minimalPayload = createMinimalPayload(apiPayload);
       const response: AxiosResponse<MotionRecurringTask> = await this.requestWithRetry(() =>
         this.client.post('/recurring-tasks', minimalPayload)
       );
