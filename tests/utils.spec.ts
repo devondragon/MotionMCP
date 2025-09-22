@@ -103,6 +103,8 @@ describe('utils', () => {
         expect(transformFrequencyToApiString({ type: 'quarterly', weekOfMonth: 'first' })).toBe('quarterly_any_day_first_week');
         expect(transformFrequencyToApiString({ type: 'quarterly', daysOfWeek: [1, 2, 3, 4, 5], weekOfMonth: 'second' })).toBe('quarterly_any_week_day_second_week');
         expect(transformFrequencyToApiString({ type: 'quarterly', monthOfQuarter: 2 })).toBe('quarterly_any_day_second_month');
+        // Test weekdays only (no weekOfMonth) - previously unreachable
+        expect(transformFrequencyToApiString({ type: 'quarterly', daysOfWeek: [1, 2, 3, 4, 5] })).toBe('quarterly_first_week_day');
       });
 
       // Custom patterns

@@ -75,7 +75,7 @@ export function transformFrequencyToApiString(frequency: FrequencyObject): strin
       return transformMonthlyPattern(daysOfWeek, dayOfMonth, weekOfMonth);
 
     case 'quarterly':
-      return transformQuarterlyPattern(daysOfWeek, dayOfMonth, weekOfMonth, monthOfQuarter);
+      return transformQuarterlyPattern(daysOfWeek, weekOfMonth, monthOfQuarter);
 
     case 'yearly':
       // Yearly patterns are basic in the API docs
@@ -188,7 +188,7 @@ function transformMonthlyPattern(daysOfWeek?: number[], dayOfMonth?: number, wee
 /**
  * Transform quarterly frequency patterns
  */
-function transformQuarterlyPattern(daysOfWeek?: number[], dayOfMonth?: number, weekOfMonth?: string, monthOfQuarter?: number): string {
+function transformQuarterlyPattern(daysOfWeek?: number[], weekOfMonth?: string, monthOfQuarter?: number): string {
   // Handle quarterly with specific day-of-week
   if (daysOfWeek && daysOfWeek.length === 1) {
     const dayAbbrev = DAY_ABBREVIATIONS[daysOfWeek[0] as keyof typeof DAY_ABBREVIATIONS];
@@ -215,15 +215,12 @@ function transformQuarterlyPattern(daysOfWeek?: number[], dayOfMonth?: number, w
     return `quarterly_any_day_${getMonthOrdinal(monthOfQuarter)}_month`;
   }
 
-  // Default patterns
-  if (dayOfMonth) {
-    return 'quarterly_first_day'; // Closest match for specific day
-  }
-
+  // Handle remaining patterns
   if (daysOfWeek && isWeekdaysPattern(daysOfWeek)) {
     return 'quarterly_first_week_day';
   }
 
+  // Default pattern (includes dayOfMonth cases)
   return 'quarterly_first_day';
 }
 
