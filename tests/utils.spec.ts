@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import { createMinimalPayload } from '../src/utils/constants';
 import { sanitizeTextContent } from '../src/utils/sanitize';
-import { transformFrequencyToApiString, validateFrequencyObject } from '../src/utils/frequencyTransform';
+import { transformFrequencyToApiString, validateFrequencyObject, isValidFrequencyObject } from '../src/utils/frequencyTransform';
 
 describe('utils', () => {
   it('createMinimalPayload removes null/empty values and preserves meaningful ones', () => {
@@ -122,8 +122,8 @@ describe('utils', () => {
 
       // Edge cases
       it('handles edge cases correctly', () => {
-        // Invalid day numbers are filtered out
-        expect(transformFrequencyToApiString({ type: 'daily', daysOfWeek: [1, 2, 8, 3, -1] })).toBe('daily_specific_days_[MO, TU, WE]');
+        // Invalid day numbers should throw an error
+        expect(() => transformFrequencyToApiString({ type: 'daily', daysOfWeek: [1, 2, 8, 3, -1] })).toThrow('Invalid day(s) in daysOfWeek: 8, -1');
 
         // endDate is ignored in transformation (handled separately)
         expect(transformFrequencyToApiString({ type: 'daily', daysOfWeek: [1, 2, 3], endDate: '2024-12-31' })).toBe('daily_specific_days_[MO, TU, WE]');
@@ -139,124 +139,124 @@ describe('utils', () => {
     describe('validateFrequencyObject', () => {
       // Basic frequency types
       it('validates all supported frequency types', () => {
-        expect(validateFrequencyObject({ type: 'daily' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'weekly' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'biweekly' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'monthly' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'quarterly' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'yearly' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'custom', customPattern: 'monthly_last_day' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'daily' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'weekly' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'biweekly' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'monthly' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'quarterly' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'yearly' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'custom', customPattern: 'monthly_last_day' })).toBe(true);
       });
 
       it('rejects invalid frequency types', () => {
-        expect(validateFrequencyObject({ type: 'invalid' as any })).toBe(false);
-        expect(validateFrequencyObject({ type: '' as any })).toBe(false);
-        expect(validateFrequencyObject({} as any)).toBe(false);
-        expect(validateFrequencyObject({ type: null } as any)).toBe(false);
-        expect(validateFrequencyObject({ type: undefined } as any)).toBe(false);
+        expect(isValidFrequencyObject({ type: 'invalid' as any })).toBe(false);
+        expect(isValidFrequencyObject({ type: '' as any })).toBe(false);
+        expect(isValidFrequencyObject({} as any)).toBe(false);
+        expect(isValidFrequencyObject({ type: null } as any)).toBe(false);
+        expect(isValidFrequencyObject({ type: undefined } as any)).toBe(false);
       });
 
       // Custom pattern validation
       it('validates custom patterns', () => {
-        expect(validateFrequencyObject({ type: 'custom', customPattern: 'monthly_any_week_day_first_week' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'custom', customPattern: 'quarterly_last_day' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'custom' } as any)).toBe(false);
-        expect(validateFrequencyObject({ type: 'custom', customPattern: '' })).toBe(false);
-        expect(validateFrequencyObject({ type: 'custom', customPattern: '   ' })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'custom', customPattern: 'monthly_any_week_day_first_week' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'custom', customPattern: 'quarterly_last_day' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'custom' } as any)).toBe(false);
+        expect(isValidFrequencyObject({ type: 'custom', customPattern: '' })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'custom', customPattern: '   ' })).toBe(false);
       });
 
       // Field validations
       it('validates daysOfWeek array', () => {
-        expect(validateFrequencyObject({ type: 'daily', daysOfWeek: [0, 1, 6] })).toBe(true);
-        expect(validateFrequencyObject({ type: 'daily', daysOfWeek: [1, 2, 3, 4, 5] })).toBe(true);
-        expect(validateFrequencyObject({ type: 'daily', daysOfWeek: [7] })).toBe(false);
-        expect(validateFrequencyObject({ type: 'daily', daysOfWeek: [-1] })).toBe(false);
-        expect(validateFrequencyObject({ type: 'daily', daysOfWeek: ['monday'] as any })).toBe(false);
-        expect(validateFrequencyObject({ type: 'daily', daysOfWeek: 'invalid' as any })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'daily', daysOfWeek: [0, 1, 6] })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'daily', daysOfWeek: [1, 2, 3, 4, 5] })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'daily', daysOfWeek: [7] })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'daily', daysOfWeek: [-1] })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'daily', daysOfWeek: ['monday'] as any })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'daily', daysOfWeek: 'invalid' as any })).toBe(false);
       });
 
       it('validates dayOfMonth', () => {
-        expect(validateFrequencyObject({ type: 'monthly', dayOfMonth: 1 })).toBe(true);
-        expect(validateFrequencyObject({ type: 'monthly', dayOfMonth: 31 })).toBe(true);
-        expect(validateFrequencyObject({ type: 'monthly', dayOfMonth: 0 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'monthly', dayOfMonth: 32 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'monthly', dayOfMonth: 'first' as any })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'monthly', dayOfMonth: 1 })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'monthly', dayOfMonth: 31 })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'monthly', dayOfMonth: 0 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'monthly', dayOfMonth: 32 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'monthly', dayOfMonth: 'first' as any })).toBe(false);
       });
 
       it('validates weekOfMonth', () => {
-        expect(validateFrequencyObject({ type: 'monthly', weekOfMonth: 'first' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'monthly', weekOfMonth: 'last' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'monthly', weekOfMonth: 'invalid' as any })).toBe(false);
-        expect(validateFrequencyObject({ type: 'monthly', weekOfMonth: 1 as any })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'monthly', weekOfMonth: 'first' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'monthly', weekOfMonth: 'last' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'monthly', weekOfMonth: 'invalid' as any })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'monthly', weekOfMonth: 1 as any })).toBe(false);
       });
 
       it('validates monthOfQuarter', () => {
-        expect(validateFrequencyObject({ type: 'quarterly', monthOfQuarter: 1 })).toBe(true);
-        expect(validateFrequencyObject({ type: 'quarterly', monthOfQuarter: 2 })).toBe(true);
-        expect(validateFrequencyObject({ type: 'quarterly', monthOfQuarter: 3 })).toBe(true);
-        expect(validateFrequencyObject({ type: 'quarterly', monthOfQuarter: 0 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'quarterly', monthOfQuarter: 4 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'quarterly', monthOfQuarter: 'first' as any })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'quarterly', monthOfQuarter: 1 })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'quarterly', monthOfQuarter: 2 })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'quarterly', monthOfQuarter: 3 })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'quarterly', monthOfQuarter: 0 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'quarterly', monthOfQuarter: 4 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'quarterly', monthOfQuarter: 'first' as any })).toBe(false);
       });
 
       it('validates interval (legacy support)', () => {
-        expect(validateFrequencyObject({ type: 'weekly', interval: 1 })).toBe(true);
-        expect(validateFrequencyObject({ type: 'weekly', interval: 2 })).toBe(true);
-        expect(validateFrequencyObject({ type: 'weekly', interval: 0 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'weekly', interval: -1 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'weekly', interval: 'two' as any })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'weekly', interval: 1 })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'weekly', interval: 2 })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'weekly', interval: 0 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'weekly', interval: -1 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'weekly', interval: 'two' as any })).toBe(false);
       });
 
       // Type-specific field restrictions
       it('validates type-specific field restrictions', () => {
         // Daily/weekly don't use monthOfQuarter or weekOfMonth
-        expect(validateFrequencyObject({ type: 'daily', monthOfQuarter: 1 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'daily', weekOfMonth: 'first' })).toBe(false);
-        expect(validateFrequencyObject({ type: 'weekly', monthOfQuarter: 1 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'weekly', weekOfMonth: 'first' })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'daily', monthOfQuarter: 1 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'daily', weekOfMonth: 'first' })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'weekly', monthOfQuarter: 1 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'weekly', weekOfMonth: 'first' })).toBe(false);
 
         // Biweekly doesn't use dayOfMonth or monthOfQuarter
-        expect(validateFrequencyObject({ type: 'biweekly', dayOfMonth: 15 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'biweekly', monthOfQuarter: 1 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'biweekly', dayOfMonth: 15 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'biweekly', monthOfQuarter: 1 })).toBe(false);
 
         // Biweekly only supports 'first' and 'second' weekOfMonth
-        expect(validateFrequencyObject({ type: 'biweekly', weekOfMonth: 'first' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'biweekly', weekOfMonth: 'second' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'biweekly', weekOfMonth: 'third' })).toBe(false);
-        expect(validateFrequencyObject({ type: 'biweekly', weekOfMonth: 'fourth' })).toBe(false);
-        expect(validateFrequencyObject({ type: 'biweekly', weekOfMonth: 'last' })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'biweekly', weekOfMonth: 'first' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'biweekly', weekOfMonth: 'second' })).toBe(true);
+        expect(isValidFrequencyObject({ type: 'biweekly', weekOfMonth: 'third' })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'biweekly', weekOfMonth: 'fourth' })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'biweekly', weekOfMonth: 'last' })).toBe(false);
 
         // Monthly doesn't use monthOfQuarter
-        expect(validateFrequencyObject({ type: 'monthly', monthOfQuarter: 1 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'monthly', monthOfQuarter: 1 })).toBe(false);
 
-        // Quarterly can't use dayOfMonth alone (needs context)
-        expect(validateFrequencyObject({ type: 'quarterly', dayOfMonth: 15 })).toBe(false);
-        expect(validateFrequencyObject({ type: 'quarterly', dayOfMonth: 15, weekOfMonth: 'first' })).toBe(true);
-        expect(validateFrequencyObject({ type: 'quarterly', dayOfMonth: 15, monthOfQuarter: 1 })).toBe(true);
+        // Quarterly doesn't support dayOfMonth (not implemented in transform logic)
+        expect(isValidFrequencyObject({ type: 'quarterly', dayOfMonth: 15 })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'quarterly', dayOfMonth: 15, weekOfMonth: 'first' })).toBe(false);
+        expect(isValidFrequencyObject({ type: 'quarterly', dayOfMonth: 15, monthOfQuarter: 1 })).toBe(false);
       });
 
       // Complex valid combinations
       it('validates complex valid combinations', () => {
-        expect(validateFrequencyObject({
+        expect(isValidFrequencyObject({
           type: 'monthly',
           daysOfWeek: [1],
           weekOfMonth: 'first',
           endDate: '2024-12-31'
         })).toBe(true);
 
-        expect(validateFrequencyObject({
+        expect(isValidFrequencyObject({
           type: 'quarterly',
           daysOfWeek: [5],
           weekOfMonth: 'last'
         })).toBe(true);
 
-        expect(validateFrequencyObject({
+        expect(isValidFrequencyObject({
           type: 'biweekly',
           daysOfWeek: [1, 2, 3, 4, 5],
           endDate: '2024-12-31'
         })).toBe(true);
 
-        expect(validateFrequencyObject({
+        expect(isValidFrequencyObject({
           type: 'weekly',
           interval: 2,
           daysOfWeek: [1, 3, 5]

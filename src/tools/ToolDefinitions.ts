@@ -412,16 +412,16 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
           daysOfWeek: {
             type: "array",
             items: { type: "number" },
-            description: "0-6 for Sunday-Saturday. Used with daily/weekly/biweekly for specific days"
+            description: "0-6 for Sunday-Saturday. Used with daily/weekly/biweekly for specific days, and with monthly/quarterly patterns (e.g., monthly_first_MO, quarterly_first_MO) for specifying days in those recurrence types"
           },
           dayOfMonth: {
             type: "number",
-            description: "1-31 for monthly/quarterly recurrence on specific day of month"
+            description: "1-31 for monthly recurrence on specific day of month"
           },
           weekOfMonth: {
             type: "string",
             enum: ["first", "second", "third", "fourth", "last"],
-            description: "Which week of month/quarter for monthly/quarterly patterns with daysOfWeek"
+            description: "Which week of month/quarter for monthly/quarterly patterns; daysOfWeek is optional (e.g., monthly_any_day_first_week or monthly_monday_first_week)"
           },
           monthOfQuarter: {
             type: "number",

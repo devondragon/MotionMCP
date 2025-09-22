@@ -1924,8 +1924,9 @@ export class MotionApiService {
   async createRecurringTask(taskData: CreateRecurringTaskData): Promise<MotionRecurringTask> {
     try {
       // Validate frequency object before transformation
-      if (!validateFrequencyObject(taskData.frequency)) {
-        throw new Error('Invalid frequency object provided');
+      const freqValidation = validateFrequencyObject(taskData.frequency);
+      if (!freqValidation.valid) {
+        throw new Error(`Invalid frequency object: ${freqValidation.reason || 'Unknown reason'}`);
       }
 
       // Transform frequency object to API string format

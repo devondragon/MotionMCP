@@ -2,16 +2,7 @@
  * Utility functions for transforming frequency objects to Motion API string format
  */
 
-export interface FrequencyObject {
-  type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
-  daysOfWeek?: number[];              // [0-6] for Sunday-Saturday
-  dayOfMonth?: number;                // 1-31 for monthly patterns
-  weekOfMonth?: 'first' | 'second' | 'third' | 'fourth' | 'last';  // For monthly/quarterly
-  monthOfQuarter?: 1 | 2 | 3;        // For quarterly patterns
-  interval?: number;                  // Legacy support: weekly + interval:2 → biweekly
-  customPattern?: string;             // Direct Motion API pattern for complex cases
-  endDate?: string;                   // ISO 8601 format end date
-}
+import { FrequencyObject } from '../types/motion';
 
 /**
  * Maps day numbers (0-6) to Motion API day abbreviations
@@ -170,9 +161,8 @@ function transformMonthlyPattern(daysOfWeek?: number[], dayOfMonth?: number, wee
       if (isWeekdaysPattern(daysOfWeek)) {
         return 'monthly_any_week_day_of_month';
       }
-      // Default to first week for multiple specific days
-      const dayAbbrevs = formatDayAbbreviations(daysOfWeek);
-      return `monthly_first_${dayAbbrevs.split(', ')[0]}`; // Take first day
+      // Multiple specific days without weekOfMonth is not supported
+      throw new Error('Unsupported multi-day monthly pattern without weekOfMonth. Please specify weekOfMonth or select a supported pattern.');
     }
   }
 
@@ -220,7 +210,12 @@ function transformQuarterlyPattern(daysOfWeek?: number[], weekOfMonth?: string, 
     return 'quarterly_first_week_day';
   }
 
-  // Default pattern (includes dayOfMonth cases)
+  // Explicitly reject unsupported multi-day selections
+  if (daysOfWeek && daysOfWeek.length > 1 && !isWeekdaysPattern(daysOfWeek)) {
+    throw new Error('Unsupported multi-day selection for quarterly patterns: ' + JSON.stringify(daysOfWeek));
+  }
+
+  // Default pattern
   return 'quarterly_first_day';
 }
 
@@ -236,8 +231,13 @@ function isWeekdaysPattern(daysOfWeek: number[]): boolean {
 
 /**
  * Helper: Format day numbers to abbreviations
+ * Throws error if invalid days are encountered
  */
 function formatDayAbbreviations(daysOfWeek: number[]): string {
+  const invalidDays = daysOfWeek.filter(day => day < 0 || day > 6);
+  if (invalidDays.length > 0) {
+    throw new Error(`Invalid day(s) in daysOfWeek: ${invalidDays.join(', ')}`);
+  }
   return daysOfWeek
     .map(day => DAY_ABBREVIATIONS[day as keyof typeof DAY_ABBREVIATIONS])
     .filter(Boolean)
@@ -253,101 +253,122 @@ function getMonthOrdinal(month: number): string {
 }
 
 /**
+ * Result of frequency validation
+ */
+export interface FrequencyValidationResult {
+  valid: boolean;
+  reason?: string;
+}
+
+/**
  * Validates that a frequency object is valid for transformation
  *
  * @param frequency - The frequency object to validate
- * @returns True if valid, false otherwise
+ * @returns Validation result with detailed reason if invalid
  */
-export function validateFrequencyObject(frequency: FrequencyObject): boolean {
+export function validateFrequencyObject(frequency: FrequencyObject): FrequencyValidationResult {
   if (!frequency.type || !['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', 'custom'].includes(frequency.type)) {
-    return false;
+    return { valid: false, reason: `Invalid frequency type: ${frequency.type}` };
   }
 
   // Custom type requires customPattern
   if (frequency.type === 'custom') {
     if (!frequency.customPattern || typeof frequency.customPattern !== 'string' || frequency.customPattern.trim() === '') {
-      return false;
+      return { valid: false, reason: 'Custom frequency type requires a non-empty customPattern' };
     }
-    return true; // Skip other validations for custom patterns
+    return { valid: true }; // Skip other validations for custom patterns
   }
 
   // Validate daysOfWeek if provided
   if (frequency.daysOfWeek) {
     if (!Array.isArray(frequency.daysOfWeek)) {
-      return false;
+      return { valid: false, reason: 'daysOfWeek must be an array' };
     }
 
     // Check that all days are valid (0-6)
-    for (const day of frequency.daysOfWeek) {
-      if (typeof day !== 'number' || day < 0 || day > 6) {
-        return false;
-      }
+    const invalidDays = frequency.daysOfWeek.filter(day => typeof day !== 'number' || day < 0 || day > 6);
+    if (invalidDays.length > 0) {
+      return { valid: false, reason: `Invalid day(s) in daysOfWeek: ${invalidDays.join(', ')}. Days must be numbers 0-6` };
     }
   }
 
   // Validate dayOfMonth if provided
   if (frequency.dayOfMonth !== undefined) {
     if (typeof frequency.dayOfMonth !== 'number' || frequency.dayOfMonth < 1 || frequency.dayOfMonth > 31) {
-      return false;
+      return { valid: false, reason: 'dayOfMonth must be a number between 1 and 31' };
     }
   }
 
   // Validate weekOfMonth if provided
   if (frequency.weekOfMonth !== undefined) {
     if (!['first', 'second', 'third', 'fourth', 'last'].includes(frequency.weekOfMonth)) {
-      return false;
+      return { valid: false, reason: 'weekOfMonth must be one of: first, second, third, fourth, last' };
     }
   }
 
   // Validate monthOfQuarter if provided
   if (frequency.monthOfQuarter !== undefined) {
     if (typeof frequency.monthOfQuarter !== 'number' || frequency.monthOfQuarter < 1 || frequency.monthOfQuarter > 3) {
-      return false;
+      return { valid: false, reason: 'monthOfQuarter must be 1, 2, or 3' };
     }
   }
 
   // Validate interval if provided (legacy support)
   if (frequency.interval !== undefined) {
     if (typeof frequency.interval !== 'number' || frequency.interval < 1) {
-      return false;
+      return { valid: false, reason: 'interval must be a positive number' };
     }
   }
 
   // Type-specific validations
   switch (frequency.type) {
     case 'quarterly':
-      // Quarterly can't use dayOfMonth alone (needs week context)
-      if (frequency.dayOfMonth && !frequency.weekOfMonth && !frequency.monthOfQuarter) {
-        return false;
+      // Quarterly doesn't support dayOfMonth (not implemented in transform logic)
+      if (frequency.dayOfMonth) {
+        return { valid: false, reason: 'dayOfMonth is not supported for quarterly patterns' };
       }
       break;
 
     case 'biweekly':
       // Biweekly doesn't use dayOfMonth or monthOfQuarter
-      if (frequency.dayOfMonth || frequency.monthOfQuarter) {
-        return false;
+      if (frequency.dayOfMonth) {
+        return { valid: false, reason: 'dayOfMonth is not supported for biweekly patterns' };
+      }
+      if (frequency.monthOfQuarter) {
+        return { valid: false, reason: 'monthOfQuarter is not supported for biweekly patterns' };
       }
       // Biweekly only supports 'first' and 'second' week
       if (frequency.weekOfMonth && !['first', 'second'].includes(frequency.weekOfMonth)) {
-        return false;
+        return { valid: false, reason: 'weekOfMonth for biweekly patterns must be "first" or "second"' };
       }
       break;
 
     case 'daily':
     case 'weekly':
       // Daily/weekly don't use monthOfQuarter or weekOfMonth
-      if (frequency.monthOfQuarter || frequency.weekOfMonth) {
-        return false;
+      if (frequency.monthOfQuarter) {
+        return { valid: false, reason: `monthOfQuarter is not supported for ${frequency.type} patterns` };
+      }
+      if (frequency.weekOfMonth) {
+        return { valid: false, reason: `weekOfMonth is not supported for ${frequency.type} patterns` };
       }
       break;
 
     case 'monthly':
       // Monthly doesn't use monthOfQuarter
       if (frequency.monthOfQuarter) {
-        return false;
+        return { valid: false, reason: 'monthOfQuarter is not supported for monthly patterns' };
       }
       break;
   }
 
-  return true;
+  return { valid: true };
+}
+
+/**
+ * Legacy boolean validation function for backward compatibility
+ * @deprecated Use validateFrequencyObject instead for detailed error information
+ */
+export function isValidFrequencyObject(frequency: FrequencyObject): boolean {
+  return validateFrequencyObject(frequency).valid;
 }

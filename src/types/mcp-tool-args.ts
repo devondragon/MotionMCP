@@ -3,6 +3,8 @@
  * All individual tool types removed - only consolidated tools remain
  */
 
+import { FrequencyObject } from './motion';
+
 // Core utility types for search and context operations (used by motion_search)
 export interface SearchContentArgs {
   query: string;
@@ -93,16 +95,7 @@ export interface MotionRecurringTasksArgs {
   name?: string;
   projectId?: string;
   assigneeId?: string;
-  frequency?: {
-    type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
-    daysOfWeek?: number[];              // [0-6] for Sunday-Saturday
-    dayOfMonth?: number;                // 1-31 for monthly patterns
-    weekOfMonth?: 'first' | 'second' | 'third' | 'fourth' | 'last';  // For monthly/quarterly
-    monthOfQuarter?: 1 | 2 | 3;        // For quarterly patterns
-    interval?: number;                  // Legacy support: weekly + interval:2 → biweekly
-    customPattern?: string;             // Direct Motion API pattern for complex cases
-    endDate?: string;                   // ISO 8601 format end date
-  };
+  frequency?: FrequencyObject;
   description?: string;
   deadlineType?: 'HARD' | 'SOFT';
   duration?: number | 'REMINDER';
