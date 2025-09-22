@@ -406,25 +406,39 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
         properties: {
           type: {
             type: "string",
-            enum: ["daily", "weekly", "monthly", "yearly"],
-            description: "Frequency type"
-          },
-          interval: {
-            type: "number",
-            description: "Repeat every N periods"
+            enum: ["daily", "weekly", "biweekly", "monthly", "quarterly", "yearly", "custom"],
+            description: "Frequency type - supports all Motion API patterns including biweekly and quarterly"
           },
           daysOfWeek: {
             type: "array",
             items: { type: "number" },
-            description: "0-6 for Sunday-Saturday (for weekly)"
+            description: "0-6 for Sunday-Saturday. Used with daily/weekly/biweekly for specific days"
           },
           dayOfMonth: {
             type: "number",
-            description: "1-31 for monthly recurrence"
+            description: "1-31 for monthly/quarterly recurrence on specific day of month"
+          },
+          weekOfMonth: {
+            type: "string",
+            enum: ["first", "second", "third", "fourth", "last"],
+            description: "Which week of month/quarter for monthly/quarterly patterns with daysOfWeek"
+          },
+          monthOfQuarter: {
+            type: "number",
+            enum: [1, 2, 3],
+            description: "Which month of quarter (1-3) for quarterly patterns"
+          },
+          interval: {
+            type: "number",
+            description: "Legacy support: weekly with interval:2 maps to biweekly patterns"
+          },
+          customPattern: {
+            type: "string",
+            description: "Direct Motion API frequency pattern string (e.g., 'monthly_any_week_day_first_week')"
           },
           endDate: {
             type: "string",
-            description: "ISO 8601 format end date"
+            description: "ISO 8601 format end date for the recurring task"
           }
         },
         required: ["type"],
