@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2025-09-27
+
+### 🐛 Bug Fixes
+
+#### Recurring Task Frequency Object Handling
+- **Fixed Issue #39**: Resolved invalid frequency objects for recurring tasks
+- **Enhanced Error Handling**: Improved validation and error messages for frequency patterns
+- **Better User Experience**: Added specific examples and documentation links for unsupported patterns
+
+#### Comprehensive Frequency Validation
+- **Multi-Day Pattern Support**: Enhanced validation for monthly and quarterly frequency patterns
+- **Error Message Improvements**: Replaced silent data loss with descriptive error messages
+- **Documentation Accuracy**: Updated tool definitions to accurately reflect implementation behavior
+
+### 🔧 Technical Improvements
+
+#### Code Quality & Consistency
+- **Centralized Type Definitions**: Unified FrequencyObject interface across all files
+- **Enhanced Validation**: Detailed validation results with actionable error descriptions
+- **Type Safety**: Improved TypeScript typing consistency throughout frequency handling
+
+#### GitHub Actions Integration
+- **Claude Code Review Workflow**: Added automated code review workflow for pull requests
+- **Claude PR Assistant Workflow**: Enhanced CI/CD pipeline with AI-assisted reviews
+
+### 🛠️ Implementation Details
+
+#### Frequency Transform Enhancements
+- **Error Handling**: Comprehensive error handling for unsupported multi-day patterns
+- **Validation Consistency**: Aligned transformer and validator function behavior
+- **Pattern Support**: Clear documentation of supported vs unsupported frequency patterns
+
+#### Testing & Quality Assurance
+- **Test Coverage**: Updated test suite to reflect new validation behavior
+- **Continuous Integration**: Added automated workflow validation
+- **TypeScript Compliance**: All changes maintain strict TypeScript compilation
+
+### 🔄 Breaking Changes
+- None - All changes are backward compatible with enhanced error reporting
+
 ## [2.1.1] - 2025-09-21
 
 ### 🐛 Bug Fixes
