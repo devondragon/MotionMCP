@@ -20,7 +20,8 @@
       "Bash(git commit:*)",
       "WebFetch(domain:github.com)",
       "Bash(npm test:*)",
-      "mcp__zen__analyze"
+      "mcp__zen__analyze",
+      "Bash(git tag:*)"
     ],
     "deny": [],
     "ask": [],
