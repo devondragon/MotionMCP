@@ -5,7 +5,7 @@
 
 An MCP (Model Context Protocol) server that gives LLMs direct access to the Motion API for projects, tasks, users, and more. Built in TypeScript with robust validation and consolidated tools to keep your client tool list lean.
 
-**Current version:** 2.1.1
+**Current version:** 2.2.0
 
 ## Quick start (npx)
 
