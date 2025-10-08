@@ -11,6 +11,9 @@ export * from './constants';
 // Export error handling utilities
 export * from './errorHandling';
 
+// Export user-facing error utilities
+export * from './userFacingErrors';
+
 // Export response formatters
 export * from './responseFormatters';
 

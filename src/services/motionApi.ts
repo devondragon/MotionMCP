@@ -23,6 +23,7 @@ import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { fetchAllPages as fetchAllPagesNew } from '../utils/paginationNew';
 import { unwrapApiResponse } from '../utils/responseWrapper';
+import { createUserFacingError, createErrorContext, UserFacingError } from '../utils/userFacingErrors';
 import { z } from 'zod';
 import { 
   WorkspacesListResponseSchema,
@@ -180,17 +181,28 @@ export class MotionApiService {
   }
 
   /**
-   * Formats API errors consistently across all methods
+   * Formats API errors with user-friendly messages while preserving technical details
    * @param error - The error that occurred
-   * @param action - Description of the action that failed (e.g., 'fetch projects')
-   * @returns Formatted Error object
+   * @param action - Description of the action that failed (e.g., 'fetch', 'create', 'update')
+   * @param resourceType - Type of resource being operated on (e.g., 'project', 'task')
+   * @param resourceId - Optional ID of the resource
+   * @param resourceName - Optional name of the resource
+   * @returns UserFacingError with both user-friendly and technical messages
    */
-  private formatApiError(error: unknown, action: string): Error {
-    const baseMessage = `Failed to ${action}`;
-    const apiMessage = isAxiosError(error) ? error.response?.data?.message : undefined;
-    const errorMessage = getErrorMessage(error);
-    return new Error(`${baseMessage}: ${apiMessage || errorMessage}`);
+  private formatApiError(
+    error: unknown,
+    action: string,
+    resourceType?: 'task' | 'project' | 'workspace' | 'user' | 'comment' | 'custom field' | 'recurring task' | 'schedule' | 'status',
+    resourceId?: string,
+    resourceName?: string
+  ): UserFacingError {
+    const context = createErrorContext(action, resourceType, resourceId, resourceName);
+    return createUserFacingError(error, context);
   }
+
+  // ========================================
+  // PRIVATE HELPER METHODS
+  // ========================================
 
   /**
    * Wraps an axios request with a retry mechanism featuring exponential backoff.
@@ -254,6 +266,10 @@ export class MotionApiService {
     // Should never reach here, but TypeScript requires a return or throw
     throw new Error('Max retries exceeded');
   }
+
+  // ========================================
+  // PROJECT API METHODS
+  // ========================================
 
   async getProjects(workspaceId: string, maxPages: number = 5): Promise<MotionProject[]> {
     const cacheKey = `projects:workspace:${workspaceId}`;
@@ -325,7 +341,7 @@ export class MotionApiService {
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
-        throw this.formatApiError(error, 'fetch projects');
+        throw this.formatApiError(error, 'fetch', 'project');
       }
     });
   }
@@ -366,7 +382,7 @@ export class MotionApiService {
         method: 'getAllProjects',
         error: getErrorMessage(error)
       });
-      throw this.formatApiError(error, 'fetch all projects');
+      throw this.formatApiError(error, 'fetch', 'project');
     }
   }
 
@@ -397,7 +413,7 @@ export class MotionApiService {
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
-        throw this.formatApiError(error, 'fetch project');
+        throw this.formatApiError(error, 'fetch', 'project', projectId);
       }
     });
   }
@@ -443,7 +459,7 @@ export class MotionApiService {
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
         fullErrorResponse: isAxiosError(error) ? JSON.stringify(error.response?.data, null, 2) : undefined
       });
-      throw this.formatApiError(error, 'create project');
+      throw this.formatApiError(error, 'create', 'project', undefined, projectData.name);
     }
   }
 
@@ -477,7 +493,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw this.formatApiError(error, 'update project');
+      throw this.formatApiError(error, 'update', 'project', projectId);
     }
   }
 
@@ -505,9 +521,13 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw this.formatApiError(error, 'delete project');
+      throw this.formatApiError(error, 'delete', 'project', projectId);
     }
   }
+
+  // ========================================
+  // TASK API METHODS
+  // ========================================
 
   async getTasks(options: GetTasksOptions): Promise<MotionTask[]> {
     const {
@@ -632,7 +652,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw this.formatApiError(error, 'fetch tasks');
+      throw this.formatApiError(error, 'fetch', 'task');
     }
   }
 
@@ -660,7 +680,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw this.formatApiError(error, 'fetch task');
+      throw this.formatApiError(error, 'fetch', 'task', taskId);
     }
   }
 
@@ -706,7 +726,7 @@ export class MotionApiService {
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
         fullErrorResponse: isAxiosError(error) ? JSON.stringify(error.response?.data, null, 2) : undefined
       });
-      throw this.formatApiError(error, 'create task');
+      throw this.formatApiError(error, 'create', 'task', undefined, taskData.name);
     }
   }
 
@@ -737,7 +757,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw this.formatApiError(error, 'update task');
+      throw this.formatApiError(error, 'update', 'task', taskId);
     }
   }
 
@@ -762,7 +782,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw this.formatApiError(error, 'delete task');
+      throw this.formatApiError(error, 'delete', 'task', taskId);
     }
   }
 
@@ -807,7 +827,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw this.formatApiError(error, 'move task');
+      throw this.formatApiError(error, 'move', 'task', taskId);
     }
   }
 
@@ -838,9 +858,13 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
       });
-      throw this.formatApiError(error, 'unassign task');
+      throw this.formatApiError(error, 'unassign', 'task', taskId);
     }
   }
+
+  // ========================================
+  // WORKSPACE API METHODS
+  // ========================================
 
   async getWorkspaces(): Promise<MotionWorkspace[]> {
     return this.workspaceCache.withCache('workspaces', async () => {
@@ -877,10 +901,14 @@ export class MotionApiService {
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
-        throw this.formatApiError(error, 'fetch workspaces');
+        throw this.formatApiError(error, 'fetch', 'workspace');
       }
     });
   }
+
+  // ========================================
+  // USER API METHODS
+  // ========================================
 
   async getUsers(workspaceId?: string): Promise<MotionUser[]> {
     const cacheKey = workspaceId ? `users:workspace:${workspaceId}` : 'users:all';
@@ -920,7 +948,7 @@ export class MotionApiService {
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
-        throw this.formatApiError(error, 'fetch users');
+        throw this.formatApiError(error, 'fetch', 'user');
       }
     });
   }
@@ -953,14 +981,16 @@ export class MotionApiService {
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
-        throw this.formatApiError(error, 'fetch current user');
+        throw this.formatApiError(error, 'fetch', 'user');
       }
     });
     
     return cachedUsers[0]; // Return just the user object
   }
 
-  // Additional methods for intelligent features
+  // ========================================
+  // SEARCH AND RESOLUTION METHODS
+  // ========================================
 
   /**
    * Resolves a project identifier (either projectId or projectName) to a MotionProject
@@ -1441,6 +1471,10 @@ export class MotionApiService {
     }
   }
 
+  // ========================================
+  // COMMENT API METHODS
+  // ========================================
+
   /**
    * Get comments for a task with proper pagination support
    * @param taskId Task ID to get comments for
@@ -1493,7 +1527,7 @@ export class MotionApiService {
           taskId,
           cursor
         });
-        throw this.formatApiError(error, 'fetch comments');
+        throw this.formatApiError(error, 'fetch', 'comment');
       }
     });
   }
@@ -1532,9 +1566,13 @@ export class MotionApiService {
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
         taskId: commentData?.taskId
       });
-      throw this.formatApiError(error, 'create comment');
+      throw this.formatApiError(error, 'create', 'comment');
     }
   }
+
+  // ========================================
+  // CUSTOM FIELD API METHODS
+  // ========================================
 
   /**
    * Fetch custom fields from Motion API
@@ -1573,7 +1611,7 @@ export class MotionApiService {
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
           workspaceId
         });
-        throw this.formatApiError(error, 'fetch custom fields');
+        throw this.formatApiError(error, 'fetch', 'custom field');
       }
     });
   }
@@ -1628,7 +1666,7 @@ export class MotionApiService {
         fieldName: fieldData?.name,
         workspaceId
       });
-      throw this.formatApiError(error, 'create custom field');
+      throw this.formatApiError(error, 'create', 'custom field', undefined, fieldData.name);
     }
   }
 
@@ -1669,7 +1707,7 @@ export class MotionApiService {
         fieldId,
         workspaceId
       });
-      throw this.formatApiError(error, 'delete custom field');
+      throw this.formatApiError(error, 'delete', 'custom field', fieldId);
     }
   }
 
@@ -1722,7 +1760,7 @@ export class MotionApiService {
         projectId,
         fieldId
       });
-      throw this.formatApiError(error, 'add custom field to project');
+      throw this.formatApiError(error, 'update', 'project', projectId);
     }
   }
 
@@ -1764,7 +1802,7 @@ export class MotionApiService {
         projectId,
         fieldId
       });
-      throw this.formatApiError(error, 'remove custom field from project');
+      throw this.formatApiError(error, 'update', 'project', projectId);
     }
   }
 
@@ -1814,7 +1852,7 @@ export class MotionApiService {
         taskId,
         fieldId
       });
-      throw this.formatApiError(error, 'add custom field to task');
+      throw this.formatApiError(error, 'update', 'task', taskId);
     }
   }
 
@@ -1855,9 +1893,13 @@ export class MotionApiService {
         taskId,
         fieldId
       });
-      throw this.formatApiError(error, 'remove custom field from task');
+      throw this.formatApiError(error, 'update', 'task', taskId);
     }
   }
+
+  // ========================================
+  // RECURRING TASK API METHODS
+  // ========================================
 
   /**
    * Fetch recurring tasks from Motion API with automatic pagination
@@ -1911,7 +1953,7 @@ export class MotionApiService {
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
           workspaceId
         });
-        throw this.formatApiError(error, 'fetch recurring tasks');
+        throw this.formatApiError(error, 'fetch', 'recurring task');
       }
     });
   }
@@ -1973,7 +2015,7 @@ export class MotionApiService {
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
         taskName: taskData?.name
       });
-      throw this.formatApiError(error, 'create recurring task');
+      throw this.formatApiError(error, 'create', 'recurring task', undefined, taskData.name);
     }
   }
 
@@ -2010,9 +2052,13 @@ export class MotionApiService {
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
         recurringTaskId
       });
-      throw this.formatApiError(error, 'delete recurring task');
+      throw this.formatApiError(error, 'delete', 'recurring task', recurringTaskId);
     }
   }
+
+  // ========================================
+  // SCHEDULE API METHODS
+  // ========================================
 
   /**
    * Get available schedule names for auto-scheduling
@@ -2043,7 +2089,7 @@ export class MotionApiService {
         error: getErrorMessage(error),
         workspaceId
       });
-      throw this.formatApiError(error, 'fetch available schedule names');
+      throw this.formatApiError(error, 'fetch', 'schedule');
     }
   }
 
@@ -2110,10 +2156,14 @@ export class MotionApiService {
           startDate,
           endDate
         });
-        throw this.formatApiError(error, 'fetch schedules');
+        throw this.formatApiError(error, 'fetch', 'schedule');
       }
     });
   }
+
+  // ========================================
+  // STATUS API METHODS
+  // ========================================
 
   /**
    * Retrieves available workflow statuses from Motion
@@ -2169,10 +2219,14 @@ export class MotionApiService {
           apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
           workspaceId
         });
-        throw this.formatApiError(error, 'fetch statuses');
+        throw this.formatApiError(error, 'fetch', 'status');
       }
     });
   }
+
+  // ========================================
+  // UTILITY METHODS
+  // ========================================
 
   /**
    * Get all uncompleted tasks across all workspaces and projects
