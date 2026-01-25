@@ -69,6 +69,28 @@ describe('parseFilterDate', () => {
       expect(parseFilterDate('2024-06')).toBeNull();
       expect(parseFilterDate('2024')).toBeNull();
     });
+
+    it('handles date overflow behavior', () => {
+      // JavaScript Date allows some overflow - Feb 30 rolls to Mar 1
+      // parseFilterDate accepts YYYY-MM-DD format if it parses to valid Date
+      // NOTE: This means Feb 30 is accepted (becomes Mar 1 internally)
+      expect(parseFilterDate('2024-02-30')).toBe('2024-02-30');
+
+      // Month 13 creates Invalid Date
+      expect(parseFilterDate('2024-13-01')).toBeNull();
+
+      // Day 32 creates Invalid Date (beyond month rollover)
+      expect(parseFilterDate('2024-01-32')).toBeNull();
+    });
+
+    it('handles leap year dates', () => {
+      // 2024 is a leap year - Feb 29 is valid
+      expect(parseFilterDate('2024-02-29')).toBe('2024-02-29');
+
+      // 2023 is not a leap year - Feb 29 rolls to Mar 1
+      // But parseFilterDate only validates format, not date validity
+      expect(parseFilterDate('2023-02-29')).toBe('2023-02-29');
+    });
   });
 
   describe('invalid inputs', () => {

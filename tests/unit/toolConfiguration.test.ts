@@ -203,6 +203,17 @@ describe('ToolConfigurator', () => {
       expect(() => configurator.parseCustomConfig('essential'))
         .toThrow('Invalid custom configuration format');
     });
+
+    it('handles path traversal attempts in custom config', () => {
+      // Path traversal should be treated as invalid tool name
+      expect(() => new ToolConfigurator('custom:../../etc/passwd', registry))
+        .toThrow('Invalid tool names in custom configuration');
+    });
+
+    it('handles malicious tool names in custom config', () => {
+      expect(() => new ToolConfigurator('custom:__proto__,constructor', registry))
+        .toThrow('Invalid tool names in custom configuration');
+    });
   });
 
   describe('invalid configuration handling', () => {

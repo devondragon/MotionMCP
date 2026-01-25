@@ -62,14 +62,32 @@ describe('sanitizeTextContent', () => {
       expect(sanitizeTextContent('<div onclick="evil()">text</div>')).toBe('text');
     });
 
+    it('handles img tags with onerror handlers', () => {
+      expect(sanitizeTextContent('<img src=x onerror=alert(1)>')).toBe('');
+      expect(sanitizeTextContent('<img src="x" onerror="alert(1)">')).toBe('');
+    });
+
+    it('handles HTML entity encoded script tags', () => {
+      // HTML entities should not bypass sanitization
+      // &lt; and &gt; are < and > in HTML entity form
+      expect(sanitizeTextContent('&lt;script&gt;alert(1)&lt;/script&gt;')).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
+      // Entities are preserved as text, not decoded into actual tags
+    });
+
     it('handles script tags with string literals containing closing tags', () => {
-      // Edge case: script content contains "</script>" in a string
-      // Current regex will stop at first </script>, leaving trailing content
-      // This is acceptable behavior - the attack is still neutralized
+      // SECURITY NOTE: This tests a known regex limitation
+      // Input: <script>var x = "</script>"; alert(1);</script>
+      // The regex stops at first </script>, leaving: "; alert(1);</script>"
+      // After HTML removal: "; alert(1);" (just text, cannot execute)
+      // This is safe because:
+      // 1. The script tag is removed (no code execution context)
+      // 2. Remaining text cannot execute JavaScript
+      // 3. Motion API likely has additional server-side sanitization
       const result = sanitizeTextContent('<script>var x = "</script>"; alert(1);</script>');
-      // The regex matches up to first </script>, leaving "; alert(1);</script>"
-      // After HTML tag removal and cleanup, we get the remaining text
-      expect(result).toContain('alert');
+      expect(result).toBe('"; alert(1);');
+      // Verify it's just text (no script tags remain)
+      expect(result).not.toContain('<script');
+      expect(result).not.toContain('</script>');
     });
   });
 
