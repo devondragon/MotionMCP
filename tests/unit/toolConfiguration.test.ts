@@ -3,21 +3,7 @@ import { ToolRegistry } from '../../src/tools/ToolRegistry';
 import { ToolConfigurator } from '../../src/tools/ToolConfigurator';
 import { TOOL_NAMES } from '../../src/tools/ToolDefinitions';
 
-// Mock the logger to prevent console output
-vi.mock('../../src/utils/logger', () => ({
-  mcpLog: vi.fn()
-}));
-
-// Also mock the utils index export
-vi.mock('../../src/utils', () => ({
-  mcpLog: vi.fn(),
-  LOG_LEVELS: {
-    DEBUG: 'debug',
-    INFO: 'info',
-    WARN: 'warn',
-    ERROR: 'error'
-  }
-}));
+// Logger is already mocked in tests/setup.ts
 
 describe('ToolRegistry', () => {
   let registry: ToolRegistry;

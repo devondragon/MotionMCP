@@ -1,9 +1,10 @@
 /**
- * Test setup - mock logger to silence console output during tests
+ * Test setup - silence console output during tests
  */
-import { vi } from 'vitest';
+import { vi, beforeEach } from 'vitest';
 
-// Mock the logger module to prevent console noise during tests
-vi.mock('../src/utils/logger', () => ({
-  mcpLog: vi.fn()
-}));
+// Silence console.error globally to prevent logger noise during tests
+// Individual tests can override this by spying on console.error themselves
+beforeEach(() => {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+});

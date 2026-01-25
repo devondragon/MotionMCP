@@ -286,11 +286,13 @@ describe('SimpleCache', () => {
       const autoCache = new SimpleCache<string>(60, 100, { autoCleanup: true });
 
       autoCache.set('key1', 'value1');
+
+      // Advance past TTL to expire the entry
       vi.advanceTimersByTime(61 * 1000);
 
-      // The auto cleanup should have run by now (runs at TTL/2 = 30s intervals)
-      // Advance another interval to trigger cleanup
-      vi.advanceTimersByTime(30 * 1000);
+      // Advance a full TTL cycle (60s) to ensure cleanup runs
+      // This is more robust than assuming the internal 30s interval
+      vi.advanceTimersByTime(60 * 1000);
 
       // The key should be removed by auto cleanup
       expect(autoCache.getStats().size).toBe(0);

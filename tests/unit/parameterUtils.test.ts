@@ -178,6 +178,21 @@ describe('parseTaskArgs', () => {
       const result = parseTaskArgs({ autoScheduled: 123 });
       expect(result.autoScheduled).toBeUndefined();
     });
+
+    it('returns undefined for numeric 0', () => {
+      const result = parseTaskArgs({ autoScheduled: 0 });
+      expect(result.autoScheduled).toBeUndefined();
+    });
+
+    it('returns undefined for numeric 1', () => {
+      const result = parseTaskArgs({ autoScheduled: 1 });
+      expect(result.autoScheduled).toBeUndefined();
+    });
+
+    it('returns undefined for negative numbers', () => {
+      const result = parseTaskArgs({ autoScheduled: -1 });
+      expect(result.autoScheduled).toBeUndefined();
+    });
   });
 
   describe('other parameters', () => {
