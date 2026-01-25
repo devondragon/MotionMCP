@@ -66,8 +66,18 @@ export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs 
 
 /**
  * Parse autoScheduled parameter to handle various input formats
+ *
+ * Supported formats:
+ * - undefined → undefined (field not provided)
+ * - null → null (explicitly disable auto-scheduling)
+ * - true / 'true' → {} (enable but require schedule)
+ * - false / 'false' → null (disable auto-scheduling)
+ * - string (non-empty) → { schedule: string } (schedule name)
+ * - object → passed through as-is
+ * - numbers (0, 1, -1, etc.) → undefined (invalid type, field not provided)
+ *
  * @param value - The autoScheduled value from MCP request
- * @returns Proper autoScheduled value for Motion API
+ * @returns Proper autoScheduled value for Motion API, or undefined for invalid types
  */
 function parseAutoScheduledParam(value: unknown): Record<string, unknown> | null | undefined {
   // If undefined, leave as undefined (field not provided)
