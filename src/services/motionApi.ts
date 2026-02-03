@@ -1271,8 +1271,10 @@ export class MotionApiService {
       const overfetchMultiplier = 3;
 
       // Helper to calculate fetch limit based on remaining items needed
+      // Returns 0 when limit already reached to signal caller should skip fetch
       const calculateFetchLimit = () => {
         const remaining = effectiveLimit - allMatchingTasks.length;
+        if (remaining <= 0) return 0;
         return Math.min(remaining * overfetchMultiplier, LIMITS.MAX_SEARCH_RESULTS);
       };
 
@@ -1307,6 +1309,10 @@ export class MotionApiService {
             if (allMatchingTasks.length >= effectiveLimit) break;
 
             try {
+              // Calculate fetch limit before API call (defense-in-depth)
+              const fetchLimit = calculateFetchLimit();
+              if (fetchLimit <= 0) break;
+
               mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for tasks', {
                 method: 'searchTasks',
                 query,
@@ -1317,7 +1323,7 @@ export class MotionApiService {
 
               const workspaceTasks = await this.getTasks({
                 workspaceId: workspace.id,
-                limit: calculateFetchLimit(),
+                limit: fetchLimit,
                 maxPages: LIMITS.MAX_PAGES
               });
               const workspaceMatches = workspaceTasks.filter(task =>
@@ -1396,8 +1402,10 @@ export class MotionApiService {
       const overfetchMultiplier = 3;
 
       // Helper to calculate fetch limit based on remaining items needed
+      // Returns 0 when limit already reached to signal caller should skip fetch
       const calculateFetchLimit = () => {
         const remaining = effectiveLimit - allMatchingProjects.length;
+        if (remaining <= 0) return 0;
         return Math.min(remaining * overfetchMultiplier, LIMITS.MAX_SEARCH_RESULTS);
       };
 
@@ -1431,6 +1439,10 @@ export class MotionApiService {
             if (allMatchingProjects.length >= effectiveLimit) break;
 
             try {
+              // Calculate fetch limit before API call (defense-in-depth)
+              const fetchLimit = calculateFetchLimit();
+              if (fetchLimit <= 0) break;
+
               mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for projects', {
                 method: 'searchProjects',
                 query,
@@ -1441,7 +1453,7 @@ export class MotionApiService {
 
               const workspaceProjects = await this.getProjects(workspace.id, {
                 maxPages: LIMITS.MAX_PAGES,
-                limit: calculateFetchLimit()
+                limit: fetchLimit
               });
               const workspaceMatches = workspaceProjects.filter(project =>
                 project.name?.toLowerCase().includes(lowerQuery) ||
@@ -2275,8 +2287,10 @@ export class MotionApiService {
       const overfetchMultiplier = 3;
 
       // Helper to calculate fetch limit based on remaining items needed
+      // Returns 0 when limit already reached to signal caller should skip fetch
       const calculateFetchLimit = () => {
         const remaining = effectiveLimit - allUncompletedTasks.length;
+        if (remaining <= 0) return 0;
         return Math.min(remaining * overfetchMultiplier, LIMITS.MAX_SEARCH_RESULTS);
       };
 
@@ -2296,10 +2310,14 @@ export class MotionApiService {
           }
 
           try {
+            // Calculate fetch limit before API call (defense-in-depth)
+            const fetchLimit = calculateFetchLimit();
+            if (fetchLimit <= 0) break;
+
             // Get tasks from this workspace with adaptive limit
             const workspaceTasks = await this.getTasks({
               workspaceId: workspace.id,
-              limit: calculateFetchLimit(),
+              limit: fetchLimit,
               maxPages: LIMITS.MAX_PAGES
             });
 
