@@ -21,7 +21,7 @@ import { LOG_LEVELS, createMinimalPayload, RETRY_CONFIG, CACHE_TTL, LIMITS, Vali
 import { transformFrequencyToApiString, validateFrequencyObject } from '../utils/frequencyTransform';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
-import { fetchAllPages as fetchAllPagesNew } from '../utils/paginationNew';
+import { fetchAllPages as fetchAllPagesNew, calculateAdaptiveFetchLimit } from '../utils/paginationNew';
 import { unwrapApiResponse } from '../utils/responseWrapper';
 import { createUserFacingError, createErrorContext, UserFacingError } from '../utils/userFacingErrors';
 import { z } from 'zod';
@@ -280,6 +280,12 @@ export class MotionApiService {
 
   async getProjects(workspaceId: string, options?: { maxPages?: number; limit?: number }): Promise<MotionProject[]> {
     const { maxPages = 5, limit } = options || {};
+
+    // Validate limit parameter if provided
+    if (limit !== undefined && (limit < 0 || !Number.isInteger(limit))) {
+      throw new Error('limit must be a non-negative integer');
+    }
+
     const cacheKey = `projects:workspace:${workspaceId}`;
 
     return this.projectCache.withCache(cacheKey, async () => {
@@ -551,6 +557,11 @@ export class MotionApiService {
       limit,
       maxPages = 5
     } = options;
+
+    // Validate limit parameter if provided
+    if (limit !== undefined && (limit < 0 || !Number.isInteger(limit))) {
+      throw new Error('limit must be a non-negative integer');
+    }
 
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching tasks from Motion API', {
@@ -1267,21 +1278,10 @@ export class MotionApiService {
       const lowerQuery = query.toLowerCase();
       const allMatchingTasks: MotionTask[] = [];
 
-      // Use overfetch multiplier since we filter results (fetch 3x what we need)
-      const overfetchMultiplier = 3;
-
-      // Helper to calculate fetch limit based on remaining items needed
-      // Returns 0 when limit already reached to signal caller should skip fetch
-      const calculateFetchLimit = () => {
-        const remaining = effectiveLimit - allMatchingTasks.length;
-        if (remaining <= 0) return 0;
-        return Math.min(remaining * overfetchMultiplier, LIMITS.MAX_SEARCH_RESULTS);
-      };
-
       // First, search in the specified workspace
       const primaryTasks = await this.getTasks({
         workspaceId,
-        limit: calculateFetchLimit(),
+        limit: calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit),
         maxPages: LIMITS.MAX_PAGES
       });
       const primaryMatches = primaryTasks.filter(task =>
@@ -1310,7 +1310,7 @@ export class MotionApiService {
 
             try {
               // Calculate fetch limit before API call (defense-in-depth)
-              const fetchLimit = calculateFetchLimit();
+              const fetchLimit = calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit);
               if (fetchLimit <= 0) break;
 
               mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for tasks', {
@@ -1398,21 +1398,10 @@ export class MotionApiService {
       const lowerQuery = query.toLowerCase();
       const allMatchingProjects: MotionProject[] = [];
 
-      // Use overfetch multiplier since we filter results (fetch 3x what we need)
-      const overfetchMultiplier = 3;
-
-      // Helper to calculate fetch limit based on remaining items needed
-      // Returns 0 when limit already reached to signal caller should skip fetch
-      const calculateFetchLimit = () => {
-        const remaining = effectiveLimit - allMatchingProjects.length;
-        if (remaining <= 0) return 0;
-        return Math.min(remaining * overfetchMultiplier, LIMITS.MAX_SEARCH_RESULTS);
-      };
-
       // First, search in the specified workspace
       const primaryProjects = await this.getProjects(workspaceId, {
         maxPages: LIMITS.MAX_PAGES,
-        limit: calculateFetchLimit()
+        limit: calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit)
       });
       const primaryMatches = primaryProjects.filter(project =>
         project.name?.toLowerCase().includes(lowerQuery) ||
@@ -1440,7 +1429,7 @@ export class MotionApiService {
 
             try {
               // Calculate fetch limit before API call (defense-in-depth)
-              const fetchLimit = calculateFetchLimit();
+              const fetchLimit = calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit);
               if (fetchLimit <= 0) break;
 
               mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for projects', {
@@ -2283,17 +2272,6 @@ export class MotionApiService {
       const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
       const allUncompletedTasks: MotionTask[] = [];
 
-      // Use overfetch multiplier since we filter results (fetch 3x what we need)
-      const overfetchMultiplier = 3;
-
-      // Helper to calculate fetch limit based on remaining items needed
-      // Returns 0 when limit already reached to signal caller should skip fetch
-      const calculateFetchLimit = () => {
-        const remaining = effectiveLimit - allUncompletedTasks.length;
-        if (remaining <= 0) return 0;
-        return Math.min(remaining * overfetchMultiplier, LIMITS.MAX_SEARCH_RESULTS);
-      };
-
       try {
         // Get all workspaces
         const workspaces = await this.getWorkspaces();
@@ -2311,7 +2289,7 @@ export class MotionApiService {
 
           try {
             // Calculate fetch limit before API call (defense-in-depth)
-            const fetchLimit = calculateFetchLimit();
+            const fetchLimit = calculateAdaptiveFetchLimit(allUncompletedTasks.length, effectiveLimit);
             if (fetchLimit <= 0) break;
 
             // Get tasks from this workspace with adaptive limit
