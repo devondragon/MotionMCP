@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.1] - 2026-02-03
+
+### 🚀 Performance Improvements
+
+#### Pagination Memory Optimization
+- **Fixed Memory Risk**: Added early termination to pagination when item limits are reached
+- **Adaptive Fetch Limits**: New `calculateAdaptiveFetchLimit()` utility prevents fetching unnecessary data
+- **Defense-in-Depth**: Multiple safeguards prevent invalid limit values (zero or negative) from causing issues
+
+### 🐛 Bug Fixes
+
+#### Search Function Edge Cases
+- **Fixed calculateFetchLimit**: Resolved edge cases where remaining items could be zero or negative
+- **Limit Validation**: Added validation to reject negative or non-integer limit values in getTasks/getProjects
+
+#### Zod v4 Compatibility
+- **Schema Updates**: Added explicit key types to z.record() schemas for Zod v4 compatibility
+- **Validation Property**: Updated error.errors to error.issues for Zod v4
+
+### 🔧 Technical Improvements
+
+#### Code Quality
+- **DRY Refactoring**: Extracted shared `calculateAdaptiveFetchLimit()` utility, removing 3 duplicate implementations
+- **Priority Validation**: Enhanced TaskHandler with proper runtime validation for priority values
+- **Error Handling**: Improved error extraction utilities and API error construction
+- **API Timeout**: Added configurable timeout for API requests
+
+#### Documentation
+- **JSDoc Coverage**: Added comprehensive documentation to ToolRegistry, TaskHandler, and pagination utilities
+- **Overfetch Explanation**: Documented the 3x overfetch multiplier rationale for search operations
+
+### 🧪 Testing
+
+#### New Test Suites
+- **CustomField Handler Tests**: 16 new tests covering custom field operations
+- **Recurring Task Handler Tests**: 11 new tests for recurring task functionality
+- **Schedule Handler Tests**: 10 new tests for schedule operations
+
+### 📦 Dependencies
+
+- **Zod**: Updated to v4 with breaking change compatibility fixes
+- **Vitest**: Updated to v4 for improved test performance
+
 ## [2.2.0] - 2025-09-27
 
 ### 🐛 Bug Fixes
