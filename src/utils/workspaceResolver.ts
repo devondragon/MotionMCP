@@ -68,9 +68,14 @@ export class WorkspaceResolver {
         if (validateAccess) {
           resolvedWorkspace = await this.resolveByWorkspaceId(workspaceId);
         } else {
-          // When not validating, just return the ID as-is
-          resolvedWorkspace = { 
-            id: workspaceId, 
+          // Skip validation - return workspace stub with provided ID
+          // The Motion API will validate access when the ID is used
+          mcpLog(LOG_LEVELS.DEBUG, 'Skipping workspace validation, using ID directly', {
+            method: 'resolveWorkspace',
+            workspaceId
+          });
+          resolvedWorkspace = {
+            id: workspaceId,
             name: 'Unknown Workspace',
             teamId: 'unknown',
             type: WORKSPACE_TYPES.UNKNOWN,
