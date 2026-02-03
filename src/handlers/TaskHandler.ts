@@ -11,6 +11,7 @@ import {
 } from '../utils';
 import { isValidPriority, parseFilterDate, ValidPriority } from '../utils/constants';
 
+/** Parameters for creating a new task */
 interface CreateTaskParams {
   name?: string;
   workspaceId?: string;
@@ -25,6 +26,7 @@ interface CreateTaskParams {
   autoScheduled?: Record<string, unknown> | null;
 }
 
+/** Parameters for listing tasks with optional filters */
 interface ListTaskParams {
   workspaceId?: string;
   workspaceName?: string;
@@ -39,10 +41,12 @@ interface ListTaskParams {
   limit?: number;
 }
 
+/** Parameters for retrieving a single task */
 interface GetTaskParams {
   taskId?: string;
 }
 
+/** Parameters for updating an existing task */
 interface UpdateTaskParams {
   taskId?: string;
   name?: string;
@@ -55,25 +59,43 @@ interface UpdateTaskParams {
   autoScheduled?: Record<string, unknown> | null;
 }
 
+/** Parameters for deleting a task */
 interface DeleteTaskParams {
   taskId?: string;
 }
 
+/** Parameters for moving a task to a different project or workspace */
 interface MoveTaskParams {
   taskId?: string;
   targetProjectId?: string;
   targetWorkspaceId?: string;
 }
 
+/** Parameters for removing the assignee from a task */
 interface UnassignTaskParams {
   taskId?: string;
 }
 
+/** Parameters for listing all uncompleted tasks across workspaces */
 interface ListAllUncompletedParams {
   limit?: number;
 }
 
+/**
+ * Handler for all task-related operations in the Motion API.
+ *
+ * Supports CRUD operations on tasks including create, list, get, update, delete,
+ * as well as specialized operations like move, unassign, and listing uncompleted tasks.
+ * Handles workspace and project resolution, input validation, and auto-scheduling configuration.
+ *
+ * @extends BaseHandler
+ */
 export class TaskHandler extends BaseHandler {
+  /**
+   * Routes task operation requests to the appropriate handler method.
+   * @param args - Task operation arguments including operation type and parameters
+   * @returns MCP-formatted response with operation result or error
+   */
   async handle(args: MotionTasksArgs): Promise<McpToolResponse> {
     try {
       const { operation, ...params } = args;
@@ -103,6 +125,17 @@ export class TaskHandler extends BaseHandler {
     }
   }
 
+  /**
+   * Creates a new task in Motion.
+   *
+   * Resolves workspace and project identifiers, converts duration values,
+   * validates auto-scheduling configuration, and creates the task via the Motion API.
+   * The task is created in the project's workspace if a project is specified,
+   * otherwise uses the resolved or default workspace.
+   *
+   * @param params - Task creation parameters including name, workspace, project, and task details
+   * @returns Success response with task name and ID, or error if creation fails
+   */
   private async handleCreate(params: CreateTaskParams): Promise<McpToolResponse> {
     if (!params.name) {
       return this.handleError(new Error("Task name is required for create operation"));
@@ -169,6 +202,16 @@ export class TaskHandler extends BaseHandler {
     return formatMcpSuccess(`Successfully created task "${task.name}" (ID: ${task.id})`);
   }
 
+  /**
+   * Lists tasks with optional filters for workspace, project, status, assignee, priority, and labels.
+   *
+   * Supports flexible assignee resolution including the special 'me' keyword for the current user.
+   * Validates priority values and date formats before querying. Returns formatted task list
+   * with applied filter context.
+   *
+   * @param params - Filter parameters for task listing
+   * @returns Formatted list of matching tasks with filter context
+   */
   private async handleList(params: ListTaskParams): Promise<McpToolResponse> {
     const workspace = await this.workspaceResolver.resolveWorkspace({
       workspaceId: params.workspaceId,
@@ -270,6 +313,11 @@ export class TaskHandler extends BaseHandler {
     });
   }
 
+  /**
+   * Retrieves detailed information for a single task.
+   * @param params - Parameters containing the task ID
+   * @returns Formatted task details or error if task not found
+   */
   private async handleGet(params: GetTaskParams): Promise<McpToolResponse> {
     if (!params.taskId) {
       return this.handleError(new Error("Task ID is required for get operation"));
@@ -279,6 +327,16 @@ export class TaskHandler extends BaseHandler {
     return formatTaskDetail(taskDetails);
   }
 
+  /**
+   * Updates an existing task with new values.
+   *
+   * Only updates fields that are explicitly provided in params.
+   * Validates priority values and converts duration strings to appropriate format.
+   * Labels are converted to the Motion API's expected object format.
+   *
+   * @param params - Update parameters including taskId and fields to update
+   * @returns Success response with updated task info or validation error
+   */
   private async handleUpdate(params: UpdateTaskParams): Promise<McpToolResponse> {
     if (!params.taskId) {
       return this.handleError(new Error("Task ID is required for update operation"));
@@ -289,7 +347,14 @@ export class TaskHandler extends BaseHandler {
     if (params.name !== undefined) updateData.name = params.name;
     if (params.description !== undefined) updateData.description = params.description;
     if (params.status !== undefined) updateData.status = params.status;
-    if (params.priority !== undefined) updateData.priority = params.priority as any;
+    if (params.priority !== undefined) {
+      if (!isValidPriority(params.priority)) {
+        return this.handleError(new Error(
+          `Invalid priority "${params.priority}". Valid values are: ASAP, HIGH, MEDIUM, LOW`
+        ));
+      }
+      updateData.priority = params.priority;
+    }
     if (params.dueDate !== undefined) {
       updateData.dueDate = normalizeDueDateForApi(params.dueDate);
     }
@@ -315,6 +380,11 @@ export class TaskHandler extends BaseHandler {
     return formatMcpSuccess(`Successfully updated task "${updatedTask.name}" (ID: ${updatedTask.id})`);
   }
 
+  /**
+   * Permanently deletes a task from Motion.
+   * @param params - Parameters containing the task ID to delete
+   * @returns Success response confirming deletion
+   */
   private async handleDelete(params: DeleteTaskParams): Promise<McpToolResponse> {
     if (!params.taskId) {
       return this.handleError(new Error("Task ID is required for delete operation"));
@@ -324,6 +394,12 @@ export class TaskHandler extends BaseHandler {
     return formatMcpSuccess(`Successfully deleted task ${params.taskId}`);
   }
 
+  /**
+   * Moves a task to a different project and/or workspace.
+   * Requires either a target project ID or workspace ID (or both).
+   * @param params - Parameters with taskId and target location
+   * @returns Success response with moved task info
+   */
   private async handleMove(params: MoveTaskParams): Promise<McpToolResponse> {
     if (!params.taskId) {
       return this.handleError(new Error("Task ID is required for move operation"));
@@ -336,6 +412,11 @@ export class TaskHandler extends BaseHandler {
     return formatMcpSuccess(`Successfully moved task "${movedTask.name}" (ID: ${movedTask.id})`);
   }
 
+  /**
+   * Removes the assignee from a task, making it unassigned.
+   * @param params - Parameters containing the task ID
+   * @returns Success response confirming unassignment
+   */
   private async handleUnassign(params: UnassignTaskParams): Promise<McpToolResponse> {
     if (!params.taskId) {
       return this.handleError(new Error("Task ID is required for unassign operation"));
@@ -345,6 +426,12 @@ export class TaskHandler extends BaseHandler {
     return formatMcpSuccess(`Successfully unassigned task "${unassignedTask.name}" (ID: ${unassignedTask.id})`);
   }
 
+  /**
+   * Lists all uncompleted tasks across all accessible workspaces.
+   * Useful for getting a complete view of pending work regardless of workspace.
+   * @param params - Optional limit for maximum number of tasks to return
+   * @returns Formatted list of uncompleted tasks from all workspaces
+   */
   private async handleListAllUncompleted(params: ListAllUncompletedParams): Promise<McpToolResponse> {
     const tasks = await this.motionService.getAllUncompletedTasks(params.limit);
 

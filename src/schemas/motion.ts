@@ -38,7 +38,7 @@ export const MotionProjectSchema = z.object({
   ]).optional(),
   createdTime: z.string().optional(),
   updatedTime: z.string().optional(),
-  customFieldValues: z.record(z.object({
+  customFieldValues: z.record(z.string(), z.object({
     type: z.string(),
     value: z.unknown()
   })).optional()
@@ -73,7 +73,7 @@ export const MotionTaskSchema = z.object({
   labels: z.array(z.object({
     name: z.string()
   })).optional(),
-  autoScheduled: z.record(z.unknown()).nullable().optional(),
+  autoScheduled: z.record(z.string(), z.unknown()).nullable().optional(),
   completedTime: z.string().optional(),
   createdTime: z.string(),
   updatedTime: z.string().optional(),
@@ -124,7 +124,7 @@ export const MotionTaskSchema = z.object({
     email: z.string()
   })),
   
-  customFieldValues: z.record(z.object({
+  customFieldValues: z.record(z.string(), z.object({
     type: z.string(),
     value: z.unknown()
   })).optional(),
@@ -193,7 +193,7 @@ export const MotionRecurringTaskSchema = z.object({
       isDefaultStatus: z.boolean(),
       isResolvedStatus: z.boolean()
     }),
-    customFieldValues: z.record(z.object({
+    customFieldValues: z.record(z.string(), z.object({
       type: z.string(),
       value: z.unknown()
     })).optional()

@@ -11,7 +11,16 @@
     "README.md",
     "LICENSE"
   ],
-  "keywords": ["mcp", "model-context-protocol", "motion", "api", "task-management", "project-management", "llm", "ai"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "motion",
+    "api",
+    "task-management",
+    "project-management",
+    "llm",
+    "ai"
+  ],
   "author": "Devon Hillard devon@digitalsanctuary.com",
   "license": "Apache-2.0",
   "repository": {
@@ -31,13 +40,13 @@
     "ajv": "^8.17.1",
     "axios": "^1.9.0",
     "dotenv": "^16.5.0",
-    "zod": "^3.25.76"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^24.2.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.18"
   },
   "scripts": {
     "build": "tsc",

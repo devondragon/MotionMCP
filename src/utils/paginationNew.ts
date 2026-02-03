@@ -49,15 +49,21 @@ export async function fetchAllPages<T>(
   const absoluteMaxPages = Math.min(maxPages, LIMITS.ABSOLUTE_MAX_PAGES); // Hard limit to prevent infinite loops
   
   while (hasMore && pageCount < absoluteMaxPages) {
+    // Pre-fetch early termination: skip fetch if we've already reached maxItems
+    if (allItems.length >= maxItems) {
+      hasMore = false;
+      break;
+    }
+
     try {
       if (logProgress && pageCount > 0) {
-        mcpLog(LOG_LEVELS.DEBUG, `Fetching page ${pageCount + 1} for ${apiEndpoint}`, { 
+        mcpLog(LOG_LEVELS.DEBUG, `Fetching page ${pageCount + 1} for ${apiEndpoint}`, {
           cursor,
           pageCount,
           itemsSoFar: allItems.length
         });
       }
-      
+
       const response = await fetchPage(cursor);
       const unwrapped = unwrapApiResponse<T>(response.data, apiEndpoint);
       
@@ -184,3 +190,28 @@ export function endpointSupportsPagination(apiEndpoint: string): boolean {
 
 // Legacy compatibility exports (to be removed when migration is complete)
 export { UnwrappedResponse } from './responseWrapper';
+
+/**
+ * Calculate adaptive fetch limit for search operations with overfetching.
+ *
+ * Used when fetching items that will be filtered client-side. The overfetch
+ * multiplier (typically 3x) compensates for filtered results, reducing the
+ * number of API calls needed while avoiding excessive memory usage.
+ *
+ * @param currentCount - Number of items already collected
+ * @param targetLimit - Maximum items the caller wants
+ * @param overfetchMultiplier - How much to overfetch (default 3x based on typical filter ratios)
+ * @param maxFetchLimit - Absolute maximum for a single fetch (prevents resource exhaustion)
+ * @returns Number of items to request, or 0 if target already reached
+ */
+export function calculateAdaptiveFetchLimit(
+  currentCount: number,
+  targetLimit: number,
+  overfetchMultiplier: number = 3,
+  maxFetchLimit: number = LIMITS.MAX_SEARCH_RESULTS
+): number {
+  // Use Math.max to ensure remaining is never negative (defense-in-depth)
+  const remaining = Math.max(0, targetLimit - currentCount);
+  if (remaining === 0) return 0;
+  return Math.min(remaining * overfetchMultiplier, maxFetchLimit);
+}

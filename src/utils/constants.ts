@@ -71,6 +71,12 @@ export const RETRY_CONFIG = {
   BACKOFF_MULTIPLIER: 2
 } as const;
 
+// API client configuration
+export const API_CONFIG = {
+  TIMEOUT_MS: 30000,           // 30 seconds - request timeout
+  CONNECT_TIMEOUT_MS: 10000    // 10 seconds - connection establishment timeout
+} as const;
+
 // Cache TTL configuration (in seconds)
 export const CACHE_TTL = {
   WORKSPACES: 600,    // 10 minutes

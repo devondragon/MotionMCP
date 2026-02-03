@@ -60,16 +60,62 @@ export class WorkspaceError extends Error {
 }
 
 /**
- * Format an error for MCP protocol response
+ * Type guard to check if an error has an error code
  */
-export function formatMcpError(error: Error | MotionApiError, _context: ErrorContext = {}): CallToolResult {
-  const errorMessage = error.message || 'An unknown error occurred';
-  
+export function isCodedError(error: unknown): error is { code: ErrorCode; context: ErrorContext } {
+  return (
+    error instanceof MotionApiError ||
+    error instanceof ValidationError ||
+    error instanceof WorkspaceError
+  );
+}
+
+/**
+ * Extract error information from any error type
+ */
+export function extractErrorInfo(error: unknown): { message: string; code: ErrorCode; context: ErrorContext } {
+  if (error instanceof Error) {
+    if (isCodedError(error)) {
+      return {
+        message: error.message,
+        code: error.code,
+        context: error.context
+      };
+    }
+    return {
+      message: error.message,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      context: {}
+    };
+  }
+  return {
+    message: String(error),
+    code: ERROR_CODES.INTERNAL_ERROR,
+    context: {}
+  };
+}
+
+/**
+ * Format an error for MCP protocol response with full context
+ */
+export function formatMcpError(error: Error | unknown, additionalContext: ErrorContext = {}): CallToolResult {
+  const { message, code, context } = extractErrorInfo(error);
+  const errorMessage = message || 'An unknown error occurred';
+  const errorContext: ErrorContext = { ...context, ...additionalContext };
+
+  // Add parameter info for validation errors
+  if (error instanceof ValidationError && error.parameter) {
+    errorContext.parameter = error.parameter;
+  }
+
+  // Build error message
+  const errorText = `Error [${code}]: ${errorMessage}`;
+
   return {
     content: [
       {
         type: MCP_RESPONSE_TYPES.TEXT,
-        text: `Error: ${errorMessage}`
+        text: errorText
       }
     ],
     isError: true

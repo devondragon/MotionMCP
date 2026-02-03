@@ -17,11 +17,11 @@ import {
   MotionApiError,
   MotionPaginatedResponse
 } from '../types/motion';
-import { LOG_LEVELS, createMinimalPayload, RETRY_CONFIG, CACHE_TTL, LIMITS, ValidPriority } from '../utils/constants';
+import { LOG_LEVELS, createMinimalPayload, RETRY_CONFIG, CACHE_TTL, LIMITS, ValidPriority, API_CONFIG } from '../utils/constants';
 import { transformFrequencyToApiString, validateFrequencyObject } from '../utils/frequencyTransform';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
-import { fetchAllPages as fetchAllPagesNew } from '../utils/paginationNew';
+import { fetchAllPages as fetchAllPagesNew, calculateAdaptiveFetchLimit } from '../utils/paginationNew';
 import { unwrapApiResponse } from '../utils/responseWrapper';
 import { createUserFacingError, createErrorContext, UserFacingError } from '../utils/userFacingErrors';
 import { z } from 'zod';
@@ -87,7 +87,7 @@ export class MotionApiService {
       if (error instanceof z.ZodError) {
         const errorDetails = {
           context,
-          validationErrors: error.errors,
+          validationErrors: error.issues,
           ...(VALIDATION_CONFIG.includeDataInLogs ? { receivedData: data } : {})
         };
 
@@ -130,7 +130,8 @@ export class MotionApiService {
       headers: {
         'X-API-Key': this.apiKey,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: API_CONFIG.TIMEOUT_MS
     });
 
     // Initialize cache instances with TTL from constants (converted to ms)
@@ -168,13 +169,19 @@ export class MotionApiService {
         };
 
         mcpLog(LOG_LEVELS.ERROR, 'Motion API request failed', errorDetails);
-        
+
         // Create typed error for better handling
-        const typedError = new Error(
-          errorData?.message || error.message
-        ) as MotionApiError;
-        typedError.response = error.response as any;
-        
+        const typedError: MotionApiError = Object.assign(
+          new Error(errorData?.message || error.message),
+          {
+            response: error.response ? {
+              status: error.response.status,
+              statusText: error.response.statusText,
+              data: error.response.data
+            } : undefined
+          }
+        );
+
         throw typedError;
       }
     );
@@ -271,15 +278,23 @@ export class MotionApiService {
   // PROJECT API METHODS
   // ========================================
 
-  async getProjects(workspaceId: string, maxPages: number = 5): Promise<MotionProject[]> {
+  async getProjects(workspaceId: string, options?: { maxPages?: number; limit?: number }): Promise<MotionProject[]> {
+    const { maxPages = 5, limit } = options || {};
+
+    // Validate limit parameter if provided
+    if (limit !== undefined && (limit < 0 || !Number.isInteger(limit))) {
+      throw new Error('limit must be a non-negative integer');
+    }
+
     const cacheKey = `projects:workspace:${workspaceId}`;
-    
+
     return this.projectCache.withCache(cacheKey, async () => {
       try {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from Motion API', {
           method: 'getProjects',
           workspaceId,
-          maxPages
+          maxPages,
+          limit
         });
 
         // Create a fetch function for potential pagination
@@ -292,15 +307,16 @@ export class MotionApiService {
 
           const queryString = params.toString();
           const url = `/projects?${queryString}`;
-          
+
           return this.requestWithRetry(() => this.client.get(url));
         };
 
         try {
           // Attempt pagination-aware fetch with new response wrapper
-          const paginatedResult = await fetchAllPagesNew<MotionProject>(fetchPage, 'projects', { 
+          const paginatedResult = await fetchAllPagesNew<MotionProject>(fetchPage, 'projects', {
             maxPages,
-            logProgress: false
+            logProgress: false,
+            ...(limit ? { maxItems: limit } : {})
           });
           
           if (paginatedResult.totalFetched > 0) {
@@ -542,6 +558,11 @@ export class MotionApiService {
       maxPages = 5
     } = options;
 
+    // Validate limit parameter if provided
+    if (limit !== undefined && (limit < 0 || !Number.isInteger(limit))) {
+      throw new Error('limit must be a non-negative integer');
+    }
+
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching tasks from Motion API', {
         method: 'getTasks',
@@ -600,23 +621,17 @@ export class MotionApiService {
         });
         
         if (paginatedResult.totalFetched > 0) {
-          let tasks = paginatedResult.items;
-          
-          // Apply limit if specified
-          if (limit && limit > 0) {
-            tasks = tasks.slice(0, limit);
-          }
-          
+          // Note: limit is already enforced by maxItems in pagination, no need to slice
           mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully with pagination', {
             method: 'getTasks',
             totalCount: paginatedResult.totalFetched,
-            returnedCount: tasks.length,
+            returnedCount: paginatedResult.items.length,
             hasMore: paginatedResult.hasMore,
             workspaceId,
             projectId,
             limitApplied: limit
           });
-          return tasks;
+          return paginatedResult.items;
         }
       } catch (paginationError) {
         // Fallback to simple fetch if pagination fails
@@ -814,8 +829,8 @@ export class MotionApiService {
         targetWorkspaceId
       });
 
-      // TODO: Invalidate task cache for source and destination projects/workspaces when implemented
-      
+      // Note: No task cache currently implemented - tasks are not cached due to frequent updates
+
       return response.data;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to move task', {
@@ -847,8 +862,8 @@ export class MotionApiService {
         taskId
       });
 
-      // TODO: Invalidate task cache for this task and any assignee-related caches when implemented
-      
+      // Note: No task cache currently implemented - tasks are not cached due to frequent updates
+
       return response.data;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to unassign task', {
@@ -1261,12 +1276,12 @@ export class MotionApiService {
       // Apply search limit to prevent resource exhaustion
       const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
       const lowerQuery = query.toLowerCase();
-      let allMatchingTasks: MotionTask[] = [];
+      const allMatchingTasks: MotionTask[] = [];
 
       // First, search in the specified workspace
       const primaryTasks = await this.getTasks({
         workspaceId,
-        limit: effectiveLimit,
+        limit: calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit),
         maxPages: LIMITS.MAX_PAGES
       });
       const primaryMatches = primaryTasks.filter(task =>
@@ -1274,13 +1289,14 @@ export class MotionApiService {
         task.description?.toLowerCase().includes(lowerQuery)
       );
 
-      allMatchingTasks.push(...primaryMatches);
+      allMatchingTasks.push(...primaryMatches.slice(0, effectiveLimit));
 
       mcpLog(LOG_LEVELS.DEBUG, 'Primary workspace search completed', {
         method: 'searchTasks',
         query,
         primaryWorkspaceId: workspaceId,
-        primaryMatches: primaryMatches.length
+        primaryMatches: primaryMatches.length,
+        keptMatches: allMatchingTasks.length
       });
 
       // If we haven't reached the limit, search other workspaces
@@ -1293,16 +1309,21 @@ export class MotionApiService {
             if (allMatchingTasks.length >= effectiveLimit) break;
 
             try {
+              // Calculate fetch limit before API call (defense-in-depth)
+              const fetchLimit = calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit);
+              if (fetchLimit <= 0) break;
+
               mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for tasks', {
                 method: 'searchTasks',
                 query,
                 searchingWorkspaceId: workspace.id,
-                searchingWorkspaceName: workspace.name
+                searchingWorkspaceName: workspace.name,
+                remainingNeeded: effectiveLimit - allMatchingTasks.length
               });
 
               const workspaceTasks = await this.getTasks({
                 workspaceId: workspace.id,
-                limit: effectiveLimit,
+                limit: fetchLimit,
                 maxPages: LIMITS.MAX_PAGES
               });
               const workspaceMatches = workspaceTasks.filter(task =>
@@ -1310,7 +1331,9 @@ export class MotionApiService {
                 task.description?.toLowerCase().includes(lowerQuery)
               );
 
-              allMatchingTasks.push(...workspaceMatches);
+              // Only add as many as we still need
+              const remaining = effectiveLimit - allMatchingTasks.length;
+              allMatchingTasks.push(...workspaceMatches.slice(0, remaining));
 
               if (workspaceMatches.length > 0) {
                 mcpLog(LOG_LEVELS.DEBUG, 'Found additional matches in workspace', {
@@ -1318,7 +1341,8 @@ export class MotionApiService {
                   query,
                   workspaceId: workspace.id,
                   workspaceName: workspace.name,
-                  matches: workspaceMatches.length
+                  matches: workspaceMatches.length,
+                  keptMatches: Math.min(workspaceMatches.length, remaining)
                 });
               }
             } catch (workspaceError: unknown) {
@@ -1341,19 +1365,15 @@ export class MotionApiService {
         }
       }
 
-      // Apply final limit and return results
-      const finalResults = allMatchingTasks.slice(0, effectiveLimit);
-
+      // Results are already limited during collection, no need to slice again
       mcpLog(LOG_LEVELS.INFO, 'Task search completed across all workspaces', {
         method: 'searchTasks',
         query,
-        totalMatches: allMatchingTasks.length,
-        returnedResults: finalResults.length,
-        limit: effectiveLimit,
-        crossWorkspaceSearch: allMatchingTasks.length > primaryMatches.length
+        returnedResults: allMatchingTasks.length,
+        limit: effectiveLimit
       });
 
-      return finalResults;
+      return allMatchingTasks;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to search tasks', {
         method: 'searchTasks',
@@ -1376,22 +1396,26 @@ export class MotionApiService {
       // Apply search limit to prevent resource exhaustion
       const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
       const lowerQuery = query.toLowerCase();
-      let allMatchingProjects: MotionProject[] = [];
+      const allMatchingProjects: MotionProject[] = [];
 
       // First, search in the specified workspace
-      const primaryProjects = await this.getProjects(workspaceId, LIMITS.MAX_PAGES);
+      const primaryProjects = await this.getProjects(workspaceId, {
+        maxPages: LIMITS.MAX_PAGES,
+        limit: calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit)
+      });
       const primaryMatches = primaryProjects.filter(project =>
         project.name?.toLowerCase().includes(lowerQuery) ||
         project.description?.toLowerCase().includes(lowerQuery)
       );
 
-      allMatchingProjects.push(...primaryMatches);
+      allMatchingProjects.push(...primaryMatches.slice(0, effectiveLimit));
 
       mcpLog(LOG_LEVELS.DEBUG, 'Primary workspace search completed', {
         method: 'searchProjects',
         query,
         primaryWorkspaceId: workspaceId,
-        primaryMatches: primaryMatches.length
+        primaryMatches: primaryMatches.length,
+        keptMatches: allMatchingProjects.length
       });
 
       // If we haven't reached the limit, search other workspaces
@@ -1404,20 +1428,30 @@ export class MotionApiService {
             if (allMatchingProjects.length >= effectiveLimit) break;
 
             try {
+              // Calculate fetch limit before API call (defense-in-depth)
+              const fetchLimit = calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit);
+              if (fetchLimit <= 0) break;
+
               mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for projects', {
                 method: 'searchProjects',
                 query,
                 searchingWorkspaceId: workspace.id,
-                searchingWorkspaceName: workspace.name
+                searchingWorkspaceName: workspace.name,
+                remainingNeeded: effectiveLimit - allMatchingProjects.length
               });
 
-              const workspaceProjects = await this.getProjects(workspace.id, LIMITS.MAX_PAGES);
+              const workspaceProjects = await this.getProjects(workspace.id, {
+                maxPages: LIMITS.MAX_PAGES,
+                limit: fetchLimit
+              });
               const workspaceMatches = workspaceProjects.filter(project =>
                 project.name?.toLowerCase().includes(lowerQuery) ||
                 project.description?.toLowerCase().includes(lowerQuery)
               );
 
-              allMatchingProjects.push(...workspaceMatches);
+              // Only add as many as we still need
+              const remaining = effectiveLimit - allMatchingProjects.length;
+              allMatchingProjects.push(...workspaceMatches.slice(0, remaining));
 
               if (workspaceMatches.length > 0) {
                 mcpLog(LOG_LEVELS.DEBUG, 'Found additional matches in workspace', {
@@ -1425,7 +1459,8 @@ export class MotionApiService {
                   query,
                   workspaceId: workspace.id,
                   workspaceName: workspace.name,
-                  matches: workspaceMatches.length
+                  matches: workspaceMatches.length,
+                  keptMatches: Math.min(workspaceMatches.length, remaining)
                 });
               }
             } catch (workspaceError: unknown) {
@@ -1448,19 +1483,15 @@ export class MotionApiService {
         }
       }
 
-      // Apply final limit and return results
-      const finalResults = allMatchingProjects.slice(0, effectiveLimit);
-
+      // Results are already limited during collection, no need to slice again
       mcpLog(LOG_LEVELS.INFO, 'Project search completed across all workspaces', {
         method: 'searchProjects',
         query,
-        totalMatches: allMatchingProjects.length,
-        returnedResults: finalResults.length,
-        limit: effectiveLimit,
-        crossWorkspaceSearch: allMatchingProjects.length > primaryMatches.length
+        returnedResults: allMatchingProjects.length,
+        limit: effectiveLimit
       });
 
-      return finalResults;
+      return allMatchingProjects;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to search projects', {
         method: 'searchProjects',
@@ -1782,8 +1813,7 @@ export class MotionApiService {
         this.client.delete(`/projects/${projectId}/custom-fields/${fieldId}`)
       );
       
-      // TODO: Invalidate project cache for specific workspace when project data is available
-      // For now, invalidate all project caches
+      // Invalidate all project caches since we don't have workspace context here
       this.projectCache.invalidate(`projects:`);
       
       mcpLog(LOG_LEVELS.INFO, 'Custom field removed from project successfully', {
@@ -1831,11 +1861,8 @@ export class MotionApiService {
         this.client.post(`/tasks/${taskId}/custom-fields`, requestData)
       );
       
-      // TODO: Invalidate task cache when implemented
-      // if (response.data?.workspaceId) {
-      //   this.taskCache.invalidate(`tasks:workspace:${response.data.workspaceId}`);
-      // }
-      
+      // Note: No task cache currently implemented - tasks are not cached due to frequent updates
+
       mcpLog(LOG_LEVELS.INFO, 'Custom field added to task successfully', {
         method: 'addCustomFieldToTask',
         taskId,
@@ -1874,9 +1901,8 @@ export class MotionApiService {
         this.client.delete(`/tasks/${taskId}/custom-fields/${fieldId}`)
       );
       
-      // TODO: Invalidate task cache when implemented
-      // this.taskCache.invalidate(`tasks:`);
-      
+      // Note: No task cache currently implemented - tasks are not cached due to frequent updates
+
       mcpLog(LOG_LEVELS.INFO, 'Custom field removed from task successfully', {
         method: 'removeCustomFieldFromTask',
         taskId,
@@ -1904,18 +1930,20 @@ export class MotionApiService {
   /**
    * Fetch recurring tasks from Motion API with automatic pagination
    * @param workspaceId - Optional workspace ID to filter recurring tasks
-   * @param maxPages - Maximum number of pages to fetch (default: 10)
+   * @param options - Optional configuration for maxPages and limit
    * @returns Array of recurring tasks from all pages
    */
-  async getRecurringTasks(workspaceId?: string, maxPages: number = 10): Promise<MotionRecurringTask[]> {
+  async getRecurringTasks(workspaceId?: string, options?: { maxPages?: number; limit?: number }): Promise<MotionRecurringTask[]> {
+    const { maxPages = 10, limit } = options || {};
     const cacheKey = workspaceId ? `recurring-tasks:workspace:${workspaceId}` : 'recurring-tasks:all';
-    
+
     return this.recurringTaskCache.withCache(cacheKey, async () => {
       try {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching recurring tasks from Motion API with pagination', {
           method: 'getRecurringTasks',
           workspaceId,
-          maxPages
+          maxPages,
+          limit
         });
 
         // Create a fetch function for pagination utility
@@ -1923,17 +1951,18 @@ export class MotionApiService {
           const params = new URLSearchParams();
           if (workspaceId) params.append('workspaceId', workspaceId);
           if (cursor) params.append('cursor', cursor);
-          
+
           const queryString = params.toString();
           const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
-          
+
           return this.requestWithRetry(() => this.client.get(url));
         };
 
         // Use pagination utility to fetch all pages
-        const paginatedResult = await fetchAllPagesNew<MotionRecurringTask>(fetchPage, 'recurring-tasks', { 
-          maxPages, 
-          logProgress: true 
+        const paginatedResult = await fetchAllPagesNew<MotionRecurringTask>(fetchPage, 'recurring-tasks', {
+          maxPages,
+          logProgress: true,
+          ...(limit ? { maxItems: limit } : {})
         });
         
         mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully with pagination', {
@@ -2259,10 +2288,14 @@ export class MotionApiService {
           }
 
           try {
-            // Get all tasks from this workspace (all projects)
+            // Calculate fetch limit before API call (defense-in-depth)
+            const fetchLimit = calculateAdaptiveFetchLimit(allUncompletedTasks.length, effectiveLimit);
+            if (fetchLimit <= 0) break;
+
+            // Get tasks from this workspace with adaptive limit
             const workspaceTasks = await this.getTasks({
               workspaceId: workspace.id,
-              limit: effectiveLimit,
+              limit: fetchLimit,
               maxPages: LIMITS.MAX_PAGES
             });
 
@@ -2274,7 +2307,9 @@ export class MotionApiService {
               return !task.status.isResolvedStatus; // Object status with isResolvedStatus false
             });
 
-            allUncompletedTasks.push(...uncompletedTasks);
+            // Only add as many as we still need
+            const remaining = effectiveLimit - allUncompletedTasks.length;
+            allUncompletedTasks.push(...uncompletedTasks.slice(0, remaining));
 
             if (uncompletedTasks.length > 0) {
               mcpLog(LOG_LEVELS.DEBUG, 'Found uncompleted tasks in workspace', {
@@ -2282,6 +2317,7 @@ export class MotionApiService {
                 workspaceId: workspace.id,
                 workspaceName: workspace.name,
                 uncompletedTasks: uncompletedTasks.length,
+                keptTasks: Math.min(uncompletedTasks.length, remaining),
                 totalTasks: workspaceTasks.length
               });
             }
@@ -2303,17 +2339,14 @@ export class MotionApiService {
         throw workspaceListError;
       }
 
-      // Apply final limit and return results
-      const finalResults = allUncompletedTasks.slice(0, effectiveLimit);
-
+      // Results are already limited during collection, no need to slice again
       mcpLog(LOG_LEVELS.INFO, 'All uncompleted tasks fetched successfully', {
         method: 'getAllUncompletedTasks',
-        totalFound: allUncompletedTasks.length,
-        returned: finalResults.length,
+        returned: allUncompletedTasks.length,
         limit: effectiveLimit
       });
 
-      return finalResults;
+      return allUncompletedTasks;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch all uncompleted tasks', {
         method: 'getAllUncompletedTasks',
