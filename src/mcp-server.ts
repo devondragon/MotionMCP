@@ -16,7 +16,7 @@ import { HandlerFactory } from './handlers/HandlerFactory';
 import { ToolRegistry, ToolConfigurator } from './tools';
 import * as dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 class MotionMCPServer {
   private server: Server;
