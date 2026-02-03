@@ -50,7 +50,7 @@ export async function fetchAllPages<T>(
   
   while (hasMore && pageCount < absoluteMaxPages) {
     // Pre-fetch early termination: skip fetch if we've already reached maxItems
-    if (maxItems && allItems.length >= maxItems) {
+    if (allItems.length >= maxItems) {
       hasMore = false;
       break;
     }
