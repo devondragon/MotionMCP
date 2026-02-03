@@ -49,15 +49,21 @@ export async function fetchAllPages<T>(
   const absoluteMaxPages = Math.min(maxPages, LIMITS.ABSOLUTE_MAX_PAGES); // Hard limit to prevent infinite loops
   
   while (hasMore && pageCount < absoluteMaxPages) {
+    // Pre-fetch early termination: skip fetch if we've already reached maxItems
+    if (maxItems && allItems.length >= maxItems) {
+      hasMore = false;
+      break;
+    }
+
     try {
       if (logProgress && pageCount > 0) {
-        mcpLog(LOG_LEVELS.DEBUG, `Fetching page ${pageCount + 1} for ${apiEndpoint}`, { 
+        mcpLog(LOG_LEVELS.DEBUG, `Fetching page ${pageCount + 1} for ${apiEndpoint}`, {
           cursor,
           pageCount,
           itemsSoFar: allItems.length
         });
       }
-      
+
       const response = await fetchPage(cursor);
       const unwrapped = unwrapApiResponse<T>(response.data, apiEndpoint);
       
