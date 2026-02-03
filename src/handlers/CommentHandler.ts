@@ -33,12 +33,9 @@ export class CommentHandler extends BaseHandler {
 
     // Add pagination info if there's more data
     if (commentsResponse.meta.nextCursor && commentsResult.content[0]) {
-      function hasTextProperty(obj: unknown): obj is { text: string } {
-        return typeof obj === 'object' && obj !== null && 'text' in obj && typeof (obj as any).text === 'string';
-      }
-
-      if (hasTextProperty(commentsResult.content[0])) {
-        commentsResult.content[0].text += `\n\n📄 More comments available. Use cursor: ${commentsResponse.meta.nextCursor}`;
+      const firstContent = commentsResult.content[0];
+      if ('text' in firstContent && typeof firstContent.text === 'string') {
+        firstContent.text += `\n\n📄 More comments available. Use cursor: ${commentsResponse.meta.nextCursor}`;
       }
     }
 
