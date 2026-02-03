@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.2] - 2026-02-03
+
+### 📦 Dependencies
+
+- **dotenv**: Upgraded from v16 to v17.2.3
+  - Added `quiet: true` option to maintain MCP stdio protocol compatibility
+- **@types/node**: Updated to 24.10.10
+
 ## [2.2.1] - 2026-02-03
 
 ### 🚀 Performance Improvements
