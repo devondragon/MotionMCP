@@ -1,6 +1,6 @@
 {
   "name": "motionmcp",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "MCP server for Motion API integration - manage projects, tasks, and workspaces from LLMs",
   "main": "dist/mcp-server.js",
   "bin": {
