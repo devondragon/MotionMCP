@@ -2,12 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.3] - 2026-02-18
+
+### 🐛 Bug Fixes
+
+- **Assignee filtering for list_all_uncompleted**: The `list_all_uncompleted` operation now supports `assignee` and `assigneeId` parameters, including the `'me'` shortcut. Previously these were silently ignored, returning all users' tasks instead of the requested assignee's tasks. (#58, closes #59)
+- **dotenv config**: Removed invalid `quiet: true` option from `dotenv.config()` that caused a TypeScript build error after the v17 upgrade
+
+### 🔧 Technical Improvements
+
+- **Shared assignee resolution**: Extracted duplicated assignee resolution logic from `handleList` and `handleListAllUncompleted` into a reusable `resolveAssignee()` private method. Supports single-workspace and cross-workspace name lookups via an optional `workspaceId` parameter.
+
 ## [2.2.2] - 2026-02-03
 
 ### 📦 Dependencies
 
 - **dotenv**: Upgraded from v16 to v17.2.3
-  - Added `quiet: true` option to maintain MCP stdio protocol compatibility
 - **@types/node**: Updated to 24.10.10
 
 ## [2.2.1] - 2026-02-03
