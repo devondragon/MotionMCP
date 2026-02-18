@@ -2261,11 +2261,12 @@ export class MotionApiService {
    * Get all uncompleted tasks across all workspaces and projects
    * Filters tasks where status.isResolvedStatus is false or undefined
    */
-  async getAllUncompletedTasks(limit?: number): Promise<MotionTask[]> {
+  async getAllUncompletedTasks(limit?: number, assigneeId?: string): Promise<MotionTask[]> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching all uncompleted tasks across workspaces', {
         method: 'getAllUncompletedTasks',
-        limit
+        limit,
+        assigneeId
       });
 
       // Apply limit to prevent resource exhaustion
@@ -2295,6 +2296,7 @@ export class MotionApiService {
             // Get tasks from this workspace with adaptive limit
             const workspaceTasks = await this.getTasks({
               workspaceId: workspace.id,
+              assigneeId,
               limit: fetchLimit,
               maxPages: LIMITS.MAX_PAGES
             });

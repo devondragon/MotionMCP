@@ -78,6 +78,8 @@ interface UnassignTaskParams {
 
 /** Parameters for listing all uncompleted tasks across workspaces */
 interface ListAllUncompletedParams {
+  assigneeId?: string;
+  assignee?: string;
   limit?: number;
 }
 
@@ -433,10 +435,48 @@ export class TaskHandler extends BaseHandler {
    * @returns Formatted list of uncompleted tasks from all workspaces
    */
   private async handleListAllUncompleted(params: ListAllUncompletedParams): Promise<McpToolResponse> {
-    const tasks = await this.motionService.getAllUncompletedTasks(params.limit);
+    let resolvedAssigneeId = params.assigneeId;
+    let assigneeDisplay: string | undefined = params.assignee;
+
+    const normalizeDisplayFromUser = (user: { name?: string; email?: string; id: string }) => {
+      return user.name || user.email || user.id;
+    };
+
+    const resolveCurrentUser = async () => {
+      const currentUser = await this.motionService.getCurrentUser();
+      resolvedAssigneeId = currentUser.id;
+      assigneeDisplay = normalizeDisplayFromUser(currentUser);
+    };
+
+    if (resolvedAssigneeId) {
+      if (resolvedAssigneeId.toLowerCase() === 'me') {
+        await resolveCurrentUser();
+      }
+    } else if (params.assignee) {
+      const assigneeInput = params.assignee.trim();
+      if (assigneeInput.toLowerCase() === 'me') {
+        await resolveCurrentUser();
+      } else {
+        // For cross-workspace lookup, resolve against all workspaces
+        const workspaces = await this.motionService.getWorkspaces();
+        let resolvedUser: { id: string; name?: string; email?: string } | undefined;
+        for (const ws of workspaces) {
+          resolvedUser = await this.motionService.resolveUserIdentifier({ userName: assigneeInput }, ws.id);
+          if (resolvedUser) break;
+        }
+        if (!resolvedUser) {
+          return this.handleError(new Error(`Assignee "${assigneeInput}" not found in any workspace`));
+        }
+        resolvedAssigneeId = resolvedUser.id;
+        assigneeDisplay = normalizeDisplayFromUser(resolvedUser);
+      }
+    }
+
+    const tasks = await this.motionService.getAllUncompletedTasks(params.limit, resolvedAssigneeId);
 
     return formatTaskList(tasks, {
       status: 'uncompleted',
+      assigneeName: assigneeDisplay || resolvedAssigneeId,
       limit: params.limit,
       allWorkspaces: true
     });
