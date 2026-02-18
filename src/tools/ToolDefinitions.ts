@@ -98,11 +98,11 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       assigneeId: {
         type: "string",
-        description: "Filter by assignee (for list)"
+        description: "Filter by assignee (for list and list_all_uncompleted)"
       },
       assignee: {
         type: "string",
-        description: "Filter by assignee name, email, or 'me' shortcut (for list). Resolved to an ID automatically"
+        description: "Filter by assignee name, email, or 'me' shortcut (for list and list_all_uncompleted). Resolved to an ID automatically"
       },
       priority: {
         type: "string",

@@ -78,6 +78,8 @@ interface UnassignTaskParams {
 
 /** Parameters for listing all uncompleted tasks across workspaces */
 interface ListAllUncompletedParams {
+  assigneeId?: string;
+  assignee?: string;
   limit?: number;
 }
 
@@ -260,36 +262,8 @@ export class TaskHandler extends BaseHandler {
       return this.handleError(new Error('Labels must be an array of non-empty strings'));
     }
 
-    let resolvedAssigneeId = params.assigneeId;
-    let assigneeDisplay: string | undefined = params.assignee;
-
-    const normalizeDisplayFromUser = (user: { name?: string; email?: string; id: string }) => {
-      return user.name || user.email || user.id;
-    };
-
-    const resolveCurrentUser = async () => {
-      const currentUser = await this.motionService.getCurrentUser();
-      resolvedAssigneeId = currentUser.id;
-      assigneeDisplay = normalizeDisplayFromUser(currentUser);
-    };
-
-    if (resolvedAssigneeId) {
-      if (resolvedAssigneeId.toLowerCase() === 'me') {
-        await resolveCurrentUser();
-      }
-    } else if (params.assignee) {
-      const assigneeInput = params.assignee.trim();
-      if (assigneeInput.toLowerCase() === 'me') {
-        await resolveCurrentUser();
-      } else {
-        const user = await this.motionService.resolveUserIdentifier({ userName: assigneeInput }, workspace.id);
-        if (!user) {
-          return this.handleError(new Error(`Assignee "${assigneeInput}" not found in any workspace`));
-        }
-        resolvedAssigneeId = user.id;
-        assigneeDisplay = normalizeDisplayFromUser(user);
-      }
-    }
+    const { resolvedId: resolvedAssigneeId, display: assigneeDisplay } =
+      await this.resolveAssignee(params.assigneeId, params.assignee, workspace.id);
 
     const tasks = await this.motionService.getTasks({
       workspaceId: workspace.id,
@@ -433,13 +407,73 @@ export class TaskHandler extends BaseHandler {
    * @returns Formatted list of uncompleted tasks from all workspaces
    */
   private async handleListAllUncompleted(params: ListAllUncompletedParams): Promise<McpToolResponse> {
-    const tasks = await this.motionService.getAllUncompletedTasks(params.limit);
+    const { resolvedId, display } =
+      await this.resolveAssignee(params.assigneeId, params.assignee);
+
+    const tasks = await this.motionService.getAllUncompletedTasks(params.limit, resolvedId);
 
     return formatTaskList(tasks, {
       status: 'uncompleted',
+      assigneeName: display || resolvedId,
       limit: params.limit,
       allWorkspaces: true
     });
+  }
+
+  /**
+   * Resolves assignee parameters into a concrete user ID and display name.
+   * Supports the 'me' shortcut (in either assigneeId or assignee), name/email lookup,
+   * and direct ID passthrough. When no workspaceId is provided, name lookups search
+   * across all workspaces.
+   *
+   * @param assigneeId - Direct user ID or the literal 'me'
+   * @param assignee - User name, email, or the literal 'me'
+   * @param workspaceId - Workspace to search for name lookups; omit for cross-workspace search
+   * @returns Resolved user ID and human-readable display name
+   */
+  private async resolveAssignee(
+    assigneeId?: string,
+    assignee?: string,
+    workspaceId?: string
+  ): Promise<{ resolvedId?: string; display?: string }> {
+    const displayFromUser = (user: { name?: string; email?: string; id: string }) =>
+      user.name || user.email || user.id;
+
+    if (assigneeId) {
+      if (assigneeId.toLowerCase() === 'me') {
+        const currentUser = await this.motionService.getCurrentUser();
+        return { resolvedId: currentUser.id, display: displayFromUser(currentUser) };
+      }
+      return { resolvedId: assigneeId, display: assignee };
+    }
+
+    if (assignee) {
+      const input = assignee.trim();
+      if (input.toLowerCase() === 'me') {
+        const currentUser = await this.motionService.getCurrentUser();
+        return { resolvedId: currentUser.id, display: displayFromUser(currentUser) };
+      }
+
+      if (workspaceId) {
+        const user = await this.motionService.resolveUserIdentifier({ userName: input }, workspaceId);
+        if (!user) {
+          throw new Error(`Assignee "${input}" not found in any workspace`);
+        }
+        return { resolvedId: user.id, display: displayFromUser(user) };
+      }
+
+      // Cross-workspace lookup
+      const workspaces = await this.motionService.getWorkspaces();
+      for (const ws of workspaces) {
+        const user = await this.motionService.resolveUserIdentifier({ userName: input }, ws.id);
+        if (user) {
+          return { resolvedId: user.id, display: displayFromUser(user) };
+        }
+      }
+      throw new Error(`Assignee "${input}" not found in any workspace`);
+    }
+
+    return {};
   }
 
   /**
