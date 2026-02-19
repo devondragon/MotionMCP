@@ -405,6 +405,9 @@ export class MotionApiService {
         workspaceCount: allWorkspaces.length
       });
 
+      if (aggregateTruncation) {
+        aggregateTruncation.returnedCount = allProjects.length;
+      }
       return { items: allProjects, truncation: aggregateTruncation };
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects from all workspaces', {
