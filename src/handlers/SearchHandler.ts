@@ -64,7 +64,7 @@ export class SearchHandler extends BaseHandler {
     if (entityTypes.includes('tasks')) {
       const { items: tasks, truncation } = await this.motionService.searchTasks(args.query, workspace.id, limit);
       results.push(...tasks);
-      if (truncation?.wasTruncated) {
+      if (truncation?.wasTruncated && !mergedTruncation) {
         mergedTruncation = truncation;
       }
     }
@@ -72,13 +72,16 @@ export class SearchHandler extends BaseHandler {
     if (entityTypes.includes('projects')) {
       const { items: projects, truncation } = await this.motionService.searchProjects(args.query, workspace.id, limit);
       results.push(...projects);
-      if (truncation?.wasTruncated) {
+      if (truncation?.wasTruncated && !mergedTruncation) {
         mergedTruncation = truncation;
       }
     }
 
     const slicedResults = results.slice(0, limit);
-    if (mergedTruncation) {
+    if (results.length > limit) {
+      // Combined results exceeded limit — report truncation for the combined result
+      mergedTruncation = { wasTruncated: true, returnedCount: slicedResults.length, reason: 'max_items', limit };
+    } else if (mergedTruncation) {
       mergedTruncation.returnedCount = slicedResults.length;
     }
 
