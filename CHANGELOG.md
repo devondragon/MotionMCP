@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2026-02-19
+
+### 🚀 New Features
+
+- **Truncation notices for MCP clients**: When paginated API responses are incomplete, MCP clients now receive a human-readable `Note:` in the response explaining that results were limited and suggesting filters to narrow results. Previously, truncation warnings only appeared in stderr logs, leaving LLMs unaware when data was incomplete. (#54, #62)
+  - New `TruncationInfo` and `ListResult<T>` types propagate truncation metadata from the pagination layer through services to formatters
+  - Three truncation reasons tracked: `page_size_limit`, `max_items`, `max_pages`
+  - Notices follow the existing `\n\nNote:` response pattern
+
+### 🐛 Bug Fixes
+
+- **Truncation aggregation in multi-workspace methods**: Fixed a bug where iterating multiple workspaces would overwrite earlier truncation info with later results. If workspace A was truncated but workspace B was not, the truncation notice could be lost. Now the first truncation is preserved across `getAllProjects`, `searchTasks`, `searchProjects`, and `getAllUncompletedTasks`.
+- **Stale truncation notices from cache**: `projectCache` and `recurringTaskCache` no longer store truncation metadata. Previously, cached `ListResult<T>` values could serve stale "there may be more items" notices after the underlying data changed. Cache now stores only item arrays; truncation is only reported on fresh fetches.
+- **SearchHandler combined truncation mismatch**: When both task and project searches returned truncated results, only the last search's truncation was preserved. Now the first truncation is kept, and when combined results exceed the limit after slicing, a proper `max_items` truncation is reported.
+- **`getAllProjects` returnedCount underreported**: The `returnedCount` in aggregate truncation was captured mid-loop when the first truncation was encountered, but subsequent workspaces kept adding items. Added a final count update before returning, matching the pattern in `searchTasks`/`searchProjects`.
+- **dotenv v17 stdout pollution**: Restored `quiet: true` in `dotenv.config()` to suppress the stdout banner that dotenv v17 writes by default. This banner was corrupting the MCP JSON-RPC stdio transport.
+
+### 🔧 Technical Improvements
+
+- **Formatter refactoring**: `formatTaskList`, `formatSearchResults`, and `formatRecurringTaskList` no longer mutate `CallToolResult` content arrays with type assertions. They now build text strings first and pass to `formatMcpSuccess`, matching the pattern used by `formatProjectList`.
+
+### 📦 Dependencies
+
+- **@modelcontextprotocol/sdk**: 1.25.3 → 1.26.0 (security fix for cross-client data leak)
+- **axios**: 1.13.4 → 1.13.5 (security fix for DoS via `__proto__` key)
+- **qs**: 6.14.1 → 6.14.2 (security fix for arrayLimit bypass)
+- **ajv**: 8.17.1 → 8.18.0 (security fix for ReDoS)
+- **dotenv**: 17.2.3 → 17.3.1
+- **@types/node**: 24.10.10 → 24.10.13
+
+### 🧪 Testing
+
+- **Regression test**: Added `stdio-safety.spec.ts` to prevent the dotenv `quiet: true` flag from being removed again.
+
 ## [2.2.4] - 2026-02-18
 
 ### 🐛 Bug Fixes
