@@ -144,15 +144,10 @@ export function formatTaskList(
   }
   if (limit) title += ` (limit: ${limit})`;
 
-  const result = formatListResponse(tasks, title, taskFormatter);
-  const notice = formatTruncationNotice(truncation);
-  if (notice && result.content && Array.isArray(result.content)) {
-    const textItem = result.content.find(item => item.type === 'text');
-    if (textItem && 'text' in textItem) {
-      (textItem as { type: 'text'; text: string }).text += notice;
-    }
-  }
-  return result;
+  const list = tasks.map(taskFormatter).join('\n');
+  let responseText = `${title}:\n${list}`;
+  responseText += formatTruncationNotice(truncation);
+  return formatMcpSuccess(responseText);
 }
 
 /**
@@ -257,15 +252,10 @@ export function formatSearchResults(
   if (limit) title += ` (Limit: ${limit})`;
   if (searchScope) title += ` (Scope: ${searchScope})`;
 
-  const result = formatListResponse(results, title, resultFormatter);
-  const notice = formatTruncationNotice(truncation);
-  if (notice && result.content && Array.isArray(result.content)) {
-    const textItem = result.content.find(item => item.type === 'text');
-    if (textItem && 'text' in textItem) {
-      (textItem as { type: 'text'; text: string }).text += notice;
-    }
-  }
-  return result;
+  const list = results.map(resultFormatter).join('\n');
+  let responseText = `${title}:\n${list}`;
+  responseText += formatTruncationNotice(truncation);
+  return formatMcpSuccess(responseText);
 }
 
 /**
@@ -367,15 +357,11 @@ export function formatRecurringTaskList(tasks: MotionRecurringTask[], truncation
     return `- ${task.name} (ID: ${task.id}) [${task.priority}] (Project: ${projectName})`;
   };
 
-  const result = formatListResponse(tasks, `Found ${tasks.length} recurring task${tasks.length === 1 ? '' : 's'}`, taskFormatter);
-  const notice = formatTruncationNotice(truncation);
-  if (notice && result.content && Array.isArray(result.content)) {
-    const textItem = result.content.find(item => item.type === 'text');
-    if (textItem && 'text' in textItem) {
-      (textItem as { type: 'text'; text: string }).text += notice;
-    }
-  }
-  return result;
+  const title = `Found ${tasks.length} recurring task${tasks.length === 1 ? '' : 's'}`;
+  const list = tasks.map(taskFormatter).join('\n');
+  let responseText = `${title}:\n${list}`;
+  responseText += formatTruncationNotice(truncation);
+  return formatMcpSuccess(responseText);
 }
 
 /**
