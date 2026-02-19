@@ -2,12 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.4] - 2026-02-18
+
+### 🐛 Bug Fixes
+
+- **MCP stdio transport corruption**: Restored `quiet: true` in `dotenv.config()` to suppress the stdout banner that dotenv v17 writes by default. This banner (`[dotenv@17.2.3] injecting env...`) was corrupting the MCP JSON-RPC stdio transport, causing `"not valid JSON"` parse errors in MCP clients like Claude Desktop. The flag was originally added in 2.2.2 but accidentally removed in 2.2.3.
+
+### 🧪 Testing
+
+- **Regression test**: Added `stdio-safety.spec.ts` with source-code and runtime assertions to prevent the `quiet: true` flag from being removed again.
+
 ## [2.2.3] - 2026-02-18
 
 ### 🐛 Bug Fixes
 
 - **Assignee filtering for list_all_uncompleted**: The `list_all_uncompleted` operation now supports `assignee` and `assigneeId` parameters, including the `'me'` shortcut. Previously these were silently ignored, returning all users' tasks instead of the requested assignee's tasks. (#58, closes #59)
-- **dotenv config**: Removed invalid `quiet: true` option from `dotenv.config()` that caused a TypeScript build error after the v17 upgrade
+- **dotenv config**: Removed `quiet: true` option from `dotenv.config()` — this was a mistake; see 2.2.4 fix
 
 ### 🔧 Technical Improvements
 
