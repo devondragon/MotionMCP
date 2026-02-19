@@ -35,3 +35,15 @@ export interface McpToolRegistry {
     handler: McpToolHandler;
   };
 }
+
+export interface TruncationInfo {
+  wasTruncated: boolean;
+  returnedCount: number;
+  reason?: 'page_size_limit' | 'max_items' | 'max_pages';
+  limit?: number;
+}
+
+export interface ListResult<T> {
+  items: T[];
+  truncation?: TruncationInfo;
+}

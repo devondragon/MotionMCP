@@ -23,6 +23,7 @@ import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
 import { fetchAllPages as fetchAllPagesNew, calculateAdaptiveFetchLimit } from '../utils/paginationNew';
 import { unwrapApiResponse } from '../utils/responseWrapper';
+import { TruncationInfo, ListResult } from '../types/mcp';
 import { createUserFacingError, createErrorContext, UserFacingError } from '../utils/userFacingErrors';
 import { z } from 'zod';
 import { 
@@ -278,7 +279,7 @@ export class MotionApiService {
   // PROJECT API METHODS
   // ========================================
 
-  async getProjects(workspaceId: string, options?: { maxPages?: number; limit?: number }): Promise<MotionProject[]> {
+  async getProjects(workspaceId: string, options?: { maxPages?: number; limit?: number }): Promise<ListResult<MotionProject>> {
     const { maxPages = 5, limit } = options || {};
 
     // Validate limit parameter if provided
@@ -288,81 +289,89 @@ export class MotionApiService {
 
     const cacheKey = `projects:workspace:${workspaceId}`;
 
-    return this.projectCache.withCache(cacheKey, async () => {
-      try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from Motion API', {
-          method: 'getProjects',
-          workspaceId,
-          maxPages,
-          limit
-        });
+    // Check cache - return items only (no stale truncation info)
+    const cachedItems = this.projectCache.get(cacheKey);
+    if (cachedItems !== null) {
+      return { items: cachedItems };
+    }
 
-        // Create a fetch function for potential pagination
-        const fetchPage = async (cursor?: string) => {
-          const params = new URLSearchParams();
-          params.append('workspaceId', workspaceId);
-          if (cursor) {
-            params.append('cursor', cursor);
-          }
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from Motion API', {
+        method: 'getProjects',
+        workspaceId,
+        maxPages,
+        limit
+      });
 
-          const queryString = params.toString();
-          const url = `/projects?${queryString}`;
-
-          return this.requestWithRetry(() => this.client.get(url));
-        };
-
-        try {
-          // Attempt pagination-aware fetch with new response wrapper
-          const paginatedResult = await fetchAllPagesNew<MotionProject>(fetchPage, 'projects', {
-            maxPages,
-            logProgress: false,
-            ...(limit ? { maxItems: limit } : {})
-          });
-          
-          if (paginatedResult.totalFetched > 0) {
-            let projects = paginatedResult.items;
-            
-            mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully with pagination', {
-              method: 'getProjects',
-              totalCount: projects.length,
-              hasMore: paginatedResult.hasMore,
-              workspaceId
-            });
-
-            return projects;
-          }
-        } catch (paginationError) {
-          mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
-            method: 'getProjects',
-            error: paginationError instanceof Error ? paginationError.message : String(paginationError)
-          });
+      // Create a fetch function for potential pagination
+      const fetchPage = async (cursor?: string) => {
+        const params = new URLSearchParams();
+        params.append('workspaceId', workspaceId);
+        if (cursor) {
+          params.append('cursor', cursor);
         }
 
-        // Use new response wrapper for single page fallback
-        const response = await fetchPage();
-        const unwrapped = unwrapApiResponse<MotionProject>(response.data, 'projects');
-        let projects = unwrapped.data;
-        
-        mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully (single page)', {
-          method: 'getProjects',
-          count: projects.length,
-          workspaceId
+        const queryString = params.toString();
+        const url = `/projects?${queryString}`;
+
+        return this.requestWithRetry(() => this.client.get(url));
+      };
+
+      try {
+        // Attempt pagination-aware fetch with new response wrapper
+        const paginatedResult = await fetchAllPagesNew<MotionProject>(fetchPage, 'projects', {
+          maxPages,
+          logProgress: false,
+          ...(limit ? { maxItems: limit } : {})
         });
 
-        return projects;
-      } catch (error: unknown) {
-        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects', {
+        if (paginatedResult.totalFetched > 0) {
+          let projects = paginatedResult.items;
+
+          mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully with pagination', {
+            method: 'getProjects',
+            totalCount: projects.length,
+            hasMore: paginatedResult.hasMore,
+            workspaceId
+          });
+
+          // Cache only items, not truncation metadata
+          this.projectCache.set(cacheKey, projects);
+          return { items: projects, truncation: paginatedResult.truncation };
+        }
+      } catch (paginationError) {
+        mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
           method: 'getProjects',
-          error: getErrorMessage(error),
-          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+          error: paginationError instanceof Error ? paginationError.message : String(paginationError)
         });
-        throw this.formatApiError(error, 'fetch', 'project');
       }
-    });
+
+      // Use new response wrapper for single page fallback
+      const response = await fetchPage();
+      const unwrapped = unwrapApiResponse<MotionProject>(response.data, 'projects');
+      let projects = unwrapped.data;
+
+      mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully (single page)', {
+        method: 'getProjects',
+        count: projects.length,
+        workspaceId
+      });
+
+      // Cache only items
+      this.projectCache.set(cacheKey, projects);
+      return { items: projects };
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects', {
+        method: 'getProjects',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+      });
+      throw this.formatApiError(error, 'fetch', 'project');
+    }
   }
 
-  async getAllProjects(): Promise<MotionProject[]> {
+  async getAllProjects(): Promise<ListResult<MotionProject>> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching projects from all workspaces', {
         method: 'getAllProjects'
@@ -370,11 +379,15 @@ export class MotionApiService {
 
       const allWorkspaces = await this.getWorkspaces();
       const allProjects: MotionProject[] = [];
+      let aggregateTruncation: TruncationInfo | undefined;
 
       for (const workspace of allWorkspaces) {
         try {
-          const workspaceProjects = await this.getProjects(workspace.id);
-          allProjects.push(...workspaceProjects);
+          const { items, truncation } = await this.getProjects(workspace.id);
+          allProjects.push(...items);
+          if (truncation?.wasTruncated && !aggregateTruncation) {
+            aggregateTruncation = { ...truncation, returnedCount: allProjects.length };
+          }
         } catch (workspaceError: unknown) {
           // Log error but continue with other workspaces
           mcpLog(LOG_LEVELS.WARN, 'Failed to fetch projects from workspace', {
@@ -392,7 +405,10 @@ export class MotionApiService {
         workspaceCount: allWorkspaces.length
       });
 
-      return allProjects;
+      if (aggregateTruncation) {
+        aggregateTruncation.returnedCount = allProjects.length;
+      }
+      return { items: allProjects, truncation: aggregateTruncation };
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects from all workspaces', {
         method: 'getAllProjects',
@@ -545,7 +561,7 @@ export class MotionApiService {
   // TASK API METHODS
   // ========================================
 
-  async getTasks(options: GetTasksOptions): Promise<MotionTask[]> {
+  async getTasks(options: GetTasksOptions): Promise<ListResult<MotionTask>> {
     const {
       workspaceId,
       projectId,
@@ -631,7 +647,7 @@ export class MotionApiService {
             projectId,
             limitApplied: limit
           });
-          return paginatedResult.items;
+          return { items: paginatedResult.items, truncation: paginatedResult.truncation };
         }
       } catch (paginationError) {
         // Fallback to simple fetch if pagination fails
@@ -650,7 +666,7 @@ export class MotionApiService {
       if (limit && limit > 0) {
         tasks = tasks.slice(0, limit);
       }
-      
+
       mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully (single page)', {
         method: 'getTasks',
         count: tasks.length,
@@ -659,7 +675,7 @@ export class MotionApiService {
         limitApplied: limit
       });
 
-      return tasks;
+      return { items: tasks };
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch tasks', {
         method: 'getTasks',
@@ -1187,7 +1203,7 @@ export class MotionApiService {
       });
 
       // First, search in the specified workspace
-      const projects = await this.getProjects(workspaceId);
+      const { items: projects } = await this.getProjects(workspaceId);
       const project = projects.find(p => p.name === projectName);
 
       if (project) {
@@ -1219,7 +1235,7 @@ export class MotionApiService {
             searchingWorkspaceName: workspace.name
           });
 
-          const workspaceProjects = await this.getProjects(workspace.id);
+          const { items: workspaceProjects } = await this.getProjects(workspace.id);
           const foundProject = workspaceProjects.find(p => p.name === projectName);
 
           if (foundProject) {
@@ -1264,7 +1280,7 @@ export class MotionApiService {
     }
   }
 
-  async searchTasks(query: string, workspaceId: string, limit?: number): Promise<MotionTask[]> {
+  async searchTasks(query: string, workspaceId: string, limit?: number): Promise<ListResult<MotionTask>> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Searching tasks', {
         method: 'searchTasks',
@@ -1277,13 +1293,17 @@ export class MotionApiService {
       const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
       const lowerQuery = query.toLowerCase();
       const allMatchingTasks: MotionTask[] = [];
+      let aggregateTruncation: TruncationInfo | undefined;
 
       // First, search in the specified workspace
-      const primaryTasks = await this.getTasks({
+      const { items: primaryTasks, truncation: primaryTruncation } = await this.getTasks({
         workspaceId,
         limit: calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit),
         maxPages: LIMITS.MAX_PAGES
       });
+      if (primaryTruncation?.wasTruncated && !aggregateTruncation) {
+        aggregateTruncation = primaryTruncation;
+      }
       const primaryMatches = primaryTasks.filter(task =>
         task.name?.toLowerCase().includes(lowerQuery) ||
         task.description?.toLowerCase().includes(lowerQuery)
@@ -1321,11 +1341,14 @@ export class MotionApiService {
                 remainingNeeded: effectiveLimit - allMatchingTasks.length
               });
 
-              const workspaceTasks = await this.getTasks({
+              const { items: workspaceTasks, truncation: wsTruncation } = await this.getTasks({
                 workspaceId: workspace.id,
                 limit: fetchLimit,
                 maxPages: LIMITS.MAX_PAGES
               });
+              if (wsTruncation?.wasTruncated && !aggregateTruncation) {
+                aggregateTruncation = wsTruncation;
+              }
               const workspaceMatches = workspaceTasks.filter(task =>
                 task.name?.toLowerCase().includes(lowerQuery) ||
                 task.description?.toLowerCase().includes(lowerQuery)
@@ -1373,7 +1396,10 @@ export class MotionApiService {
         limit: effectiveLimit
       });
 
-      return allMatchingTasks;
+      if (aggregateTruncation) {
+        aggregateTruncation.returnedCount = allMatchingTasks.length;
+      }
+      return { items: allMatchingTasks, truncation: aggregateTruncation };
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to search tasks', {
         method: 'searchTasks',
@@ -1384,7 +1410,7 @@ export class MotionApiService {
     }
   }
 
-  async searchProjects(query: string, workspaceId: string, limit?: number): Promise<MotionProject[]> {
+  async searchProjects(query: string, workspaceId: string, limit?: number): Promise<ListResult<MotionProject>> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Searching projects', {
         method: 'searchProjects',
@@ -1397,12 +1423,16 @@ export class MotionApiService {
       const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
       const lowerQuery = query.toLowerCase();
       const allMatchingProjects: MotionProject[] = [];
+      let aggregateTruncation: TruncationInfo | undefined;
 
       // First, search in the specified workspace
-      const primaryProjects = await this.getProjects(workspaceId, {
+      const { items: primaryProjects, truncation: primaryTruncation } = await this.getProjects(workspaceId, {
         maxPages: LIMITS.MAX_PAGES,
         limit: calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit)
       });
+      if (primaryTruncation?.wasTruncated && !aggregateTruncation) {
+        aggregateTruncation = primaryTruncation;
+      }
       const primaryMatches = primaryProjects.filter(project =>
         project.name?.toLowerCase().includes(lowerQuery) ||
         project.description?.toLowerCase().includes(lowerQuery)
@@ -1440,10 +1470,13 @@ export class MotionApiService {
                 remainingNeeded: effectiveLimit - allMatchingProjects.length
               });
 
-              const workspaceProjects = await this.getProjects(workspace.id, {
+              const { items: workspaceProjects, truncation: wsTruncation } = await this.getProjects(workspace.id, {
                 maxPages: LIMITS.MAX_PAGES,
                 limit: fetchLimit
               });
+              if (wsTruncation?.wasTruncated && !aggregateTruncation) {
+                aggregateTruncation = wsTruncation;
+              }
               const workspaceMatches = workspaceProjects.filter(project =>
                 project.name?.toLowerCase().includes(lowerQuery) ||
                 project.description?.toLowerCase().includes(lowerQuery)
@@ -1491,7 +1524,10 @@ export class MotionApiService {
         limit: effectiveLimit
       });
 
-      return allMatchingProjects;
+      if (aggregateTruncation) {
+        aggregateTruncation.returnedCount = allMatchingProjects.length;
+      }
+      return { items: allMatchingProjects, truncation: aggregateTruncation };
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to search projects', {
         method: 'searchProjects',
@@ -1933,58 +1969,64 @@ export class MotionApiService {
    * @param options - Optional configuration for maxPages and limit
    * @returns Array of recurring tasks from all pages
    */
-  async getRecurringTasks(workspaceId?: string, options?: { maxPages?: number; limit?: number }): Promise<MotionRecurringTask[]> {
+  async getRecurringTasks(workspaceId?: string, options?: { maxPages?: number; limit?: number }): Promise<ListResult<MotionRecurringTask>> {
     const { maxPages = 10, limit } = options || {};
     const cacheKey = workspaceId ? `recurring-tasks:workspace:${workspaceId}` : 'recurring-tasks:all';
 
-    return this.recurringTaskCache.withCache(cacheKey, async () => {
-      try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching recurring tasks from Motion API with pagination', {
-          method: 'getRecurringTasks',
-          workspaceId,
-          maxPages,
-          limit
-        });
+    // Check cache - return items only (no stale truncation info)
+    const cachedItems = this.recurringTaskCache.get(cacheKey);
+    if (cachedItems !== null) {
+      return { items: cachedItems };
+    }
 
-        // Create a fetch function for pagination utility
-        const fetchPage = async (cursor?: string) => {
-          const params = new URLSearchParams();
-          if (workspaceId) params.append('workspaceId', workspaceId);
-          if (cursor) params.append('cursor', cursor);
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching recurring tasks from Motion API with pagination', {
+        method: 'getRecurringTasks',
+        workspaceId,
+        maxPages,
+        limit
+      });
 
-          const queryString = params.toString();
-          const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
+      // Create a fetch function for pagination utility
+      const fetchPage = async (cursor?: string) => {
+        const params = new URLSearchParams();
+        if (workspaceId) params.append('workspaceId', workspaceId);
+        if (cursor) params.append('cursor', cursor);
 
-          return this.requestWithRetry(() => this.client.get(url));
-        };
+        const queryString = params.toString();
+        const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
 
-        // Use pagination utility to fetch all pages
-        const paginatedResult = await fetchAllPagesNew<MotionRecurringTask>(fetchPage, 'recurring-tasks', {
-          maxPages,
-          logProgress: true,
-          ...(limit ? { maxItems: limit } : {})
-        });
-        
-        mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully with pagination', {
-          method: 'getRecurringTasks',
-          totalCount: paginatedResult.totalFetched,
-          pagesProcessed: Math.ceil(paginatedResult.totalFetched / 50), // Assuming ~50 items per page
-          hasMore: paginatedResult.hasMore,
-          workspaceId
-        });
+        return this.requestWithRetry(() => this.client.get(url));
+      };
 
-        return paginatedResult.items;
-      } catch (error: unknown) {
-        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch recurring tasks', {
-          method: 'getRecurringTasks',
-          error: getErrorMessage(error),
-          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-          workspaceId
-        });
-        throw this.formatApiError(error, 'fetch', 'recurring task');
-      }
-    });
+      // Use pagination utility to fetch all pages
+      const paginatedResult = await fetchAllPagesNew<MotionRecurringTask>(fetchPage, 'recurring-tasks', {
+        maxPages,
+        logProgress: true,
+        ...(limit ? { maxItems: limit } : {})
+      });
+
+      mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully with pagination', {
+        method: 'getRecurringTasks',
+        totalCount: paginatedResult.totalFetched,
+        pagesProcessed: Math.ceil(paginatedResult.totalFetched / 50), // Assuming ~50 items per page
+        hasMore: paginatedResult.hasMore,
+        workspaceId
+      });
+
+      // Cache only items, not truncation metadata
+      this.recurringTaskCache.set(cacheKey, paginatedResult.items);
+      return { items: paginatedResult.items, truncation: paginatedResult.truncation };
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch recurring tasks', {
+        method: 'getRecurringTasks',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
+        workspaceId
+      });
+      throw this.formatApiError(error, 'fetch', 'recurring task');
+    }
   }
 
   /**
@@ -2261,7 +2303,7 @@ export class MotionApiService {
    * Get all uncompleted tasks across all workspaces and projects
    * Filters tasks where status.isResolvedStatus is false or undefined
    */
-  async getAllUncompletedTasks(limit?: number, assigneeId?: string): Promise<MotionTask[]> {
+  async getAllUncompletedTasks(limit?: number, assigneeId?: string): Promise<ListResult<MotionTask>> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Fetching all uncompleted tasks across workspaces', {
         method: 'getAllUncompletedTasks',
@@ -2272,6 +2314,7 @@ export class MotionApiService {
       // Apply limit to prevent resource exhaustion
       const effectiveLimit = limit || LIMITS.MAX_SEARCH_RESULTS;
       const allUncompletedTasks: MotionTask[] = [];
+      let aggregateTruncation: TruncationInfo | undefined;
 
       try {
         // Get all workspaces
@@ -2294,12 +2337,15 @@ export class MotionApiService {
             if (fetchLimit <= 0) break;
 
             // Get tasks from this workspace with adaptive limit
-            const workspaceTasks = await this.getTasks({
+            const { items: workspaceTasks, truncation: wsTruncation } = await this.getTasks({
               workspaceId: workspace.id,
               assigneeId,
               limit: fetchLimit,
               maxPages: LIMITS.MAX_PAGES
             });
+            if (wsTruncation?.wasTruncated && !aggregateTruncation) {
+              aggregateTruncation = wsTruncation;
+            }
 
             // Filter for uncompleted tasks
             const uncompletedTasks = workspaceTasks.filter(task => {
@@ -2348,7 +2394,10 @@ export class MotionApiService {
         limit: effectiveLimit
       });
 
-      return allUncompletedTasks;
+      if (aggregateTruncation) {
+        aggregateTruncation.returnedCount = allUncompletedTasks.length;
+      }
+      return { items: allUncompletedTasks, truncation: aggregateTruncation };
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch all uncompleted tasks', {
         method: 'getAllUncompletedTasks',

@@ -1,5 +1,5 @@
 import { BaseHandler } from './base/BaseHandler';
-import { McpToolResponse } from '../types/mcp';
+import { McpToolResponse, TruncationInfo } from '../types/mcp';
 import { MotionSearchArgs } from '../types/mcp-tool-args';
 import { formatMcpSuccess, formatSearchResults, LIMITS } from '../utils';
 
@@ -59,20 +59,36 @@ export class SearchHandler extends BaseHandler {
     });
 
     let results: Array<any> = [];
+    let mergedTruncation: TruncationInfo | undefined;
 
     if (entityTypes.includes('tasks')) {
-      const tasks = await this.motionService.searchTasks(args.query, workspace.id, limit);
+      const { items: tasks, truncation } = await this.motionService.searchTasks(args.query, workspace.id, limit);
       results.push(...tasks);
+      if (truncation?.wasTruncated && !mergedTruncation) {
+        mergedTruncation = truncation;
+      }
     }
 
     if (entityTypes.includes('projects')) {
-      const projects = await this.motionService.searchProjects(args.query, workspace.id, limit);
+      const { items: projects, truncation } = await this.motionService.searchProjects(args.query, workspace.id, limit);
       results.push(...projects);
+      if (truncation?.wasTruncated && !mergedTruncation) {
+        mergedTruncation = truncation;
+      }
     }
 
-    return formatSearchResults(results.slice(0, limit), args.query, {
+    const slicedResults = results.slice(0, limit);
+    if (results.length > limit) {
+      // Combined results exceeded limit — report truncation for the combined result
+      mergedTruncation = { wasTruncated: true, returnedCount: slicedResults.length, reason: 'max_items', limit };
+    } else if (mergedTruncation) {
+      mergedTruncation.returnedCount = slicedResults.length;
+    }
+
+    return formatSearchResults(slicedResults, args.query, {
       limit,
-      searchScope: entityTypes.join(',') || 'both'
+      searchScope: entityTypes.join(',') || 'both',
+      truncation: mergedTruncation
     });
   }
 

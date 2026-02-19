@@ -9,7 +9,23 @@
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask, MotionSchedule, MotionScheduleDetails, MotionStatus } from '../types/motion';
+import { TruncationInfo } from '../types/mcp';
 import { LIMITS } from './constants';
+
+const TRUNCATION_REASON_MESSAGES: Record<string, string> = {
+  page_size_limit: 'due to page size limits',
+  max_items: 'due to the maximum item limit',
+  max_pages: 'due to the maximum page limit'
+};
+
+/**
+ * Format a human-readable truncation notice for MCP responses
+ */
+export function formatTruncationNotice(truncation?: TruncationInfo): string {
+  if (!truncation?.wasTruncated) return '';
+  const reason = truncation.reason ? TRUNCATION_REASON_MESSAGES[truncation.reason] || '' : '';
+  return `\n\nNote: Results were limited to ${truncation.returnedCount} items${reason ? ` (${reason})` : ''}. There may be additional items not shown. Try using filters to narrow your results.`;
+}
 
 /**
  * Format a list of items for MCP response
@@ -32,18 +48,19 @@ export function formatListResponse<T>(
 interface ProjectListOptions {
   includeWorkspaceNote?: boolean;
   showIds?: boolean;
+  truncation?: TruncationInfo;
 }
 
 /**
  * Format project list response with workspace context
  */
 export function formatProjectList(
-  projects: MotionProject[], 
-  workspaceName: string, 
-  workspaceId: string | null = null, 
+  projects: MotionProject[],
+  workspaceName: string,
+  workspaceId: string | null = null,
   options: ProjectListOptions = {}
 ): CallToolResult {
-  const { includeWorkspaceNote = false, showIds = true } = options;
+  const { includeWorkspaceNote = false, showIds = true, truncation } = options;
   
   const projectFormatter = (project: MotionProject) => {
     if (showIds) {
@@ -69,7 +86,9 @@ export function formatProjectList(
   if (includeWorkspaceNote && !workspaceId) {
     responseText += `\n\nNote: This shows projects from the default workspace. You can specify a different workspace using the workspaceId or workspaceName parameter, or use motion_workspaces (operation: list) to see all available workspaces.`;
   }
-  
+
+  responseText += formatTruncationNotice(truncation);
+
   return formatMcpSuccess(responseText);
 }
 
@@ -82,6 +101,7 @@ interface TaskListContext {
   dueDate?: string;
   limit?: number;
   allWorkspaces?: boolean;
+  truncation?: TruncationInfo;
 }
 
 /**
@@ -91,7 +111,7 @@ export function formatTaskList(
   tasks: MotionTask[],
   context: TaskListContext = {}
 ): CallToolResult {
-  const { workspaceName, projectName, status, assigneeName, priority, dueDate, limit, allWorkspaces } = context;
+  const { workspaceName, projectName, status, assigneeName, priority, dueDate, limit, allWorkspaces, truncation } = context;
   
   const taskFormatter = (task: MotionTask) => {
     let line = `- ${task.name}`;
@@ -123,8 +143,11 @@ export function formatTaskList(
     title += ` due by ${dueDateText}`;
   }
   if (limit) title += ` (limit: ${limit})`;
-  
-  return formatListResponse(tasks, title, taskFormatter);
+
+  const list = tasks.map(taskFormatter).join('\n');
+  let responseText = `${title}:\n${list}`;
+  responseText += formatTruncationNotice(truncation);
+  return formatMcpSuccess(responseText);
 }
 
 /**
@@ -201,6 +224,7 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
 interface SearchOptions {
   limit?: number;
   searchScope?: string;
+  truncation?: TruncationInfo;
 }
 
 interface SearchResult {
@@ -217,18 +241,21 @@ export function formatSearchResults(
   query: string, 
   options: SearchOptions = {}
 ): CallToolResult {
-  const { limit, searchScope } = options;
-  
+  const { limit, searchScope, truncation } = options;
+
   const resultFormatter = (result: SearchResult) => {
     const type = result.projectId ? "task" : "project";
     return `- [${type}] ${result.name} (ID: ${result.id})`;
   };
-  
+
   let title = `Search Results for "${query}"`;
   if (limit) title += ` (Limit: ${limit})`;
   if (searchScope) title += ` (Scope: ${searchScope})`;
-  
-  return formatListResponse(results, title, resultFormatter);
+
+  const list = results.map(resultFormatter).join('\n');
+  let responseText = `${title}:\n${list}`;
+  responseText += formatTruncationNotice(truncation);
+  return formatMcpSuccess(responseText);
 }
 
 /**
@@ -320,17 +347,21 @@ export function formatCustomFieldSuccess(operation: string, entityType?: string,
 /**
  * Format recurring task list response
  */
-export function formatRecurringTaskList(tasks: MotionRecurringTask[]): CallToolResult {
+export function formatRecurringTaskList(tasks: MotionRecurringTask[], truncation?: TruncationInfo): CallToolResult {
   if (tasks.length === 0) {
     return formatMcpSuccess("No recurring tasks found.");
   }
-  
+
   const taskFormatter = (task: MotionRecurringTask) => {
     const projectName = task.project?.name ?? 'No Project';
     return `- ${task.name} (ID: ${task.id}) [${task.priority}] (Project: ${projectName})`;
   };
-  
-  return formatListResponse(tasks, `Found ${tasks.length} recurring task${tasks.length === 1 ? '' : 's'}`, taskFormatter);
+
+  const title = `Found ${tasks.length} recurring task${tasks.length === 1 ? '' : 's'}`;
+  const list = tasks.map(taskFormatter).join('\n');
+  let responseText = `${title}:\n${list}`;
+  responseText += formatTruncationNotice(truncation);
+  return formatMcpSuccess(responseText);
 }
 
 /**

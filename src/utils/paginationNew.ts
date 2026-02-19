@@ -9,6 +9,7 @@ import { AxiosResponse } from 'axios';
 import { mcpLog } from './logger';
 import { LOG_LEVELS, LIMITS } from './constants';
 import { unwrapApiResponse, supportsPagination, UnwrappedResponse } from './responseWrapper';
+import { TruncationInfo } from '../types/mcp';
 // MotionPaginationMeta is imported from responseWrapper via UnwrappedResponse
 
 export interface PaginatedResponse<T> {
@@ -16,6 +17,7 @@ export interface PaginatedResponse<T> {
   nextCursor?: string;
   hasMore: boolean;
   totalFetched: number;
+  truncation?: TruncationInfo;
 }
 
 export interface CursorPaginationOptions {
@@ -44,6 +46,7 @@ export async function fetchAllPages<T>(
   let cursor: string | undefined;
   let pageCount = 0;
   let hasMore = true;
+  let truncation: TruncationInfo | undefined;
   
   // Infinite loop protection - ensure we never fetch more than absolute max pages
   const absoluteMaxPages = Math.min(maxPages, LIMITS.ABSOLUTE_MAX_PAGES); // Hard limit to prevent infinite loops
@@ -76,6 +79,7 @@ export async function fetchAllPages<T>(
           truncatedSize: LIMITS.MAX_PAGE_SIZE
         });
         unwrapped.data = unwrapped.data.slice(0, LIMITS.MAX_PAGE_SIZE);
+        truncation = { wasTruncated: true, returnedCount: 0, reason: 'page_size_limit', limit: LIMITS.MAX_PAGE_SIZE };
       }
       
       // Add items to our collection, but check memory limits first
@@ -86,14 +90,15 @@ export async function fetchAllPages<T>(
         if (remainingSlots > 0) {
           allItems.push(...itemsToAdd.slice(0, remainingSlots));
         }
-        
+
         mcpLog(LOG_LEVELS.WARN, `Memory limit reached for ${apiEndpoint}, stopping pagination`, {
           totalItems: allItems.length,
           maxItems,
           pageCount: pageCount + 1,
           endpoint: apiEndpoint
         });
-        
+
+        truncation = { wasTruncated: true, returnedCount: allItems.length, reason: 'max_items', limit: maxItems };
         hasMore = false;
       } else {
         allItems.push(...itemsToAdd);
@@ -154,13 +159,20 @@ export async function fetchAllPages<T>(
       totalItems: allItems.length,
       endpoint: apiEndpoint
     });
+    truncation = { wasTruncated: true, returnedCount: allItems.length, reason: 'max_pages', limit: absoluteMaxPages };
   }
-  
+
+  // Update returnedCount on page_size_limit truncation now that we know the final count
+  if (truncation?.reason === 'page_size_limit') {
+    truncation.returnedCount = allItems.length;
+  }
+
   return {
     items: allItems,
     nextCursor: cursor,
     hasMore: hasMore && pageCount < absoluteMaxPages,
-    totalFetched: allItems.length
+    totalFetched: allItems.length,
+    ...(truncation ? { truncation } : {})
   };
 }
 

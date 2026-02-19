@@ -265,7 +265,7 @@ export class TaskHandler extends BaseHandler {
     const { resolvedId: resolvedAssigneeId, display: assigneeDisplay } =
       await this.resolveAssignee(params.assigneeId, params.assignee, workspace.id);
 
-    const tasks = await this.motionService.getTasks({
+    const { items: tasks, truncation } = await this.motionService.getTasks({
       workspaceId: workspace.id,
       projectId: resolvedProjectId,
       status: params.status,
@@ -283,7 +283,8 @@ export class TaskHandler extends BaseHandler {
       assigneeName: assigneeDisplay || resolvedAssigneeId,
       priority: params.priority,
       dueDate: params.dueDate,
-      limit: params.limit
+      limit: params.limit,
+      truncation
     });
   }
 
@@ -410,13 +411,14 @@ export class TaskHandler extends BaseHandler {
     const { resolvedId, display } =
       await this.resolveAssignee(params.assigneeId, params.assignee);
 
-    const tasks = await this.motionService.getAllUncompletedTasks(params.limit, resolvedId);
+    const { items: tasks, truncation } = await this.motionService.getAllUncompletedTasks(params.limit, resolvedId);
 
     return formatTaskList(tasks, {
       status: 'uncompleted',
       assigneeName: display || resolvedId,
       limit: params.limit,
-      allWorkspaces: true
+      allWorkspaces: true,
+      truncation
     });
   }
 
