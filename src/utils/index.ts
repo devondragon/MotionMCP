@@ -25,3 +25,6 @@ export { WorkspaceResolver } from './workspaceResolver';
 
 // Export logger
 export { mcpLog } from './logger';
+
+// Export truncation types
+export { TruncationInfo, ListResult } from '../types/mcp';

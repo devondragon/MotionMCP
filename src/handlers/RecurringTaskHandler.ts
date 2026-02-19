@@ -28,8 +28,8 @@ export class RecurringTaskHandler extends BaseHandler {
     if (!args.workspaceId) {
       return this.handleError(new Error('Workspace ID is required for list operation'));
     }
-    const recurringTasks = await this.motionService.getRecurringTasks(args.workspaceId);
-    return formatRecurringTaskList(recurringTasks);
+    const { items: recurringTasks, truncation } = await this.motionService.getRecurringTasks(args.workspaceId);
+    return formatRecurringTaskList(recurringTasks, truncation);
   }
 
   private async handleCreate(args: MotionRecurringTasksArgs): Promise<McpToolResponse> {

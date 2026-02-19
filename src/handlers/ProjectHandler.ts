@@ -69,8 +69,8 @@ export class ProjectHandler extends BaseHandler {
   private async handleList(params: ListProjectParams): Promise<McpToolResponse> {
     // If allWorkspaces is true and no specific workspace is provided, list all projects
     if (params.allWorkspaces && !params.workspaceId && !params.workspaceName) {
-      const allProjects = await this.motionService.getAllProjects();
-      return formatProjectList(allProjects, 'All Workspaces');
+      const { items: allProjects, truncation } = await this.motionService.getAllProjects();
+      return formatProjectList(allProjects, 'All Workspaces', null, { truncation });
     }
 
     // Otherwise, use the existing single-workspace logic
@@ -79,8 +79,8 @@ export class ProjectHandler extends BaseHandler {
       workspaceName: params.workspaceName
     });
 
-    const projects = await this.motionService.getProjects(workspace.id);
-    return formatProjectList(projects, workspace.name);
+    const { items: projects, truncation } = await this.motionService.getProjects(workspace.id);
+    return formatProjectList(projects, workspace.name, null, { truncation });
   }
 
   private async handleGet(params: GetProjectParams): Promise<McpToolResponse> {
