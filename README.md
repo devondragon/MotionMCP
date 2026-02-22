@@ -3,15 +3,23 @@
 
 # Motion MCP Server
 
-An MCP (Model Context Protocol) server that gives LLMs direct access to the Motion API for projects, tasks, users, and more. Built in TypeScript with robust validation and consolidated tools to keep your client tool list lean.
+[Motion](https://www.usemotion.com/) is an AI-powered calendar and task management app that auto-schedules your work. This MCP server bridges Motion's API with LLMs like Claude and ChatGPT via the [Model Context Protocol](https://modelcontextprotocol.io/docs/), so you can manage tasks, search projects, check your schedule, and more — all through natural conversation. It works on desktop, web, and mobile.
 
-**Current version:** 2.3.0
+## Preview
 
-## Quick start (npx)
+<a href="sample.png"><img src="sample.png" alt="Motion MCP Server Preview" width="400" /></a>
 
-1. **Get your Motion API key** from [https://app.usemotion.com/settings/api](https://app.usemotion.com/settings/api)
+*Click the image above to view full size*
 
-2. **Add to Claude Desktop** - Update your `claude_desktop_config.json`:
+## Getting Started
+
+**Prerequisites:** Node.js 18+ and a [Motion API key](https://app.usemotion.com/settings/api).
+
+### Local Setup (npx)
+
+For desktop MCP clients — Claude Desktop, Claude Code, Cursor, and similar.
+
+Add to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -28,192 +36,100 @@ An MCP (Model Context Protocol) server that gives LLMs direct access to the Moti
 }
 ```
 
-3. **Test the server** - Or run directly from command line:
+Test from the command line:
 
 ```bash
-MOTION_API_KEY=your_motion_api_key npx motionmcp
+MOTION_API_KEY=your_api_key npx motionmcp
 ```
 
-> Tip: `npx` runs the latest published version.
+> **Tip:** `npx` always runs the latest published version — no install needed.
 
-## Preview
+### Remote Setup (Cloudflare Workers)
 
-<a href="sample.png"><img src="sample.png" alt="Motion MCP Server Preview" width="400" /></a>
+For mobile and web clients — Claude mobile/web, ChatGPT mobile/web, or any HTTP MCP client.
 
-*Click the image above to view full size*
+#### One-click deploy
 
-## Features
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/devondragon/MotionMCP)
 
-* MCP protocol support for seamless LLM integration
-* Motion API integration for projects, tasks, users, comments, custom fields, and recurring tasks
-* **Consolidated tools** to reduce tool count (minimal, essential, all, or custom)
-* Context utilities: semantic search and lightweight context summaries
-* API key via environment variable
-* Structured JSON logging
-* **TypeScript** with strong types, validation, and robust error handling
+After deploy, set your secrets in the Cloudflare dashboard (Workers > your worker > Settings > Variables):
+- `MOTION_API_KEY` — your Motion API key
+- `MOTION_MCP_SECRET` — a random string (generate with `openssl rand -hex 16`)
 
-## Prerequisites
-
-* Node.js 18 or higher
-
-## Tool Configuration
-
-The server supports configurable tool sets to stay within MCP client limits (~100 tools across all servers). Configure via the `MOTION_MCP_TOOLS` environment variable:
-
-### Configuration options
-
-#### Minimal (3 tools)
-Best for users who need only basic functionality and want to maximize room for other MCP servers.
+#### Manual deploy
 
 ```bash
-MOTION_MCP_TOOLS=minimal npx motionmcp
+# Set secrets
+npx wrangler secret put MOTION_API_KEY
+npx wrangler secret put MOTION_MCP_SECRET   # use: openssl rand -hex 16
+
+# Deploy
+npm run worker:deploy
 ```
 
-**Available tools:**
-- `motion_tasks` - Task operations (create, list, get, update, delete, move, unassign)
-- `motion_projects` - Project operations (create, list, get)
-- `motion_workspaces` - Workspace management (list, get, set_default)
-
-#### Essential (7 tools, default)
-Balanced configuration with core functionality plus search, user management, and scheduling.
-
-```bash
-# Default - no configuration needed
-npx motionmcp
-# or explicitly:
-MOTION_MCP_TOOLS=essential npx motionmcp
+Your MCP URL will be:
+```
+https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp/YOUR_SECRET
 ```
 
-**Available tools:**
-- All from Minimal, plus:
-- `motion_users` - User operations (list, current)
-- `motion_search` - Search and context utilities (content, context, smart)
-- `motion_comments` - Comment management (list, create)
-- `motion_schedules` - Schedule operations (list)
+#### Connecting from Claude
 
-#### Complete (10 tools)
-All consolidated tools for full Motion API access.
+1. Go to [claude.ai](https://claude.ai) > Settings > Connectors
+2. Add your MCP URL
+3. The server syncs automatically to the Claude mobile app
 
-```bash
-MOTION_MCP_TOOLS=complete npx motionmcp
-```
+#### Connecting from ChatGPT
 
-**Available tools:**
-- All from Essential, plus:
-- `motion_custom_fields` - Custom field management (list, create, delete, add/remove)
-- `motion_recurring_tasks` - Recurring task management (list, create, delete)
-- `motion_statuses` - Status operations (list)
+1. Go to ChatGPT Settings > Connectors
+2. Add your MCP URL
 
- 
+> **Security:** The secret in the URL prevents casual discovery. Treat the full URL like a password — don't share it publicly.
 
-#### Custom
-Specify exactly which tools you need.
+Tool configuration works the same as the local server. Set `MOTION_MCP_TOOLS` in `wrangler.toml` under `[vars]`, or override via `wrangler secret put MOTION_MCP_TOOLS`.
 
-```bash
-MOTION_MCP_TOOLS=custom:motion_tasks,motion_projects,motion_search npx motionmcp
-```
+For local Worker development, see [DEVELOPER.md](./DEVELOPER.md).
 
-### Consolidated Tools
+### API Key
 
-The consolidated tools reduce the total tool count by combining related operations:
+The server reads your Motion API key from the `MOTION_API_KEY` environment variable.
 
-- **`motion_projects`**: Single tool for core project operations
-  - Operations: `create`, `list`, `get`
-  - Example: `{"operation": "create", "name": "New Project", "workspaceName": "Personal"}`
-
-- **`motion_tasks`**: Single tool for all task operations  
-  - Operations: `create`, `list`, `get`, `update`, `delete`, `move`, `unassign`
-  - Example: `{"operation": "create", "name": "New Task", "projectName": "My Project"}`
-
-- **`motion_comments`**: Manage task comments
-  - Operations: `list`, `create`
-  - Example: `{"operation": "create", "taskId": "task_123", "content": "Great progress!"}`
-
-- **`motion_custom_fields`**: Single tool for custom field management
-  - Operations: `list`, `create`, `delete`, `add_to_project`, `remove_from_project`, `add_to_task`, `remove_from_task`
-  - Example: `{"operation": "create", "name": "Priority Level", "type": "DROPDOWN", "options": ["Low", "Medium", "High"]}`
-
-- **`motion_recurring_tasks`**: Single tool for recurring task templates
-  - Operations: `list`, `create`, `delete`
-  - Example: `{"operation": "create", "name": "Weekly Review", "workspaceId": "ws_123", "assigneeId": "user_123", "frequency": {"type": "weekly", "daysOfWeek": [1,3,5] }, "duration": 30 }`
-
-## Providing Your Motion API Key
-
-The Motion MCP Server supports the following ways to provide your API key:
-
-### 1. Environment Variable
-
+**Inline (npx):**
 ```bash
 MOTION_API_KEY=your-key npx motionmcp
 ```
 
-### 2. .env file (when running via npm)
-
-Create a `.env` next to the project with:
-
+**`.env` file (when running from source via npm):**
 ```bash
 MOTION_API_KEY=your-key
 ```
 
-> When using npx, prefer exporting the variable in your shell as shown above.
+> When using `npx`, prefer the inline environment variable since `npx` won't read a local `.env` file.
 
-## Tool Overview
+## Tool Configuration
 
-### Context & Search
+MCP clients have tool limits (~100 tools across all servers), so the server lets you control how many tools are exposed via the `MOTION_MCP_TOOLS` environment variable:
 
-* `motion_search` — content search, context, and smart search
+| Level | Tools | Description |
+|---|---|---|
+| **minimal** | 3 | Tasks, projects, workspaces only |
+| **essential** (default) | 7 | Adds users, search, comments, schedules |
+| **complete** | 10 | Full API access including custom fields, recurring tasks, statuses |
+| **custom** | varies | Pick exactly the tools you need |
 
-### Projects
+Custom example:
+```bash
+MOTION_MCP_TOOLS=custom:motion_tasks,motion_projects,motion_search npx motionmcp
+```
 
-* `motion_projects` — create, list, get
+## Tools Reference
 
-### Tasks
+### motion_tasks
+**Operations:** `create`, `list`, `get`, `update`, `delete`, `move`, `unassign`
 
-* `motion_tasks` — create, list, get, update, delete, move, unassign
+The primary tool for task management. Supports all Motion API parameters including `name`, `description`, `priority`, `dueDate`, `duration`, `labels`, `assigneeId`, and `autoScheduled`. You can reference workspaces and projects by name — the server resolves them automatically.
 
-### Comments, Custom Fields, Recurring
-
-* `motion_comments` — list, create (task comments)
-* `motion_custom_fields` — list, create, delete, add/remove on project or task
-* `motion_recurring_tasks` — list, create, delete
-
-### Workspaces, Users, Schedules, Statuses
-
-* `motion_workspaces` — list, get, set_default
-* `motion_users` — list (by workspace), current
-* `motion_schedules` — user schedules and time zones
-* `motion_statuses` — available statuses by workspace
-
-## Enhanced Features
-
-### Smart Defaults & Resolution
-
-* Workspace and project auto-detection and fuzzy matching
-* Intelligent defaults: selects "Personal" workspace if none provided
-* Robust fallback and error messaging
-
-### Task Creation
-
-Supports all Motion API parameters:
-
-* Basic: `name`, `description`, `workspaceId|workspaceName`, `projectId|projectName`
-* Advanced: `priority`, `dueDate`, `duration`, `labels`, `assigneeId`, `autoScheduled`
-
-### Semantic Search
-
-* Cross-search by query with intelligent scope and priority boosting
-
-### Scheduling & Workload
-
-* Prioritized scheduling with conflict detection and task balancing
-* Detailed workload breakdowns by status, priority, and project
-
-## Example Tool Use
-
-### Creating a task with the consolidated tool
 ```json
-Tool: motion_tasks
-Args: {
+{
   "operation": "create",
   "name": "Complete API integration",
   "workspaceName": "Development",
@@ -224,20 +140,55 @@ Args: {
 }
 ```
 
-### Adding a comment to a task
+### motion_projects
+**Operations:** `create`, `list`, `get`
+
+Manage Motion projects. Workspace and project names are fuzzy-matched, and the server auto-selects your "Personal" workspace if none is specified.
+
 ```json
-Tool: motion_comments
-Args: {
-  "operation": "create",
-  "taskId": "task_123",
-  "content": "Updated the API endpoints as discussed"
-}
+{"operation": "create", "name": "New Project", "workspaceName": "Personal"}
 ```
 
-### Creating a custom field
+### motion_workspaces
+**Operations:** `list`, `get`, `set_default`
+
+List and inspect workspaces, or set a default workspace for subsequent calls.
+
+### motion_users
+**Operations:** `list`, `current`
+
+List users in a workspace or get the current authenticated user.
+
+### motion_search
+**Operations:** `content`, `context`, `smart`
+
+Cross-search tasks and projects by query with intelligent scope and priority boosting. The `context` operation returns a lightweight summary of your workspace (tasks, projects, schedules) — useful for giving an LLM situational awareness. The `smart` operation combines search with prioritized scheduling to surface what's most relevant.
+
 ```json
-Tool: motion_custom_fields
-Args: {
+{"operation": "content", "query": "API integration", "workspaceName": "Development"}
+```
+
+### motion_comments
+**Operations:** `list`, `create`
+
+Read and add comments on tasks and projects.
+
+```json
+{"operation": "create", "taskId": "task_123", "content": "Updated the API endpoints as discussed"}
+```
+
+### motion_schedules
+**Operations:** `list`
+
+Retrieve user schedules and time zones. Supports prioritized scheduling with conflict detection and workload breakdowns by status, priority, and project.
+
+### motion_custom_fields
+**Operations:** `list`, `create`, `delete`, `add_to_project`, `remove_from_project`, `add_to_task`, `remove_from_task`
+
+Define and manage custom fields across workspaces, projects, and tasks.
+
+```json
+{
   "operation": "create",
   "name": "Sprint",
   "type": "DROPDOWN",
@@ -246,10 +197,13 @@ Args: {
 }
 ```
 
-### Creating a recurring task
+### motion_recurring_tasks
+**Operations:** `list`, `create`, `delete`
+
+Manage recurring task templates.
+
 ```json
-Tool: motion_recurring_tasks
-Args: {
+{
   "operation": "create",
   "name": "Weekly Team Standup",
   "recurrence": "WEEKLY",
@@ -259,7 +213,12 @@ Args: {
 }
 ```
 
-## Advanced Claude Desktop Configuration
+### motion_statuses
+**Operations:** `list`
+
+List available statuses for a workspace.
+
+## Advanced Configuration
 
 **Minimal setup (3 tools only):**
 ```json
@@ -310,92 +269,13 @@ Args: {
 }
 ```
 
-See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
-
-## Remote Deployment (Cloudflare Workers)
-
-Deploy as a remote MCP server to access your Motion tasks from Claude mobile/web and ChatGPT.
-
-### What this enables
-
-- **Claude mobile app** (iOS/Android) and **claude.ai** web
-- **ChatGPT** mobile and web (via Settings > Connectors)
-- Any MCP client that supports remote servers via Streamable HTTP or SSE
-
-### Prerequisites
-
-- [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (included as dev dependency)
-
-### One-click deploy
-
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/devondragon/MotionMCP)
-
-This forks the repo, connects it to your Cloudflare account, and deploys automatically. After deploy, set your secrets in the Cloudflare dashboard (Workers > your worker > Settings > Variables):
-- `MOTION_API_KEY` — your Motion API key
-- `MOTION_MCP_SECRET` — a random string (generate with `openssl rand -hex 16`)
-
-### Manual deploy
-
-1. **Set your secrets:**
-
-```bash
-npx wrangler secret put MOTION_API_KEY
-npx wrangler secret put MOTION_MCP_SECRET
-```
-
-For `MOTION_MCP_SECRET`, generate a random string:
-
-```bash
-openssl rand -hex 16
-```
-
-2. **Deploy:**
-
-```bash
-npm run worker:deploy
-```
-
-3. **Your MCP URL is:**
-
-```
-https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp/YOUR_SECRET
-```
-
-### Connect from Claude
-
-1. Go to [claude.ai](https://claude.ai) > Settings > Connectors
-2. Add your MCP URL
-3. The server syncs automatically to the Claude mobile app
-
-### Connect from ChatGPT
-
-1. Go to ChatGPT Settings > Connectors
-2. Add your MCP URL
-
-### Local development
-
-```bash
-npm run worker:dev
-# Server starts at http://localhost:8787
-# Test with: http://localhost:8787/mcp/test-secret
-```
-
-### Security note
-
-The secret in the URL prevents casual discovery of your server. Treat the full URL like a password — don't share it publicly. Neither Claude nor ChatGPT currently support static bearer tokens for remote MCP servers, so the URL-embedded secret is a practical middle ground.
-
-### Configuration
-
-Tool configuration works the same as the local server. Set `MOTION_MCP_TOOLS` in `wrangler.toml` under `[vars]`, or override via `wrangler secret put MOTION_MCP_TOOLS`.
+See the full developer setup in [DEVELOPER.md](./DEVELOPER.md).
 
 ## Debugging
 
-* Logs output to `stderr` in JSON format
-* Check for missing keys, workspace/project names, and permissions
-* Use `motion_workspaces` (list) and `motion_projects` (list) to validate IDs
-
-## Logging Example
+- Logs output to `stderr` in JSON format
+- Check for missing keys, workspace/project names, and permissions
+- Use `motion_workspaces` (list) and `motion_projects` (list) to validate IDs
 
 ```json
 {
