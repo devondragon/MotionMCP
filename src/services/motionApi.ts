@@ -46,7 +46,8 @@ function getErrorMessage(error: unknown): string {
 interface GetTasksOptions {
   workspaceId: string;
   projectId?: string;
-  status?: string;
+  status?: string | string[];
+  includeAllStatuses?: boolean;
   assigneeId?: string;
   priority?: ValidPriority;
   dueDate?: string;
@@ -566,6 +567,7 @@ export class MotionApiService {
       workspaceId,
       projectId,
       status,
+      includeAllStatuses,
       assigneeId,
       priority,
       dueDate,
@@ -585,6 +587,7 @@ export class MotionApiService {
         workspaceId,
         projectId,
         status,
+        includeAllStatuses,
         assigneeId,
         priority,
         dueDate,
@@ -600,7 +603,16 @@ export class MotionApiService {
           params.append('projectId', projectId);
         }
         if (status) {
-          params.append('status', status);
+          if (Array.isArray(status)) {
+            for (const s of status) {
+              params.append('status', s);
+            }
+          } else {
+            params.append('status', status);
+          }
+        }
+        if (includeAllStatuses) {
+          params.append('includeAllStatuses', 'true');
         }
         if (assigneeId) {
           params.append('assigneeId', assigneeId);

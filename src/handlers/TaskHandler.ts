@@ -32,7 +32,8 @@ interface ListTaskParams {
   workspaceName?: string;
   projectId?: string;
   projectName?: string;
-  status?: string;
+  status?: string | string[];
+  includeAllStatuses?: boolean;
   assigneeId?: string;
   assignee?: string;
   priority?: string;
@@ -238,6 +239,13 @@ export class TaskHandler extends BaseHandler {
       }
     }
 
+    // Validate that status and includeAllStatuses are not combined
+    if (params.includeAllStatuses && params.status) {
+      return this.handleError(new Error(
+        "Cannot combine 'includeAllStatuses' with 'status' filter. Use one or the other."
+      ));
+    }
+
     // Validate priority if provided
     if (params.priority && !isValidPriority(params.priority)) {
       return this.handleError(new Error(
@@ -269,6 +277,7 @@ export class TaskHandler extends BaseHandler {
       workspaceId: workspace.id,
       projectId: resolvedProjectId,
       status: params.status,
+      includeAllStatuses: params.includeAllStatuses,
       assigneeId: resolvedAssigneeId,
       priority: params.priority as ValidPriority | undefined,
       dueDate: validatedDueDate,
@@ -276,10 +285,16 @@ export class TaskHandler extends BaseHandler {
       limit: params.limit
     });
 
+    const statusDisplay = params.includeAllStatuses
+      ? 'all statuses'
+      : Array.isArray(params.status)
+        ? params.status.join(', ')
+        : params.status;
+
     return formatTaskList(tasks, {
       workspaceName: workspace.name,
       projectName: resolvedProjectName,
-      status: params.status,
+      status: statusDisplay,
       assigneeName: assigneeDisplay || resolvedAssigneeId,
       priority: params.priority,
       dueDate: params.dueDate,
