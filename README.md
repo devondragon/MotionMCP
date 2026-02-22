@@ -327,7 +327,15 @@ Deploy as a remote MCP server to access your Motion tasks from Claude mobile/web
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (included as dev dependency)
 
-### Deploy
+### One-click deploy
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/devondragon/MotionMCP)
+
+This forks the repo, connects it to your Cloudflare account, and deploys automatically. After deploy, set your secrets in the Cloudflare dashboard (Workers > your worker > Settings > Variables):
+- `MOTION_API_KEY` — your Motion API key
+- `MOTION_MCP_SECRET` — a random string (generate with `openssl rand -hex 16`)
+
+### Manual deploy
 
 1. **Set your secrets:**
 
