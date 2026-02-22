@@ -116,11 +116,69 @@ Notes:
 - Direct node execution is more reliable than npm in Claude Desktop's environment.
 - Remember to rebuild (`npm run build`) after making code changes.
 
+## Cloudflare Worker (remote MCP server)
+
+The project also includes a Cloudflare Worker entry point (`src/worker.ts`) that exposes the same MCP tools over HTTP. This enables access from Claude mobile/web and ChatGPT — any client that supports remote MCP servers via Streamable HTTP or SSE.
+
+### Prerequisites
+
+- [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
+- Wrangler CLI (included as a dev dependency)
+
+### Local development
+
+```bash
+npm run worker:dev
+# Starts at http://localhost:8787
+# Uses MOTION_API_KEY from your .env file
+# Test: curl http://localhost:8787/health
+```
+
+The local dev server reads `MOTION_MCP_SECRET` from `.env` (or skips validation if not set). Set it to a test value like `test-secret` for local testing.
+
+### Deploy to Cloudflare
+
+```bash
+# Set secrets (prompted for values)
+npx wrangler secret put MOTION_API_KEY
+npx wrangler secret put MOTION_MCP_SECRET  # generate with: openssl rand -hex 16
+
+# Deploy
+npm run worker:deploy
+```
+
+Your MCP URL will be: `https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp/YOUR_SECRET`
+
+### Connecting clients
+
+- **Claude (web/mobile):** Add the URL in [claude.ai](https://claude.ai) > Settings > Connectors. Syncs to mobile automatically.
+- **ChatGPT (web/mobile):** Add the URL in Settings > Connectors.
+
+### Worker type checking
+
+The Worker uses a separate TypeScript config (`tsconfig.worker.json`) with ES modules and Workers types:
+
+```bash
+npm run worker:type-check
+```
+
+This is separate from the main `npm run type-check` / `npm run build` which compiles the stdio server.
+
+### Architecture notes
+
+- The Worker reuses all existing handlers, services, tools, and utilities — it only differs in transport
+- `McpAgent` from the Cloudflare Agents SDK handles Streamable HTTP and SSE via Durable Objects
+- `MotionApiService` receives the API key from Worker env bindings instead of `process.env`
+- Tool JSON Schemas are converted to Zod schemas at init time (via `src/utils/jsonSchemaToZod.ts`) because `McpServer.tool()` requires Zod
+- Access is controlled by a secret token in the URL path — treat the full URL like a password
+
 ## Troubleshooting
 
 - Missing or invalid API key: verify MOTION_API_KEY is set (in your shell or .env).
-- Typescript errors: run `npm run type-check` and fix issues before building.
+- Typescript errors: run `npm run type-check` and fix issues before building. For Worker issues, also run `npm run worker:type-check`.
 - No tools listed in client: check MOTION_MCP_TOOLS and that the client launched the expected script (mcp vs mcp:dev).
+- Worker 404 on all requests: verify `MOTION_MCP_SECRET` is set and matches the secret in your URL path.
+- Worker local dev issues: make sure `MOTION_API_KEY` is in your `.env` file.
 
 ---
 
