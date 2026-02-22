@@ -604,8 +604,13 @@ export class MotionApiService {
         }
         if (status) {
           if (Array.isArray(status)) {
-            for (const s of status) {
-              params.append('status', s);
+            // Deduplicate and skip empty strings before appending
+            // Note: Motion API supports repeated status= params for multi-value filtering
+            const uniqueStatuses = Array.from(new Set(status));
+            for (const s of uniqueStatuses) {
+              if (s) {
+                params.append('status', s);
+              }
             }
           } else {
             params.append('status', status);

@@ -48,10 +48,13 @@ export interface MotionTasksArgs {
   assigneeId?: string;
   assignee?: string;
   limit?: number;
+  // List-only params
+  includeAllStatuses?: boolean;
   // Create/Update params
   name?: string;
   description?: string;
-  status?: string;
+  // status accepts an array for list (multi-status filter) but only string for create/update
+  status?: string | string[];
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate?: string;
   duration?: string | number;

@@ -19,6 +19,7 @@ interface CreateTaskParams {
   projectId?: string;
   projectName?: string;
   description?: string;
+  status?: string | string[];
   priority?: string;
   dueDate?: string;
   duration?: string | number;
@@ -143,6 +144,9 @@ export class TaskHandler extends BaseHandler {
     if (!params.name) {
       return this.handleError(new Error("Task name is required for create operation"));
     }
+    if (Array.isArray(params.status)) {
+      return this.handleError(new Error("'status' must be a single string for create operation, not an array"));
+    }
 
     const taskData = parseTaskArgs(params as unknown as Record<string, unknown>);
     const workspace = await this.workspaceResolver.resolveWorkspace(taskData);
@@ -239,8 +243,15 @@ export class TaskHandler extends BaseHandler {
       }
     }
 
+    // Validate status array elements if provided as array
+    if (Array.isArray(params.status) && params.status.some(s => !s || typeof s !== 'string')) {
+      return this.handleError(new Error('status array must contain only non-empty strings'));
+    }
+
     // Validate that status and includeAllStatuses are not combined
-    if (params.includeAllStatuses && params.status) {
+    // An empty array is semantically "no filter" and should not trigger this error
+    const hasStatusFilter = Array.isArray(params.status) ? params.status.length > 0 : !!params.status;
+    if (params.includeAllStatuses && hasStatusFilter) {
       return this.handleError(new Error(
         "Cannot combine 'includeAllStatuses' with 'status' filter. Use one or the other."
       ));
@@ -287,9 +298,11 @@ export class TaskHandler extends BaseHandler {
 
     const statusDisplay = params.includeAllStatuses
       ? 'all statuses'
-      : Array.isArray(params.status)
+      : Array.isArray(params.status) && params.status.length > 0
         ? params.status.join(', ')
-        : params.status;
+        : typeof params.status === 'string'
+          ? params.status
+          : undefined;
 
     return formatTaskList(tasks, {
       workspaceName: workspace.name,
@@ -330,6 +343,9 @@ export class TaskHandler extends BaseHandler {
   private async handleUpdate(params: UpdateTaskParams): Promise<McpToolResponse> {
     if (!params.taskId) {
       return this.handleError(new Error("Task ID is required for update operation"));
+    }
+    if (Array.isArray(params.status)) {
+      return this.handleError(new Error("'status' must be a single string for update operation, not an array"));
     }
 
     // Create update object with only valid MotionTask fields
