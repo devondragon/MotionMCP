@@ -312,6 +312,75 @@ Args: {
 
 See the full developer setup and more options in [DEVELOPER.md](./DEVELOPER.md).
 
+## Remote Deployment (Cloudflare Workers)
+
+Deploy as a remote MCP server to access your Motion tasks from Claude mobile/web and ChatGPT.
+
+### What this enables
+
+- **Claude mobile app** (iOS/Android) and **claude.ai** web
+- **ChatGPT** mobile and web (via Settings > Connectors)
+- Any MCP client that supports remote servers via Streamable HTTP or SSE
+
+### Prerequisites
+
+- [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (included as dev dependency)
+
+### Deploy
+
+1. **Set your secrets:**
+
+```bash
+npx wrangler secret put MOTION_API_KEY
+npx wrangler secret put MOTION_MCP_SECRET
+```
+
+For `MOTION_MCP_SECRET`, generate a random string:
+
+```bash
+openssl rand -hex 16
+```
+
+2. **Deploy:**
+
+```bash
+npm run worker:deploy
+```
+
+3. **Your MCP URL is:**
+
+```
+https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp/YOUR_SECRET
+```
+
+### Connect from Claude
+
+1. Go to [claude.ai](https://claude.ai) > Settings > Connectors
+2. Add your MCP URL
+3. The server syncs automatically to the Claude mobile app
+
+### Connect from ChatGPT
+
+1. Go to ChatGPT Settings > Connectors
+2. Add your MCP URL
+
+### Local development
+
+```bash
+npm run worker:dev
+# Server starts at http://localhost:8787
+# Test with: http://localhost:8787/mcp/test-secret
+```
+
+### Security note
+
+The secret in the URL prevents casual discovery of your server. Treat the full URL like a password — don't share it publicly. Neither Claude nor ChatGPT currently support static bearer tokens for remote MCP servers, so the URL-embedded secret is a practical middle ground.
+
+### Configuration
+
+Tool configuration works the same as the local server. Set `MOTION_MCP_TOOLS` in `wrangler.toml` under `[vars]`, or override via `wrangler secret put MOTION_MCP_TOOLS`.
+
 ## Debugging
 
 * Logs output to `stderr` in JSON format

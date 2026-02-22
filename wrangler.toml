@@ -1,0 +1,20 @@
+name = "motion-mcp-server"
+main = "src/worker.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [
+  { name = "MCP_OBJECT", class_name = "MotionMCPAgent" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["MotionMCPAgent"]
+
+[vars]
+MOTION_MCP_TOOLS = "essential"
+
+# Secrets set via wrangler:
+#   npx wrangler secret put MOTION_API_KEY
+#   npx wrangler secret put MOTION_MCP_SECRET

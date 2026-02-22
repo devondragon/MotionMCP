@@ -107,10 +107,10 @@ export class MotionApiService {
     }
   }
 
-  constructor() {
-    const apiKey = process.env.MOTION_API_KEY;
-    
-    if (!apiKey) {
+  constructor(apiKey?: string) {
+    const resolvedApiKey = apiKey || process.env.MOTION_API_KEY;
+
+    if (!resolvedApiKey) {
       mcpLog(LOG_LEVELS.ERROR, 'Motion API key not found in environment variables', {
         component: 'MotionApiService',
         method: 'constructor'
@@ -118,7 +118,7 @@ export class MotionApiService {
       throw new Error('MOTION_API_KEY environment variable is required');
     }
 
-    this.apiKey = apiKey;
+    this.apiKey = resolvedApiKey;
     this.baseUrl = 'https://api.usemotion.com/v1';
 
     mcpLog(LOG_LEVELS.INFO, 'Initializing Motion API service', {
