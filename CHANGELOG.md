@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.0] - 2026-02-22
+
+### 🚀 New Features
+
+- **Cloudflare Workers remote MCP server**: Added a new entry point (`src/worker.ts`) that runs the MCP server as a Cloudflare Worker using Streamable HTTP/SSE transport. This enables access from mobile and web clients (Claude mobile, claude.ai, ChatGPT) without requiring a local stdio process. Uses `McpAgent` from the Cloudflare Agents SDK with Durable Objects for per-session state. Auth is handled via a secret token embedded in the URL path. (#60)
+  - New `wrangler.toml` configuration and `tsconfig.worker.json` for Worker builds
+  - `jsonSchemaToZod.ts` utility converts JSON Schema tool definitions to Zod schemas (required by `McpServer.tool()`) using Zod v4's `fromJSONSchema()`
+  - Deploy via `npm run worker:deploy` or the one-click "Deploy to Cloudflare Workers" button in the README
+
+- **Multi-status filtering for task listing**: The `motion_tasks` list operation now accepts `status` as an array of strings, enabling filtering by multiple statuses in a single request (e.g., `status: ["Todo", "In Progress"]`). Repeated `status=` query parameters are sent to the Motion API, which returns the union of matching tasks. (#68, #69)
+  - New `includeAllStatuses` boolean parameter to retrieve tasks in all statuses (including completed/canceled)
+  - Validation prevents combining `status` filter with `includeAllStatuses`
+  - Per-element validation ensures status arrays contain only non-empty strings
+  - Status values are deduplicated before sending to the API
+  - Fully backward compatible — single string `status` values work as before
+
+### 📖 Documentation
+
+- Restructured README for clarity: consolidated overlapping tool sections into a single Tools Reference, reorganized API key setup and advanced configuration
+- Added "Deploy to Cloudflare Workers" button to README
+- Updated CLAUDE.md and DEVELOPER.md with Cloudflare Worker architecture details, development workflow, and deployment instructions
+
 ## [2.3.0] - 2026-02-19
 
 ### 🚀 New Features
