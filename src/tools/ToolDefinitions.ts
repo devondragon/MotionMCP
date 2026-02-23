@@ -93,8 +93,15 @@ export const tasksToolDefinition: McpToolDefinition = {
         description: "Project name (alternative to projectId)"
       },
       status: {
-        type: "string",
-        description: "Filter by status (for list)"
+        oneOf: [
+          { type: "string" },
+          { type: "array", items: { type: "string" } }
+        ],
+        description: "Filter by status (for list). Single string or array of strings (e.g., [\"Todo\", \"Completed\"]). Without status or includeAllStatuses, only active (non-resolved) tasks are returned. Use motion_statuses to list valid values per workspace."
+      },
+      includeAllStatuses: {
+        type: "boolean",
+        description: "When true, returns tasks across all statuses including completed/resolved (for list). Cannot be combined with status filter."
       },
       assigneeId: {
         type: "string",
