@@ -5,10 +5,13 @@ import type { HandlerContext } from '../src/handlers/base/HandlerInterface';
 function makeContext(overrides: Partial<HandlerContext> = {}): HandlerContext {
   const motionService = {
     createTask: vi.fn().mockResolvedValue({ id: 't1', name: 'Hello' }),
-    getTasks: vi.fn().mockResolvedValue([
-      { id: 't1', name: 'A' },
-      { id: 't2', name: 'B' },
-    ]),
+    getTasks: vi.fn().mockResolvedValue({
+      items: [
+        { id: 't1', name: 'A' },
+        { id: 't2', name: 'B' },
+      ],
+      truncation: undefined,
+    }),
     getTask: vi.fn().mockResolvedValue({ id: 't1', name: 'A' }),
     updateTask: vi.fn().mockResolvedValue({ id: 't1', name: 'New' }),
     deleteTask: vi.fn().mockResolvedValue(undefined),
