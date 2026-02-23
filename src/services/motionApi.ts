@@ -953,54 +953,61 @@ export class MotionApiService {
   // ========================================
 
   async getWorkspaces(ids?: string[]): Promise<MotionWorkspace[]> {
-    const cacheKey = ids ? `workspaces:${ids.join(',')}` : 'workspaces';
-    return this.workspaceCache.withCache(cacheKey, async () => {
-      try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching workspaces from Motion API', {
-          method: 'getWorkspaces',
-          filterIds: ids
-        });
-
-        const params = new URLSearchParams();
-        if (ids && ids.length > 0) {
-          for (const id of ids) {
-            params.append('ids', id);
-          }
-        }
-        const queryString = params.toString();
-        const url = queryString ? `/workspaces?${queryString}` : '/workspaces';
-
-        const response: AxiosResponse = await this.requestWithRetry(() => this.client.get(url));
-        
-        // Validate the response structure
-        const validatedResponse = this.validateResponse(
-          response.data,
-          WorkspacesListResponseSchema,
-          'getWorkspaces'
-        );
-        
-        // Extract workspaces array (handle both wrapped and unwrapped responses)
-        const workspaces = Array.isArray(validatedResponse)
-          ? validatedResponse
-          : validatedResponse.workspaces;
-        
-        mcpLog(LOG_LEVELS.INFO, 'Workspaces fetched and cached successfully', {
-          method: 'getWorkspaces',
-          count: workspaces.length,
-          workspaceNames: workspaces.map((w: MotionWorkspace) => w.name)
-        });
-
-        return workspaces;
-      } catch (error: unknown) {
-        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch workspaces', {
-          method: 'getWorkspaces',
-          error: getErrorMessage(error),
-          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
-        });
-        throw this.formatApiError(error, 'fetch', 'workspace');
-      }
+    // Skip caching when filtering by IDs — filtered results are unlikely to be reused
+    if (ids && ids.length > 0) {
+      return this.fetchWorkspaces(ids);
+    }
+    return this.workspaceCache.withCache('workspaces', async () => {
+      return this.fetchWorkspaces();
     });
+  }
+
+  private async fetchWorkspaces(ids?: string[]): Promise<MotionWorkspace[]> {
+    try {
+      mcpLog(LOG_LEVELS.DEBUG, 'Fetching workspaces from Motion API', {
+        method: 'getWorkspaces',
+        filterIds: ids
+      });
+
+      const params = new URLSearchParams();
+      if (ids && ids.length > 0) {
+        for (const id of ids) {
+          params.append('ids', id);
+        }
+      }
+      const queryString = params.toString();
+      const url = queryString ? `/workspaces?${queryString}` : '/workspaces';
+
+      const response: AxiosResponse = await this.requestWithRetry(() => this.client.get(url));
+
+      // Validate the response structure
+      const validatedResponse = this.validateResponse(
+        response.data,
+        WorkspacesListResponseSchema,
+        'getWorkspaces'
+      );
+
+      // Extract workspaces array (handle both wrapped and unwrapped responses)
+      const workspaces = Array.isArray(validatedResponse)
+        ? validatedResponse
+        : validatedResponse.workspaces;
+
+      mcpLog(LOG_LEVELS.INFO, 'Workspaces fetched successfully', {
+        method: 'getWorkspaces',
+        count: workspaces.length,
+        workspaceNames: workspaces.map((w: MotionWorkspace) => w.name)
+      });
+
+      return workspaces;
+    } catch (error: unknown) {
+      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch workspaces', {
+        method: 'getWorkspaces',
+        error: getErrorMessage(error),
+        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
+        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
+      });
+      throw this.formatApiError(error, 'fetch', 'workspace');
+    }
   }
 
   // ========================================
@@ -1318,7 +1325,7 @@ export class MotionApiService {
           const foundProject = workspaceProjects.find(p => p.name === projectName);
 
           if (foundProject) {
-            mcpLog(LOG_LEVELS.INFO, 'Project found by name in different workspace', {
+            mcpLog(LOG_LEVELS.WARN, 'Project found by name in different workspace', {
               method: 'getProjectByName',
               projectName,
               projectId: foundProject.id,
@@ -1916,7 +1923,7 @@ export class MotionApiService {
   /**
    * Remove a custom field from a project
    * @param projectId - ID of the project
-   * @param fieldId - ID of the custom field
+   * @param valueId - ID of the custom field value
    * @returns Success indicator
    */
   async removeCustomFieldFromProject(projectId: string, valueId: string): Promise<{ success: boolean }> {
@@ -2009,27 +2016,27 @@ export class MotionApiService {
   /**
    * Remove a custom field from a task
    * @param taskId - ID of the task
-   * @param fieldId - ID of the custom field
+   * @param valueId - ID of the custom field value
    * @returns Success indicator
    */
-  async removeCustomFieldFromTask(taskId: string, fieldId: string): Promise<{ success: boolean }> {
+  async removeCustomFieldFromTask(taskId: string, valueId: string): Promise<{ success: boolean }> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Removing custom field from task', {
         method: 'removeCustomFieldFromTask',
         taskId,
-        fieldId
+        valueId
       });
 
       await this.requestWithRetry(() =>
-        this.client.delete(`/beta/custom-field-values/task/${taskId}/custom-fields/${fieldId}`)
+        this.client.delete(`/beta/custom-field-values/task/${taskId}/custom-fields/${valueId}`)
       );
-      
+
       // Note: No task cache currently implemented - tasks are not cached due to frequent updates
 
       mcpLog(LOG_LEVELS.INFO, 'Custom field removed from task successfully', {
         method: 'removeCustomFieldFromTask',
         taskId,
-        fieldId
+        valueId
       });
 
       return { success: true };
@@ -2040,7 +2047,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
         taskId,
-        fieldId
+        valueId
       });
       throw this.formatApiError(error, 'update', 'task', taskId);
     }

@@ -80,6 +80,9 @@ export class CustomFieldHandler extends BaseHandler {
     if (!args.projectId || !args.fieldId) {
       return this.handleError(new Error('Project ID and field ID are required for add_to_project operation'));
     }
+    if (args.value !== undefined && !args.field) {
+      return this.handleError(new Error('Field type (field) is required when providing a value. Use "text", "number", "multiSelect", etc.'));
+    }
 
     await this.motionService.addCustomFieldToProject(args.projectId, args.fieldId, args.value, args.field);
     return formatCustomFieldSuccess('added', 'project', args.projectId);
@@ -97,6 +100,9 @@ export class CustomFieldHandler extends BaseHandler {
   private async handleAddToTask(args: MotionCustomFieldsArgs): Promise<McpToolResponse> {
     if (!args.taskId || !args.fieldId) {
       return this.handleError(new Error('Task ID and field ID are required for add_to_task operation'));
+    }
+    if (args.value !== undefined && !args.field) {
+      return this.handleError(new Error('Field type (field) is required when providing a value. Use "text", "number", "multiSelect", etc.'));
     }
 
     await this.motionService.addCustomFieldToTask(args.taskId, args.fieldId, args.value, args.field);

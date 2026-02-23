@@ -162,7 +162,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       targetWorkspaceId: {
         type: "string",
-        description: "Target workspace ID (required for move operation)"
+        description: "Target workspace ID (required for move operation). Move transfers a task between workspaces — project-level targeting is not supported by the Motion API."
       },
       limit: {
         type: "number",
