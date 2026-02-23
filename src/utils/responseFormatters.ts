@@ -147,6 +147,15 @@ export function formatTaskList(
   const list = tasks.map(taskFormatter).join('\n');
   let responseText = `${title}:\n${list}`;
   responseText += formatTruncationNotice(truncation);
+
+  // Warn when client-side filters are active: priority/dueDate are not API params,
+  // so they are applied after fetching. If the fetch limit was reached before all
+  // pages were scanned, matching tasks beyond that limit may have been excluded.
+  const clientSideFilters = [priority && 'priority', dueDate && 'dueDate'].filter(Boolean);
+  if (clientSideFilters.length > 0) {
+    responseText += `\n\nNote: ${clientSideFilters.join(' and ')} filtering is applied client-side after fetching. If results seem incomplete, try narrowing by workspace/project or removing the filter to see all tasks.`;
+  }
+
   return formatMcpSuccess(responseText);
 }
 
