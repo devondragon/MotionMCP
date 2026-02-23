@@ -118,7 +118,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       dueDate: {
         type: "string",
-        description: "Due date (for create/update) or filter (for list, filtered client-side). Date-only values are stored as end-of-day UTC. Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
+        description: "Due date (for create/update) or filter (for list, filtered client-side — returns tasks due on or before this date). Date-only values are stored as end-of-day UTC. Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
       },
       labels: {
         type: "array",
@@ -332,7 +332,7 @@ export const customFieldsToolDefinition: McpToolDefinition = {
       },
       fieldId: {
         type: "string",
-        description: "Custom field instance ID. For remove_from_project/remove_from_task, this is the custom field value ID"
+        description: "Custom field instance ID (used for all operations)"
       },
       workspaceId: {
         type: "string",
@@ -345,7 +345,7 @@ export const customFieldsToolDefinition: McpToolDefinition = {
       field: {
         type: "string",
         enum: ["text", "url", "date", "person", "multiPerson", "phone", "select", "multiSelect", "number", "email", "checkbox", "relatedTo"],
-        description: "Field type (for create)"
+        description: "Field type (required for create; also used to specify the value type when providing a value in add_to_project/add_to_task)"
       },
       options: {
         type: "array",

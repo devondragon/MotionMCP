@@ -859,7 +859,7 @@ export class MotionApiService {
     }
   }
 
-  async moveTask(taskId: string, targetWorkspaceId: string, assigneeId?: string | null): Promise<MotionTask> {
+  async moveTask(taskId: string, targetWorkspaceId: string, assigneeId?: string): Promise<MotionTask> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Moving task in Motion API', {
         method: 'moveTask',
@@ -872,7 +872,7 @@ export class MotionApiService {
       const moveData: { workspaceId: string; assigneeId?: string } = {
         workspaceId: targetWorkspaceId,
       };
-      if (assigneeId) moveData.assigneeId = assigneeId;
+      if (assigneeId !== undefined) moveData.assigneeId = assigneeId;
 
       const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() =>
         this.client.patch(`/tasks/${taskId}/move`, moveData)
@@ -993,7 +993,8 @@ export class MotionApiService {
   // ========================================
 
   async getUsers(workspaceId?: string, teamId?: string): Promise<MotionUser[]> {
-    const cacheKey = teamId ? `users:team:${teamId}` : workspaceId ? `users:workspace:${workspaceId}` : 'users:all';
+    const parts = [workspaceId && `ws:${workspaceId}`, teamId && `team:${teamId}`].filter(Boolean);
+    const cacheKey = parts.length > 0 ? `users:${parts.join(':')}` : 'users:all';
 
     return this.userCache.withCache(cacheKey, async () => {
       try {
