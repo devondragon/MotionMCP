@@ -6,11 +6,11 @@ import { formatMcpSuccess } from '../utils';
 export class UserHandler extends BaseHandler {
   async handle(args: MotionUsersArgs): Promise<McpToolResponse> {
     try {
-      const { operation, workspaceId, workspaceName } = args;
+      const { operation, workspaceId, workspaceName, teamId } = args;
 
       switch(operation) {
         case 'list':
-          return await this.handleList(workspaceId, workspaceName);
+          return await this.handleList(workspaceId, workspaceName, teamId);
         case 'current':
           return await this.handleGetCurrent();
         default:
@@ -21,9 +21,9 @@ export class UserHandler extends BaseHandler {
     }
   }
 
-  private async handleList(workspaceId?: string, workspaceName?: string): Promise<McpToolResponse> {
+  private async handleList(workspaceId?: string, workspaceName?: string, teamId?: string): Promise<McpToolResponse> {
     const workspace = await this.workspaceResolver.resolveWorkspace({ workspaceId, workspaceName });
-    const users = await this.motionService.getUsers(workspace.id);
+    const users = await this.motionService.getUsers(workspace.id, teamId);
 
     const userList = users.map(u => `- ${u.name} (${u.email}) [ID: ${u.id}]`).join('\n');
     return formatMcpSuccess(`Users in workspace "${workspace.name}":\n${userList}`);

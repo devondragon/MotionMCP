@@ -33,6 +33,7 @@ interface ListTaskParams {
   workspaceName?: string;
   projectId?: string;
   projectName?: string;
+  name?: string;
   status?: string | string[];
   includeAllStatuses?: boolean;
   assigneeId?: string;
@@ -66,11 +67,11 @@ interface DeleteTaskParams {
   taskId?: string;
 }
 
-/** Parameters for moving a task to a different project or workspace */
+/** Parameters for moving a task to a different workspace */
 interface MoveTaskParams {
   taskId?: string;
-  targetProjectId?: string;
   targetWorkspaceId?: string;
+  assigneeId?: string;
 }
 
 /** Parameters for removing the assignee from a task */
@@ -187,7 +188,8 @@ export class TaskHandler extends BaseHandler {
       }
     }
 
-    const convertedLabels = taskData.labels?.map(name => ({ name }));
+    // API accepts labels as plain string array per docs
+    const convertedLabels = taskData.labels;
 
     // Validate auto-scheduling configuration
     await this.validateAutoScheduling(taskData.autoScheduled, targetWorkspaceId);
@@ -220,10 +222,18 @@ export class TaskHandler extends BaseHandler {
    * @returns Formatted list of matching tasks with filter context
    */
   private async handleList(params: ListTaskParams): Promise<McpToolResponse> {
-    const workspace = await this.workspaceResolver.resolveWorkspace({
-      workspaceId: params.workspaceId,
-      workspaceName: params.workspaceName
-    });
+    // Workspace resolution is optional — if no workspace specified, API returns all workspaces
+    let resolvedWorkspaceId: string | undefined;
+    let resolvedWorkspaceName: string | undefined;
+
+    if (params.workspaceId || params.workspaceName) {
+      const workspace = await this.workspaceResolver.resolveWorkspace({
+        workspaceId: params.workspaceId,
+        workspaceName: params.workspaceName
+      });
+      resolvedWorkspaceId = workspace.id;
+      resolvedWorkspaceName = workspace.name;
+    }
 
     // Resolve project identifier (projectId or projectName) using the centralized utility
     let resolvedProjectId = params.projectId;
@@ -232,7 +242,7 @@ export class TaskHandler extends BaseHandler {
     if (params.projectId || params.projectName) {
       const project = await this.motionService.resolveProjectIdentifier(
         { projectId: params.projectId, projectName: params.projectName },
-        workspace.id
+        resolvedWorkspaceId
       );
       if (project) {
         resolvedProjectId = project.id;
@@ -282,11 +292,12 @@ export class TaskHandler extends BaseHandler {
     }
 
     const { resolvedId: resolvedAssigneeId, display: assigneeDisplay } =
-      await this.resolveAssignee(params.assigneeId, params.assignee, workspace.id);
+      await this.resolveAssignee(params.assigneeId, params.assignee, resolvedWorkspaceId);
 
     const { items: tasks, truncation } = await this.motionService.getTasks({
-      workspaceId: workspace.id,
+      workspaceId: resolvedWorkspaceId,
       projectId: resolvedProjectId,
+      name: params.name,
       status: params.status,
       includeAllStatuses: params.includeAllStatuses,
       assigneeId: resolvedAssigneeId,
@@ -305,7 +316,7 @@ export class TaskHandler extends BaseHandler {
           : undefined;
 
     return formatTaskList(tasks, {
-      workspaceName: workspace.name,
+      workspaceName: resolvedWorkspaceName,
       projectName: resolvedProjectName,
       status: statusDisplay,
       assigneeName: assigneeDisplay || resolvedAssigneeId,
@@ -379,7 +390,8 @@ export class TaskHandler extends BaseHandler {
         updateData.duration = params.duration;
       }
     }
-    if (params.labels !== undefined) updateData.labels = params.labels?.map(name => ({ name }));
+    // API accepts labels as plain string array per docs
+    if (params.labels !== undefined) updateData.labels = params.labels;
     if (params.autoScheduled !== undefined) updateData.autoScheduled = params.autoScheduled as Record<string, unknown> | null;
 
     const updatedTask = await this.motionService.updateTask(params.taskId, updateData);
@@ -401,20 +413,20 @@ export class TaskHandler extends BaseHandler {
   }
 
   /**
-   * Moves a task to a different project and/or workspace.
-   * Requires either a target project ID or workspace ID (or both).
-   * @param params - Parameters with taskId and target location
+   * Moves a task to a different workspace.
+   * Requires a target workspace ID. Optionally reassigns the task.
+   * @param params - Parameters with taskId, target workspace, and optional assignee
    * @returns Success response with moved task info
    */
   private async handleMove(params: MoveTaskParams): Promise<McpToolResponse> {
     if (!params.taskId) {
       return this.handleError(new Error("Task ID is required for move operation"));
     }
-    if (!params.targetProjectId && !params.targetWorkspaceId) {
-      return this.handleError(new Error("Either target project ID or target workspace ID is required for move operation"));
+    if (!params.targetWorkspaceId) {
+      return this.handleError(new Error("Target workspace ID is required for move operation"));
     }
 
-    const movedTask = await this.motionService.moveTask(params.taskId, params.targetProjectId, params.targetWorkspaceId);
+    const movedTask = await this.motionService.moveTask(params.taskId, params.targetWorkspaceId, params.assigneeId);
     return formatMcpSuccess(`Successfully moved task "${movedTask.name}" (ID: ${movedTask.id})`);
   }
 

@@ -61,7 +61,6 @@ export interface MotionTasksArgs {
   labels?: string[];
   autoScheduled?: object | null;
   // Move params
-  targetProjectId?: string;
   targetWorkspaceId?: string;
 }
 
@@ -69,6 +68,7 @@ export interface MotionUsersArgs {
   operation: 'list' | 'current';
   workspaceId?: string;
   workspaceName?: string;
+  teamId?: string;
 }
 
 export interface MotionCommentsArgs {

@@ -44,8 +44,9 @@ function getErrorMessage(error: unknown): string {
 }
 
 interface GetTasksOptions {
-  workspaceId: string;
+  workspaceId?: string;
   projectId?: string;
+  name?: string;
   status?: string | string[];
   includeAllStatuses?: boolean;
   assigneeId?: string;
@@ -496,6 +497,7 @@ export class MotionApiService {
     }
   }
 
+  // Note: Project update/delete are not in the public API docs but appear to be functional
   async updateProject(projectId: string, updates: Partial<MotionProject>): Promise<MotionProject> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Updating project in Motion API', {
@@ -530,6 +532,7 @@ export class MotionApiService {
     }
   }
 
+  // Note: Project delete is not in the public API docs but appears to be functional
   async deleteProject(projectId: string): Promise<void> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Deleting project from Motion API', {
@@ -566,6 +569,7 @@ export class MotionApiService {
     const {
       workspaceId,
       projectId,
+      name,
       status,
       includeAllStatuses,
       assigneeId,
@@ -595,10 +599,29 @@ export class MotionApiService {
         maxPages
       });
 
+      // Client-side filters for params not supported by the API
+      const applyClientFilters = (tasks: MotionTask[]): MotionTask[] => {
+        let filtered = tasks;
+        if (priority) {
+          filtered = filtered.filter(t => t.priority === priority);
+        }
+        if (dueDate) {
+          // Compare date portion only (YYYY-MM-DD)
+          filtered = filtered.filter(t => {
+            if (!t.dueDate) return false;
+            const taskDate = t.dueDate.substring(0, 10);
+            return taskDate <= dueDate;
+          });
+        }
+        return filtered;
+      };
+
       // Create a fetch function for potential pagination
       const fetchPage = async (cursor?: string) => {
         const params = new URLSearchParams();
-        params.append('workspaceId', workspaceId);
+        if (workspaceId) {
+          params.append('workspaceId', workspaceId);
+        }
         if (projectId) {
           params.append('projectId', projectId);
         }
@@ -622,16 +645,15 @@ export class MotionApiService {
         if (assigneeId) {
           params.append('assigneeId', assigneeId);
         }
-        if (priority) {
-          params.append('priority', priority);
-        }
-        if (dueDate) {
-          params.append('dueDate', dueDate);
+        // Note: priority and dueDate are NOT valid API query params — filtered client-side after fetch
+        if (name) {
+          params.append('name', name);
         }
         if (labels && labels.length > 0) {
+          // API accepts 'label' (singular) as a string parameter
           for (const label of labels) {
             if (label) {
-              params.append('labels', label);
+              params.append('label', label);
             }
           }
         }
@@ -654,17 +676,18 @@ export class MotionApiService {
         });
         
         if (paginatedResult.totalFetched > 0) {
-          // Note: limit is already enforced by maxItems in pagination, no need to slice
+          const filteredItems = applyClientFilters(paginatedResult.items);
           mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully with pagination', {
             method: 'getTasks',
             totalCount: paginatedResult.totalFetched,
-            returnedCount: paginatedResult.items.length,
+            returnedCount: filteredItems.length,
+            clientFiltered: filteredItems.length !== paginatedResult.items.length,
             hasMore: paginatedResult.hasMore,
             workspaceId,
             projectId,
             limitApplied: limit
           });
-          return { items: paginatedResult.items, truncation: paginatedResult.truncation };
+          return { items: filteredItems, truncation: paginatedResult.truncation };
         }
       } catch (paginationError) {
         // Fallback to simple fetch if pagination fails
@@ -677,8 +700,8 @@ export class MotionApiService {
       // Use new response wrapper for single page fallback
       const response = await fetchPage();
       const unwrapped = unwrapApiResponse<MotionTask>(response.data, 'tasks');
-      let tasks = unwrapped.data;
-      
+      let tasks = applyClientFilters(unwrapped.data);
+
       // Apply limit if specified
       if (limit && limit > 0) {
         tasks = tasks.slice(0, limit);
@@ -778,6 +801,8 @@ export class MotionApiService {
     }
   }
 
+  // Note: API docs list name and workspaceId as required for PATCH /tasks/{id},
+  // but the API appears to accept partial updates without them. Not enforced here.
   async updateTask(taskId: string, updates: Partial<MotionTask>): Promise<MotionTask> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Updating task in Motion API', {
@@ -834,32 +859,30 @@ export class MotionApiService {
     }
   }
 
-  async moveTask(taskId: string, targetProjectId?: string | null, targetWorkspaceId?: string | null): Promise<MotionTask> {
+  async moveTask(taskId: string, targetWorkspaceId: string, assigneeId?: string | null): Promise<MotionTask> {
     try {
-      if (!targetProjectId && !targetWorkspaceId) {
-        throw new Error('Either targetProjectId or targetWorkspaceId must be provided');
-      }
-      
       mcpLog(LOG_LEVELS.DEBUG, 'Moving task in Motion API', {
         method: 'moveTask',
         taskId,
-        targetProjectId,
-        targetWorkspaceId
+        targetWorkspaceId,
+        assigneeId
       });
 
-      const moveData: { projectId?: string; workspaceId?: string } = {};
-      if (targetProjectId) moveData.projectId = targetProjectId;
-      if (targetWorkspaceId) moveData.workspaceId = targetWorkspaceId;
-      
-      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => 
+      // API requires workspaceId, optionally accepts assigneeId
+      const moveData: { workspaceId: string; assigneeId?: string } = {
+        workspaceId: targetWorkspaceId,
+      };
+      if (assigneeId) moveData.assigneeId = assigneeId;
+
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() =>
         this.client.patch(`/tasks/${taskId}/move`, moveData)
       );
-      
+
       mcpLog(LOG_LEVELS.INFO, 'Task moved successfully', {
         method: 'moveTask',
         taskId,
-        targetProjectId,
-        targetWorkspaceId
+        targetWorkspaceId,
+        assigneeId
       });
 
       // Note: No task cache currently implemented - tasks are not cached due to frequent updates
@@ -869,8 +892,8 @@ export class MotionApiService {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to move task', {
         method: 'moveTask',
         taskId,
-        targetProjectId,
         targetWorkspaceId,
+        assigneeId,
         error: getErrorMessage(error),
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
@@ -886,8 +909,8 @@ export class MotionApiService {
         taskId
       });
 
-      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => 
-        this.client.patch(`/tasks/${taskId}/unassign`)
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() =>
+        this.client.delete(`/tasks/${taskId}/assignee`)
       );
       
       mcpLog(LOG_LEVELS.INFO, 'Task unassigned successfully', {
@@ -914,14 +937,25 @@ export class MotionApiService {
   // WORKSPACE API METHODS
   // ========================================
 
-  async getWorkspaces(): Promise<MotionWorkspace[]> {
-    return this.workspaceCache.withCache('workspaces', async () => {
+  async getWorkspaces(ids?: string[]): Promise<MotionWorkspace[]> {
+    const cacheKey = ids ? `workspaces:${ids.join(',')}` : 'workspaces';
+    return this.workspaceCache.withCache(cacheKey, async () => {
       try {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching workspaces from Motion API', {
-          method: 'getWorkspaces'
+          method: 'getWorkspaces',
+          filterIds: ids
         });
 
-        const response: AxiosResponse = await this.requestWithRetry(() => this.client.get('/workspaces'));
+        const params = new URLSearchParams();
+        if (ids && ids.length > 0) {
+          for (const id of ids) {
+            params.append('ids', id);
+          }
+        }
+        const queryString = params.toString();
+        const url = queryString ? `/workspaces?${queryString}` : '/workspaces';
+
+        const response: AxiosResponse = await this.requestWithRetry(() => this.client.get(url));
         
         // Validate the response structure
         const validatedResponse = this.validateResponse(
@@ -958,19 +992,23 @@ export class MotionApiService {
   // USER API METHODS
   // ========================================
 
-  async getUsers(workspaceId?: string): Promise<MotionUser[]> {
-    const cacheKey = workspaceId ? `users:workspace:${workspaceId}` : 'users:all';
-    
+  async getUsers(workspaceId?: string, teamId?: string): Promise<MotionUser[]> {
+    const cacheKey = teamId ? `users:team:${teamId}` : workspaceId ? `users:workspace:${workspaceId}` : 'users:all';
+
     return this.userCache.withCache(cacheKey, async () => {
       try {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching users from Motion API', {
           method: 'getUsers',
-          workspaceId
+          workspaceId,
+          teamId
         });
 
         const params = new URLSearchParams();
         if (workspaceId) {
           params.append('workspaceId', workspaceId);
+        }
+        if (teamId) {
+          params.append('teamId', teamId);
         }
 
         const queryString = params.toString();
@@ -1049,7 +1087,7 @@ export class MotionApiService {
    */
   async resolveProjectIdentifier(
     identifier: { projectId?: string; projectName?: string },
-    workspaceId: string
+    workspaceId?: string
   ): Promise<MotionProject | undefined> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Resolving project identifier', {
@@ -1211,7 +1249,7 @@ export class MotionApiService {
     }
   }
 
-  async getProjectByName(projectName: string, workspaceId: string): Promise<MotionProject | undefined> {
+  async getProjectByName(projectName: string, workspaceId?: string): Promise<MotionProject | undefined> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Finding project by name', {
         method: 'getProjectByName',
@@ -1219,21 +1257,23 @@ export class MotionApiService {
         workspaceId
       });
 
-      // First, search in the specified workspace
-      const { items: projects } = await this.getProjects(workspaceId);
-      const project = projects.find(p => p.name === projectName);
+      // First, search in the specified workspace (if provided)
+      if (workspaceId) {
+        const { items: projects } = await this.getProjects(workspaceId);
+        const project = projects.find(p => p.name === projectName);
 
-      if (project) {
-        mcpLog(LOG_LEVELS.INFO, 'Project found by name in specified workspace', {
-          method: 'getProjectByName',
-          projectName,
-          projectId: project.id,
-          workspaceId
-        });
-        return project;
+        if (project) {
+          mcpLog(LOG_LEVELS.INFO, 'Project found by name in specified workspace', {
+            method: 'getProjectByName',
+            projectName,
+            projectId: project.id,
+            workspaceId
+          });
+          return project;
+        }
       }
 
-      // If not found in specified workspace, search across all other workspaces
+      // If not found in specified workspace (or none specified), search across all other workspaces
       mcpLog(LOG_LEVELS.DEBUG, 'Project not found in specified workspace, searching all workspaces', {
         method: 'getProjectByName',
         projectName,
@@ -1802,7 +1842,7 @@ export class MotionApiService {
    * @param value - Optional value for the field
    * @returns Updated project data
    */
-  async addCustomFieldToProject(projectId: string, fieldId: string, value?: string | number | boolean | string[] | null): Promise<MotionProject> {
+  async addCustomFieldToProject(projectId: string, fieldId: string, value?: string | number | boolean | string[] | null, fieldType?: string): Promise<MotionProject> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Adding custom field to project', {
         method: 'addCustomFieldToProject',
@@ -1811,13 +1851,19 @@ export class MotionApiService {
         hasValue: value !== undefined
       });
 
-      const requestData = {
-        fieldId,
-        ...(value !== undefined && { value })
+      // API expects: { customFieldInstanceId, value: { type, value } }
+      const requestData: Record<string, unknown> = {
+        customFieldInstanceId: fieldId,
       };
+      if (value !== undefined) {
+        requestData.value = {
+          type: fieldType || 'text',
+          value
+        };
+      }
 
-      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() => 
-        this.client.post(`/projects/${projectId}/custom-fields`, requestData)
+      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() =>
+        this.client.post(`/beta/custom-field-values/project/${projectId}`, requestData)
       );
       
       // Invalidate project cache for specific workspace if available
@@ -1862,13 +1908,13 @@ export class MotionApiService {
         fieldId
       });
 
-      await this.requestWithRetry(() => 
-        this.client.delete(`/projects/${projectId}/custom-fields/${fieldId}`)
+      await this.requestWithRetry(() =>
+        this.client.delete(`/beta/custom-field-values/project/${projectId}/custom-fields/${fieldId}`)
       );
-      
+
       // Invalidate all project caches since we don't have workspace context here
       this.projectCache.invalidate(`projects:`);
-      
+
       mcpLog(LOG_LEVELS.INFO, 'Custom field removed from project successfully', {
         method: 'removeCustomFieldFromProject',
         projectId,
@@ -1896,7 +1942,7 @@ export class MotionApiService {
    * @param value - Optional value for the field
    * @returns Updated task data
    */
-  async addCustomFieldToTask(taskId: string, fieldId: string, value?: string | number | boolean | string[] | null): Promise<MotionTask> {
+  async addCustomFieldToTask(taskId: string, fieldId: string, value?: string | number | boolean | string[] | null, fieldType?: string): Promise<MotionTask> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Adding custom field to task', {
         method: 'addCustomFieldToTask',
@@ -1905,13 +1951,19 @@ export class MotionApiService {
         hasValue: value !== undefined
       });
 
-      const requestData = {
-        fieldId,
-        ...(value !== undefined && { value })
+      // API expects: { customFieldInstanceId, value: { type, value } }
+      const requestData: Record<string, unknown> = {
+        customFieldInstanceId: fieldId,
       };
+      if (value !== undefined) {
+        requestData.value = {
+          type: fieldType || 'text',
+          value
+        };
+      }
 
-      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => 
-        this.client.post(`/tasks/${taskId}/custom-fields`, requestData)
+      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() =>
+        this.client.post(`/beta/custom-field-values/task/${taskId}`, requestData)
       );
       
       // Note: No task cache currently implemented - tasks are not cached due to frequent updates
@@ -1950,8 +2002,8 @@ export class MotionApiService {
         fieldId
       });
 
-      await this.requestWithRetry(() => 
-        this.client.delete(`/tasks/${taskId}/custom-fields/${fieldId}`)
+      await this.requestWithRetry(() =>
+        this.client.delete(`/beta/custom-field-values/task/${taskId}/custom-fields/${fieldId}`)
       );
       
       // Note: No task cache currently implemented - tasks are not cached due to frequent updates

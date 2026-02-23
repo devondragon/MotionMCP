@@ -105,7 +105,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       assigneeId: {
         type: "string",
-        description: "Filter by assignee (for list and list_all_uncompleted)"
+        description: "Filter by assignee (for list and list_all_uncompleted), or new assignee (for move)"
       },
       assignee: {
         type: "string",
@@ -113,12 +113,12 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       priority: {
         type: "string",
-        description: "Filter by priority level (for list): ASAP, HIGH, MEDIUM, LOW",
+        description: "Filter by priority level (for list, filtered client-side): ASAP, HIGH, MEDIUM, LOW",
         enum: ["ASAP", "HIGH", "MEDIUM", "LOW"]
       },
       dueDate: {
         type: "string",
-        description: "Due date (for create/update) or filter (for list). Date-only values are stored as end-of-day UTC. Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
+        description: "Due date (for create/update) or filter (for list, filtered client-side). Date-only values are stored as end-of-day UTC. Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
       },
       labels: {
         type: "array",
@@ -129,7 +129,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       name: {
         type: "string",
-        description: "Task name (required for create)"
+        description: "Task name (required for create, optional for list as case-insensitive substring search)"
       },
       description: {
         type: "string",
@@ -168,13 +168,9 @@ export const tasksToolDefinition: McpToolDefinition = {
         ],
         description: "Auto-scheduling configuration. Requires a schedule name. Use motion_schedules to see available schedules. Examples: 'Work Hours' or {schedule: 'Work Hours', deadlineType: 'SOFT'}"
       },
-      targetProjectId: {
-        type: "string",
-        description: "Target project for move operation"
-      },
       targetWorkspaceId: {
         type: "string",
-        description: "Target workspace for move operation"
+        description: "Target workspace ID (required for move operation)"
       },
       limit: {
         type: "number",
@@ -285,6 +281,10 @@ export const usersToolDefinition: McpToolDefinition = {
       workspaceName: {
         type: "string",
         description: "Workspace name (alternative to workspaceId, ignored for current)"
+      },
+      teamId: {
+        type: "string",
+        description: "Team ID to filter users by (optional for list operation)"
       }
     },
     required: ["operation"]
@@ -332,7 +332,7 @@ export const customFieldsToolDefinition: McpToolDefinition = {
       },
       fieldId: {
         type: "string",
-        description: "Custom field ID"
+        description: "Custom field instance ID. For remove_from_project/remove_from_task, this is the custom field value ID"
       },
       workspaceId: {
         type: "string",

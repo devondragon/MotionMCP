@@ -77,7 +77,7 @@ export class CustomFieldHandler extends BaseHandler {
       return this.handleError(new Error('Project ID and field ID are required for add_to_project operation'));
     }
 
-    await this.motionService.addCustomFieldToProject(args.projectId, args.fieldId, args.value);
+    await this.motionService.addCustomFieldToProject(args.projectId, args.fieldId, args.value, args.field);
     return formatCustomFieldSuccess('added', 'project', args.projectId);
   }
 
@@ -95,7 +95,7 @@ export class CustomFieldHandler extends BaseHandler {
       return this.handleError(new Error('Task ID and field ID are required for add_to_task operation'));
     }
 
-    await this.motionService.addCustomFieldToTask(args.taskId, args.fieldId, args.value);
+    await this.motionService.addCustomFieldToTask(args.taskId, args.fieldId, args.value, args.field);
     return formatCustomFieldSuccess('added', 'task', args.taskId);
   }
 
