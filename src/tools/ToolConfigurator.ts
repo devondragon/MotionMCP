@@ -19,12 +19,12 @@ export class ToolConfigurator {
     if (!validConfigs.includes(this.config) && !this.config.startsWith('custom:')) {
       mcpLog(LOG_LEVELS.ERROR, `Invalid MOTION_MCP_TOOLS configuration: "${this.config}"`, {
         validOptions: [...validConfigs, 'custom:tool1,tool2,...'],
-        defaulting: 'essential'
+        defaulting: 'complete'
       });
 
-      // Still default to essential, but log it prominently
-      mcpLog(LOG_LEVELS.WARN, 'Defaulting to "essential" configuration');
-      this.config = 'essential';
+      // Still default to complete, but log it prominently
+      mcpLog(LOG_LEVELS.WARN, 'Defaulting to "complete" configuration');
+      this.config = 'complete';
     }
 
     // For custom configurations, validate tool names exist

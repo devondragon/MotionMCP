@@ -14,6 +14,7 @@ import { InputValidator } from './utils/validator';
 import { HandlerContext } from './handlers/base/HandlerInterface';
 import { HandlerFactory } from './handlers/HandlerFactory';
 import { ToolRegistry, ToolConfigurator } from './tools';
+import { SERVER_INSTRUCTIONS } from './constants';
 import * as dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
@@ -29,7 +30,7 @@ class MotionMCPServer {
     this.server = new Server(
       {
         name: "motion-mcp-server",
-        version: "2.0.0",
+        version: "2.4.0",
       },
       {
         capabilities: {
@@ -37,6 +38,7 @@ class MotionMCPServer {
           prompts: {},
           resources: {},
         },
+        instructions: SERVER_INSTRUCTIONS,
       }
     );
 
@@ -51,7 +53,7 @@ class MotionMCPServer {
   private initializeTools(): void {
     this.toolRegistry = new ToolRegistry();
     this.toolConfigurator = new ToolConfigurator(
-      process.env.MOTION_MCP_TOOLS || 'essential',
+      process.env.MOTION_MCP_TOOLS || 'complete',
       this.toolRegistry
     );
   }

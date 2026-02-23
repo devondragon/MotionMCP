@@ -6,6 +6,7 @@ import { InputValidator } from "./utils/validator";
 import { HandlerFactory } from "./handlers/HandlerFactory";
 import { ToolRegistry, ToolConfigurator } from "./tools";
 import { jsonSchemaToZodShape } from "./utils/jsonSchemaToZod";
+import { SERVER_INSTRUCTIONS } from "./constants";
 
 interface Env {
   MOTION_API_KEY: string;
@@ -15,10 +16,10 @@ interface Env {
 }
 
 export class MotionMCPAgent extends McpAgent<Env> {
-  server = new McpServer({
-    name: "motion-mcp-server",
-    version: "2.3.0",
-  });
+  server = new McpServer(
+    { name: "motion-mcp-server", version: "2.4.0" },
+    { instructions: SERVER_INSTRUCTIONS },
+  );
 
   async init() {
     const motionService = new MotionApiService(this.env.MOTION_API_KEY);
@@ -29,7 +30,7 @@ export class MotionMCPAgent extends McpAgent<Env> {
 
     const registry = new ToolRegistry();
     const configurator = new ToolConfigurator(
-      this.env.MOTION_MCP_TOOLS || "essential",
+      this.env.MOTION_MCP_TOOLS || "complete",
       registry
     );
     const enabledTools = configurator.getEnabledTools();
