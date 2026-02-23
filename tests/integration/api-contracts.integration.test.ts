@@ -251,8 +251,7 @@ describeIf('API contract tests (real Motion API)', () => {
       });
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('name');
-      console.log(`[Verify #3] Project created without description. Has description: ${'description' in result}`);
-      console.log(`[Verify #3] Project response keys: ${Object.keys(result).join(', ')}`);
+      // Verified: API accepts projects without description and returns one in the response (empty string)
       // Note: Motion API doesn't have a delete project endpoint, so this project will persist
     });
   });
@@ -269,6 +268,8 @@ describeIf('API contract tests (real Motion API)', () => {
 
     afterAll(async () => {
       // Cleanup: remove custom field from task, delete task, delete custom field
+      // Note: removeCustomFieldFromTask expects a valueId (assignment ID), not the field definition ID.
+      // The add response ({ type, value }) doesn't expose an assignment ID, so this cleanup may fail silently.
       if (cfTestTaskId && customFieldId) {
         try { await service.removeCustomFieldFromTask(cfTestTaskId, customFieldId); } catch { /* ignore */ }
         await rateLimitDelay();
@@ -294,13 +295,8 @@ describeIf('API contract tests (real Motion API)', () => {
         expect(typeof field.id).toBe('string');
         customFieldId = field.id;
 
-        // Verify #1: Does the API response use 'field' or 'type' for the field type?
-        const hasFieldProp = 'field' in field;
-        const hasTypeProp = 'type' in field;
-        console.log(`[Verify #1] Custom field POST response keys: ${Object.keys(field).join(', ')}`);
-        console.log(`[Verify #1] Has 'field': ${hasFieldProp}, Has 'type': ${hasTypeProp}`);
-        // Assert at least one is present
-        expect(hasFieldProp || hasTypeProp).toBe(true);
+        // The API response shape uses either 'field' or 'type' for the field type
+        expect('field' in field || 'type' in field).toBe(true);
       } catch (err: any) {
         // Beta endpoints may not be available (404)
         if (err?.statusCode === 404 || err?.originalError?.response?.status === 404 ||
@@ -324,10 +320,9 @@ describeIf('API contract tests (real Motion API)', () => {
         const found = fields.find((f) => f.id === customFieldId);
         expect(found).toBeDefined();
 
-        // Verify #1: Log the shape of custom fields from GET endpoint
+        // Verify field shape is consistent between POST and GET
         if (found) {
-          console.log(`[Verify #1] GET custom field response keys: ${Object.keys(found).join(', ')}`);
-          console.log(`[Verify #1] GET 'field' value: ${(found as any).field}, 'type' value: ${(found as any).type}`);
+          expect('field' in found || 'type' in found).toBe(true);
         }
       }
     });

@@ -1919,16 +1919,16 @@ export class MotionApiService {
    * @param fieldId - ID of the custom field
    * @returns Success indicator
    */
-  async removeCustomFieldFromProject(projectId: string, fieldId: string): Promise<{ success: boolean }> {
+  async removeCustomFieldFromProject(projectId: string, valueId: string): Promise<{ success: boolean }> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Removing custom field from project', {
         method: 'removeCustomFieldFromProject',
         projectId,
-        fieldId
+        valueId
       });
 
       await this.requestWithRetry(() =>
-        this.client.delete(`/beta/custom-field-values/project/${projectId}/custom-fields/${fieldId}`)
+        this.client.delete(`/beta/custom-field-values/project/${projectId}/custom-fields/${valueId}`)
       );
 
       // Invalidate all project caches since we don't have workspace context here
@@ -1937,7 +1937,7 @@ export class MotionApiService {
       mcpLog(LOG_LEVELS.INFO, 'Custom field removed from project successfully', {
         method: 'removeCustomFieldFromProject',
         projectId,
-        fieldId
+        valueId
       });
 
       return { success: true };
@@ -1948,7 +1948,7 @@ export class MotionApiService {
         apiStatus: isAxiosError(error) ? error.response?.status : undefined,
         apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
         projectId,
-        fieldId
+        valueId
       });
       throw this.formatApiError(error, 'update', 'project', projectId);
     }
