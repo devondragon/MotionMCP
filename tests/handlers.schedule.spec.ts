@@ -33,137 +33,18 @@ function makeContext() {
 
 describe('ScheduleHandler', () => {
   describe('list operation', () => {
-    it('lists all schedules without filters', async () => {
+    it('lists all schedules', async () => {
       const { ctx, motionService } = makeContext();
       const handler = new ScheduleHandler(ctx);
       const args: MotionSchedulesArgs = {};
 
       const res = await handler.handle(args);
 
-      expect(motionService.getSchedules).toHaveBeenCalledWith(undefined, undefined, undefined);
+      expect(motionService.getSchedules).toHaveBeenCalledWith();
       expect(res.isError).toBeFalsy();
       const text = (res.content?.[0] as any)?.text || '';
       expect(text).toContain('Work Hours');
       expect(text).toContain('Personal Time');
-    });
-
-    it('lists schedules with userId filter', async () => {
-      const { ctx, motionService } = makeContext();
-      const handler = new ScheduleHandler(ctx);
-      const args: MotionSchedulesArgs = { userId: 'user1' };
-
-      const res = await handler.handle(args);
-
-      expect(motionService.getSchedules).toHaveBeenCalledWith('user1', undefined, undefined);
-      expect(res.isError).toBeFalsy();
-    });
-
-    it('lists schedules with date range', async () => {
-      const { ctx, motionService } = makeContext();
-      const handler = new ScheduleHandler(ctx);
-      const args: MotionSchedulesArgs = {
-        startDate: '2024-01-01',
-        endDate: '2024-01-31',
-      };
-
-      const res = await handler.handle(args);
-
-      expect(motionService.getSchedules).toHaveBeenCalledWith(undefined, '2024-01-01', '2024-01-31');
-      expect(res.isError).toBeFalsy();
-    });
-
-    it('lists schedules with all filters', async () => {
-      const { ctx, motionService } = makeContext();
-      const handler = new ScheduleHandler(ctx);
-      const args: MotionSchedulesArgs = {
-        userId: 'user1',
-        startDate: '2024-01-01',
-        endDate: '2024-01-31',
-      };
-
-      const res = await handler.handle(args);
-
-      expect(motionService.getSchedules).toHaveBeenCalledWith('user1', '2024-01-01', '2024-01-31');
-      expect(res.isError).toBeFalsy();
-    });
-
-    it('accepts ISO datetime format for dates', async () => {
-      const { ctx, motionService } = makeContext();
-      const handler = new ScheduleHandler(ctx);
-      const args: MotionSchedulesArgs = {
-        startDate: '2024-01-15T10:30:00Z',
-        endDate: '2024-01-20T15:00:00Z',
-      };
-
-      const res = await handler.handle(args);
-
-      expect(motionService.getSchedules).toHaveBeenCalledWith(
-        undefined,
-        '2024-01-15T10:30:00Z',
-        '2024-01-20T15:00:00Z'
-      );
-      expect(res.isError).toBeFalsy();
-    });
-  });
-
-  describe('date validation', () => {
-    it('returns error for invalid startDate', async () => {
-      const { ctx } = makeContext();
-      const handler = new ScheduleHandler(ctx);
-      const args: MotionSchedulesArgs = {
-        startDate: 'not-a-date',
-      };
-
-      const res = await handler.handle(args);
-
-      expect(res.isError).toBe(true);
-      const text = (res.content?.[0] as any)?.text || '';
-      expect(text).toContain('startDate');
-      expect(text).toContain('valid date');
-    });
-
-    it('returns error for invalid endDate', async () => {
-      const { ctx } = makeContext();
-      const handler = new ScheduleHandler(ctx);
-      const args: MotionSchedulesArgs = {
-        endDate: 'invalid',
-      };
-
-      const res = await handler.handle(args);
-
-      expect(res.isError).toBe(true);
-      const text = (res.content?.[0] as any)?.text || '';
-      expect(text).toContain('endDate');
-      expect(text).toContain('valid date');
-    });
-
-    it('returns error when startDate is after endDate', async () => {
-      const { ctx } = makeContext();
-      const handler = new ScheduleHandler(ctx);
-      const args: MotionSchedulesArgs = {
-        startDate: '2024-01-31',
-        endDate: '2024-01-01',
-      };
-
-      const res = await handler.handle(args);
-
-      expect(res.isError).toBe(true);
-      const text = (res.content?.[0] as any)?.text || '';
-      expect(text).toContain('startDate must be before');
-    });
-
-    it('allows startDate equal to endDate', async () => {
-      const { ctx, motionService } = makeContext();
-      const handler = new ScheduleHandler(ctx);
-      const args: MotionSchedulesArgs = {
-        startDate: '2024-01-15',
-        endDate: '2024-01-15',
-      };
-
-      const res = await handler.handle(args);
-
-      expect(motionService.getSchedules).toHaveBeenCalled();
-      expect(res.isError).toBeFalsy();
     });
   });
 

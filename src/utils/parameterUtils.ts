@@ -38,8 +38,6 @@ interface TaskArgs extends WorkspaceArgs {
 interface ProjectArgs extends WorkspaceArgs {
   name?: string;
   description?: string;
-  color?: string;
-  status?: string;
 }
 
 /**
@@ -79,7 +77,7 @@ export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs 
  * @param value - The autoScheduled value from MCP request
  * @returns Proper autoScheduled value for Motion API, or undefined for invalid types
  */
-function parseAutoScheduledParam(value: unknown): Record<string, unknown> | null | undefined {
+export function parseAutoScheduledParam(value: unknown): Record<string, unknown> | null | undefined {
   // If undefined, leave as undefined (field not provided)
   if (value === undefined) {
     return undefined;
@@ -187,8 +185,6 @@ export function parseProjectArgs(args: Record<string, unknown> = {}): ProjectArg
   return {
     name: args.name ? sanitizeName(args.name as string) : undefined,
     description: sanitizeDescription(args.description as string),
-    color: (args.color as string) || undefined,
-    status: (args.status as string) || undefined,
     ...parseWorkspaceArgs(args)
   };
 }

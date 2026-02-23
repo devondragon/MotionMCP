@@ -336,9 +336,9 @@ describe('parseProjectArgs', () => {
     expect(result.name).toBe('Project');
   });
 
-  it('parses color', () => {
-    const result = parseProjectArgs({ color: '#ff0000' });
-    expect(result.color).toBe('#ff0000');
+  it('parses description', () => {
+    const result = parseProjectArgs({ description: 'A test project' });
+    expect(result.description).toBe('A test project');
   });
 });
 

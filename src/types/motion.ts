@@ -267,7 +267,7 @@ export interface CreateRecurringTaskData {
   frequency: FrequencyObject;
   description?: string;
   deadlineType?: 'HARD' | 'SOFT';
-  duration?: number | 'NONE' | 'REMINDER';
+  duration?: number | 'REMINDER';
   startingOn?: string;
   idealTime?: string;
   schedule?: string;

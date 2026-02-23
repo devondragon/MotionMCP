@@ -58,6 +58,8 @@
     "watch": "tsc --watch",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest --config vitest.integration.config.ts",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",
     "worker:type-check": "tsc --noEmit -p tsconfig.worker.json",

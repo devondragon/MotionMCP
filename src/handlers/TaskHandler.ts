@@ -5,6 +5,7 @@ import { MotionTask } from '../types/motion';
 import {
   formatMcpSuccess,
   parseTaskArgs,
+  parseAutoScheduledParam,
   formatTaskList,
   formatTaskDetail,
   normalizeDueDateForApi
@@ -392,7 +393,10 @@ export class TaskHandler extends BaseHandler {
     }
     // API accepts labels as plain string array per docs
     if (params.labels !== undefined) updateData.labels = params.labels;
-    if (params.autoScheduled !== undefined) updateData.autoScheduled = params.autoScheduled as Record<string, unknown> | null;
+    if (params.autoScheduled !== undefined) {
+      // Normalize string shorthand (e.g., "Work Hours") to { schedule: "Work Hours" }
+      updateData.autoScheduled = parseAutoScheduledParam(params.autoScheduled);
+    }
 
     const updatedTask = await this.motionService.updateTask(params.taskId, updateData);
     return formatMcpSuccess(`Successfully updated task "${updatedTask.name}" (ID: ${updatedTask.id})`);
@@ -427,7 +431,10 @@ export class TaskHandler extends BaseHandler {
     }
 
     const movedTask = await this.motionService.moveTask(params.taskId, params.targetWorkspaceId, params.assigneeId);
-    return formatMcpSuccess(`Successfully moved task "${movedTask.name}" (ID: ${movedTask.id})`);
+    if (movedTask?.name) {
+      return formatMcpSuccess(`Successfully moved task "${movedTask.name}" (ID: ${movedTask.id})`);
+    }
+    return formatMcpSuccess(`Successfully moved task (ID: ${params.taskId})`);
   }
 
   /**
@@ -441,7 +448,10 @@ export class TaskHandler extends BaseHandler {
     }
 
     const unassignedTask = await this.motionService.unassignTask(params.taskId);
-    return formatMcpSuccess(`Successfully unassigned task "${unassignedTask.name}" (ID: ${unassignedTask.id})`);
+    if (unassignedTask?.name) {
+      return formatMcpSuccess(`Successfully unassigned task "${unassignedTask.name}" (ID: ${unassignedTask.id})`);
+    }
+    return formatMcpSuccess(`Successfully unassigned task (ID: ${params.taskId})`);
   }
 
   /**

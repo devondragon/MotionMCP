@@ -49,8 +49,12 @@ export class CustomFieldHandler extends BaseHandler {
       return this.handleError(new Error(`Field name exceeds ${LIMITS.CUSTOM_FIELD_NAME_MAX_LENGTH} characters`));
     }
 
-    if (['select', 'multiSelect'].includes(args.field) !== Boolean(args.options)) {
-      return this.handleError(new Error('Options parameter only allowed for select/multiSelect field types'));
+    const isSelectType = ['select', 'multiSelect'].includes(args.field);
+    if (!isSelectType && args.options) {
+      return this.handleError(new Error('Options parameter is only allowed for select/multiSelect field types'));
+    }
+    if (isSelectType && !args.options) {
+      return this.handleError(new Error('Options parameter is required for select/multiSelect field types'));
     }
 
     const fieldData: CreateCustomFieldData = {
@@ -82,11 +86,11 @@ export class CustomFieldHandler extends BaseHandler {
   }
 
   private async handleRemoveFromProject(args: MotionCustomFieldsArgs): Promise<McpToolResponse> {
-    if (!args.projectId || !args.fieldId) {
-      return this.handleError(new Error('Project ID and field ID are required for remove_from_project operation'));
+    if (!args.projectId || !args.valueId) {
+      return this.handleError(new Error('Project ID and valueId (custom field value ID) are required for remove_from_project operation'));
     }
 
-    await this.motionService.removeCustomFieldFromProject(args.projectId, args.fieldId);
+    await this.motionService.removeCustomFieldFromProject(args.projectId, args.valueId);
     return formatCustomFieldSuccess('removed', 'project', args.projectId);
   }
 
@@ -100,11 +104,11 @@ export class CustomFieldHandler extends BaseHandler {
   }
 
   private async handleRemoveFromTask(args: MotionCustomFieldsArgs): Promise<McpToolResponse> {
-    if (!args.taskId || !args.fieldId) {
-      return this.handleError(new Error('Task ID and field ID are required for remove_from_task operation'));
+    if (!args.taskId || !args.valueId) {
+      return this.handleError(new Error('Task ID and valueId (custom field value ID) are required for remove_from_task operation'));
     }
 
-    await this.motionService.removeCustomFieldFromTask(args.taskId, args.fieldId);
+    await this.motionService.removeCustomFieldFromTask(args.taskId, args.valueId);
     return formatCustomFieldSuccess('removed', 'task', args.taskId);
   }
 }

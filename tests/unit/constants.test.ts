@@ -129,10 +129,10 @@ describe('isValidPriority', () => {
 });
 
 describe('createMinimalPayload', () => {
-  it('removes null values', () => {
+  it('preserves null values (API distinguishes absent vs null)', () => {
     const result = createMinimalPayload({ name: 'test', value: null });
-    expect(result).toEqual({ name: 'test' });
-    expect('value' in result).toBe(false);
+    expect(result).toEqual({ name: 'test', value: null });
+    expect('value' in result).toBe(true);
   });
 
   it('removes undefined values', () => {
@@ -147,10 +147,10 @@ describe('createMinimalPayload', () => {
     expect('description' in result).toBe(false);
   });
 
-  it('removes empty arrays', () => {
+  it('preserves empty arrays (e.g., labels: [] to clear labels)', () => {
     const result = createMinimalPayload({ name: 'test', labels: [] });
-    expect(result).toEqual({ name: 'test' });
-    expect('labels' in result).toBe(false);
+    expect(result).toEqual({ name: 'test', labels: [] });
+    expect('labels' in result).toBe(true);
   });
 
   it('removes empty objects', () => {
@@ -188,7 +188,7 @@ describe('createMinimalPayload', () => {
       d: [],
       e: {}
     });
-    expect(result).toEqual({ name: 'test' });
+    expect(result).toEqual({ name: 'test', a: null, d: [] });
   });
 });
 

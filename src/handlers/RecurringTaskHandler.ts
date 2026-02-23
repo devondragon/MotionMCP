@@ -38,8 +38,8 @@ export class RecurringTaskHandler extends BaseHandler {
     }
 
     // Validate frequency
-    if (!args.frequency.type || !['daily', 'weekly', 'monthly', 'yearly'].includes(args.frequency.type)) {
-      return this.handleError(new Error('Frequency type must be one of: daily, weekly, monthly, yearly'));
+    if (!args.frequency.type || !['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', 'custom'].includes(args.frequency.type)) {
+      return this.handleError(new Error('Frequency type must be one of: daily, weekly, biweekly, monthly, quarterly, yearly, custom'));
     }
 
     // Additional validations would go here...

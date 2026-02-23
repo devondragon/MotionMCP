@@ -29,11 +29,9 @@ export interface MotionProjectsArgs {
   projectId?: string;
   workspaceId?: string;
   workspaceName?: string;
-  // Create/Update params
+  // Create params
   name?: string;
   description?: string;
-  color?: string;
-  status?: string;
 }
 
 export interface MotionTasksArgs {
@@ -82,7 +80,8 @@ export interface MotionCommentsArgs {
 export interface MotionCustomFieldsArgs {
   operation: 'list' | 'create' | 'delete' | 'add_to_project' | 'remove_from_project' | 'add_to_task' | 'remove_from_task';
   fieldId?: string;
-  workspaceId: string;
+  valueId?: string;
+  workspaceId?: string;
   name?: string;
   field?: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 'phone' | 'select' | 'multiSelect' | 'number' | 'email' | 'checkbox' | 'relatedTo';
   options?: string[];
@@ -109,9 +108,7 @@ export interface MotionRecurringTasksArgs {
 }
 
 export interface MotionSchedulesArgs {
-  userId?: string;
-  startDate?: string;
-  endDate?: string;
+  // The Motion API GET /schedules accepts no query parameters
 }
 
 export interface MotionStatusesArgs {

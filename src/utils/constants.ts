@@ -151,18 +151,15 @@ export function createMinimalPayload<T extends Record<string, any>>(obj: T): Par
   for (const key in obj) {
     const value = obj[key];
 
-    // Skip null, undefined, empty strings, and empty arrays
-    if (value === null || value === undefined || value === '') {
-      continue;
-    }
-
-    // Skip empty arrays
-    if (Array.isArray(value) && value.length === 0) {
+    // Skip undefined and empty strings only.
+    // Preserve null (API may distinguish absent vs null, e.g., autoScheduled: null).
+    // Preserve empty arrays (e.g., labels: [] to clear all labels).
+    if (value === undefined || value === '') {
       continue;
     }
 
     // Skip empty objects (but preserve objects with properties)
-    if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length === 0) {
       continue;
     }
 

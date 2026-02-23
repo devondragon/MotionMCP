@@ -7,6 +7,7 @@ import {
   MotionComment,
   CreateCommentData,
   MotionCustomField,
+  MotionCustomFieldValue,
   CreateCustomFieldData,
   MotionRecurringTask,
   CreateRecurringTaskData,
@@ -327,20 +328,18 @@ export class MotionApiService {
           ...(limit ? { maxItems: limit } : {})
         });
 
-        if (paginatedResult.totalFetched > 0) {
-          let projects = paginatedResult.items;
+        const projects = paginatedResult.items;
 
-          mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully with pagination', {
-            method: 'getProjects',
-            totalCount: projects.length,
-            hasMore: paginatedResult.hasMore,
-            workspaceId
-          });
+        mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully with pagination', {
+          method: 'getProjects',
+          totalCount: projects.length,
+          hasMore: paginatedResult.hasMore,
+          workspaceId
+        });
 
-          // Cache only items, not truncation metadata
-          this.projectCache.set(cacheKey, projects);
-          return { items: projects, truncation: paginatedResult.truncation };
-        }
+        // Cache only items, not truncation metadata
+        this.projectCache.set(cacheKey, projects);
+        return { items: projects, truncation: paginatedResult.truncation };
       } catch (paginationError) {
         mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
           method: 'getProjects',
@@ -668,27 +667,41 @@ export class MotionApiService {
       };
 
       try {
-        // Attempt pagination-aware fetch with new response wrapper
-        const paginatedResult = await fetchAllPagesNew<MotionTask>(fetchPage, 'tasks', { 
+        // When client-side filters are active, don't cap pagination with maxItems
+        // because valid matches may exist beyond the first batch. Fetch all pages
+        // and apply the limit after filtering instead.
+        const hasClientFilters = Boolean(priority || dueDate);
+        const paginatedResult = await fetchAllPagesNew<MotionTask>(fetchPage, 'tasks', {
           maxPages,
           logProgress: false,  // Less verbose for tasks
-          ...(limit ? { maxItems: limit } : {})
+          ...(!hasClientFilters && limit ? { maxItems: limit } : {})
         });
-        
-        if (paginatedResult.totalFetched > 0) {
-          const filteredItems = applyClientFilters(paginatedResult.items);
-          mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully with pagination', {
-            method: 'getTasks',
-            totalCount: paginatedResult.totalFetched,
-            returnedCount: filteredItems.length,
-            clientFiltered: filteredItems.length !== paginatedResult.items.length,
-            hasMore: paginatedResult.hasMore,
-            workspaceId,
-            projectId,
-            limitApplied: limit
-          });
-          return { items: filteredItems, truncation: paginatedResult.truncation };
+
+        let filteredItems = applyClientFilters(paginatedResult.items);
+        let truncation = paginatedResult.truncation;
+
+        // Apply limit after client-side filtering
+        if (hasClientFilters && limit && limit > 0 && filteredItems.length > limit) {
+          truncation = {
+            wasTruncated: true,
+            returnedCount: limit,
+            reason: 'max_items',
+            limit,
+          };
+          filteredItems = filteredItems.slice(0, limit);
         }
+
+        mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully with pagination', {
+          method: 'getTasks',
+          totalCount: paginatedResult.totalFetched,
+          returnedCount: filteredItems.length,
+          clientFiltered: filteredItems.length !== paginatedResult.items.length,
+          hasMore: paginatedResult.hasMore,
+          workspaceId,
+          projectId,
+          limitApplied: limit
+        });
+        return { items: filteredItems, truncation };
       } catch (paginationError) {
         // Fallback to simple fetch if pagination fails
         mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
@@ -859,7 +872,7 @@ export class MotionApiService {
     }
   }
 
-  async moveTask(taskId: string, targetWorkspaceId: string, assigneeId?: string): Promise<MotionTask> {
+  async moveTask(taskId: string, targetWorkspaceId: string, assigneeId?: string): Promise<MotionTask | undefined> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Moving task in Motion API', {
         method: 'moveTask',
@@ -874,7 +887,7 @@ export class MotionApiService {
       };
       if (assigneeId !== undefined) moveData.assigneeId = assigneeId;
 
-      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() =>
+      const response = await this.requestWithRetry(() =>
         this.client.patch(`/tasks/${taskId}/move`, moveData)
       );
 
@@ -887,7 +900,8 @@ export class MotionApiService {
 
       // Note: No task cache currently implemented - tasks are not cached due to frequent updates
 
-      return response.data;
+      // Docs say 200 with task object, but handle 204 No Content defensively
+      return response.status === 204 ? undefined : response.data;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to move task', {
         method: 'moveTask',
@@ -902,17 +916,17 @@ export class MotionApiService {
     }
   }
 
-  async unassignTask(taskId: string): Promise<MotionTask> {
+  async unassignTask(taskId: string): Promise<MotionTask | undefined> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Unassigning task in Motion API', {
         method: 'unassignTask',
         taskId
       });
 
-      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() =>
+      const response = await this.requestWithRetry(() =>
         this.client.delete(`/tasks/${taskId}/assignee`)
       );
-      
+
       mcpLog(LOG_LEVELS.INFO, 'Task unassigned successfully', {
         method: 'unassignTask',
         taskId
@@ -920,7 +934,8 @@ export class MotionApiService {
 
       // Note: No task cache currently implemented - tasks are not cached due to frequent updates
 
-      return response.data;
+      // Response undocumented — handle 204 No Content defensively
+      return response.status === 204 ? undefined : response.data;
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to unassign task', {
         method: 'unassignTask',
@@ -1171,11 +1186,18 @@ export class MotionApiService {
         workspaceId
       });
 
-      // If userId is provided, search by ID across all workspaces
-      if (identifier.userId) {
-        const allWorkspaces = await this.getWorkspaces();
+      // Build ordered list of workspaces to search: specified workspace first, then others
+      const allWorkspaces = await this.getWorkspaces();
+      const orderedWorkspaces = workspaceId
+        ? [
+            ...allWorkspaces.filter(w => w.id === workspaceId),
+            ...allWorkspaces.filter(w => w.id !== workspaceId),
+          ]
+        : allWorkspaces;
 
-        for (const workspace of allWorkspaces) {
+      // If userId is provided, search by ID
+      if (identifier.userId) {
+        for (const workspace of orderedWorkspaces) {
           try {
             const users = await this.getUsers(workspace.id);
             const user = users.find(u => u.id === identifier.userId);
@@ -1199,12 +1221,11 @@ export class MotionApiService {
         }
       }
 
-      // If userName is provided, search by name/email across all workspaces
+      // If userName is provided, search by name/email
       if (identifier.userName) {
-        const allWorkspaces = await this.getWorkspaces();
         const searchTerm = identifier.userName.toLowerCase();
 
-        for (const workspace of allWorkspaces) {
+        for (const workspace of orderedWorkspaces) {
           try {
             const users = await this.getUsers(workspace.id);
             const user = users.find(u =>
@@ -1841,9 +1862,9 @@ export class MotionApiService {
    * @param projectId - ID of the project
    * @param fieldId - ID of the custom field
    * @param value - Optional value for the field
-   * @returns Updated project data
+   * @returns The field value as returned by the API ({ type, value })
    */
-  async addCustomFieldToProject(projectId: string, fieldId: string, value?: string | number | boolean | string[] | null, fieldType?: string): Promise<MotionProject> {
+  async addCustomFieldToProject(projectId: string, fieldId: string, value?: string | number | boolean | string[] | null, fieldType?: string): Promise<MotionCustomFieldValue> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Adding custom field to project', {
         method: 'addCustomFieldToProject',
@@ -1853,6 +1874,7 @@ export class MotionApiService {
       });
 
       // API expects: { customFieldInstanceId, value: { type, value } }
+      // Value type uses camelCase per API docs (e.g., text, multiSelect)
       const requestData: Record<string, unknown> = {
         customFieldInstanceId: fieldId,
       };
@@ -1863,18 +1885,14 @@ export class MotionApiService {
         };
       }
 
-      const response: AxiosResponse<MotionProject> = await this.requestWithRetry(() =>
+      const response: AxiosResponse<MotionCustomFieldValue> = await this.requestWithRetry(() =>
         this.client.post(`/beta/custom-field-values/project/${projectId}`, requestData)
       );
-      
-      // Invalidate project cache for specific workspace if available
-      if (response.data?.workspaceId) {
-        this.projectCache.invalidate(`projects:workspace:${response.data.workspaceId}`);
-      } else {
-        // Fallback to broader invalidation if workspace unknown
-        this.projectCache.invalidate(`projects:`);
-      }
-      
+
+      // Invalidate project cache broadly — the API response is { type, value },
+      // not a full project object, so we don't have workspace context
+      this.projectCache.invalidate(`projects:`);
+
       mcpLog(LOG_LEVELS.INFO, 'Custom field added to project successfully', {
         method: 'addCustomFieldToProject',
         projectId,
@@ -1941,9 +1959,9 @@ export class MotionApiService {
    * @param taskId - ID of the task
    * @param fieldId - ID of the custom field
    * @param value - Optional value for the field
-   * @returns Updated task data
+   * @returns The field value as returned by the API ({ type, value })
    */
-  async addCustomFieldToTask(taskId: string, fieldId: string, value?: string | number | boolean | string[] | null, fieldType?: string): Promise<MotionTask> {
+  async addCustomFieldToTask(taskId: string, fieldId: string, value?: string | number | boolean | string[] | null, fieldType?: string): Promise<MotionCustomFieldValue> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Adding custom field to task', {
         method: 'addCustomFieldToTask',
@@ -1953,6 +1971,7 @@ export class MotionApiService {
       });
 
       // API expects: { customFieldInstanceId, value: { type, value } }
+      // Value type uses camelCase per API docs (e.g., text, multiSelect)
       const requestData: Record<string, unknown> = {
         customFieldInstanceId: fieldId,
       };
@@ -1963,11 +1982,9 @@ export class MotionApiService {
         };
       }
 
-      const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() =>
+      const response: AxiosResponse<MotionCustomFieldValue> = await this.requestWithRetry(() =>
         this.client.post(`/beta/custom-field-values/task/${taskId}`, requestData)
       );
-      
-      // Note: No task cache currently implemented - tasks are not cached due to frequent updates
 
       mcpLog(LOG_LEVELS.INFO, 'Custom field added to task successfully', {
         method: 'addCustomFieldToTask',
@@ -2124,11 +2141,12 @@ export class MotionApiService {
         workspaceId: taskData.workspaceId
       });
 
-      // Create payload with transformed frequency while preserving other frequency fields
+      // Build API payload: extract endDate from frequency object to top-level,
+      // replace frequency object with transformed string
+      const { frequency: _freqObj, ...restTaskData } = taskData;
       const apiPayload = {
-        ...taskData,
+        ...restTaskData,
         frequency: frequencyString,
-        // Preserve endDate and other fields that should be sent separately to the API
         ...(taskData.frequency.endDate && { endDate: taskData.frequency.endDate })
       };
 
@@ -2235,55 +2253,37 @@ export class MotionApiService {
   }
 
   /**
-   * Fetch schedules from Motion API
-   * @param userId - Optional user ID to filter schedules
-   * @param startDate - Optional start date (ISO 8601) to filter schedules
-   * @param endDate - Optional end date (ISO 8601) to filter schedules
+   * Fetch schedules from Motion API.
+   * The Motion API GET /schedules accepts no query parameters.
    * @returns Array of schedules
    */
-  async getSchedules(userId?: string, startDate?: string, endDate?: string): Promise<MotionSchedule[]> {
-    // Use JSON.stringify for deterministic cache key generation to avoid collisions
-    const cacheParams = { userId: userId || null, startDate: startDate || null, endDate: endDate || null };
-    const cacheKey = `schedules:${JSON.stringify(cacheParams)}`;
-    
+  async getSchedules(): Promise<MotionSchedule[]> {
+    const cacheKey = 'schedules:all';
+
     return this.scheduleCache.withCache(cacheKey, async () => {
       try {
         mcpLog(LOG_LEVELS.DEBUG, 'Fetching schedules from Motion API', {
-          method: 'getSchedules',
-          userId,
-          startDate,
-          endDate
+          method: 'getSchedules'
         });
 
-        const params = new URLSearchParams();
-        if (userId) params.append('userId', userId);
-        if (startDate) params.append('startDate', startDate);
-        if (endDate) params.append('endDate', endDate);
-        
-        const queryString = params.toString();
-        const url = queryString ? `/schedules?${queryString}` : '/schedules';
-        
-        const response: AxiosResponse<ListResponse<MotionSchedule>> = await this.requestWithRetry(() => this.client.get(url));
-        
+        const response: AxiosResponse<ListResponse<MotionSchedule>> = await this.requestWithRetry(() => this.client.get('/schedules'));
+
         // Validate response against schema
         const validatedResponse = this.validateResponse(
           response.data,
           SchedulesListResponseSchema,
           'getSchedules'
         );
-        
+
         // Handle both wrapped and unwrapped responses
-        const schedules = Array.isArray(validatedResponse) 
-          ? validatedResponse 
+        const schedules = Array.isArray(validatedResponse)
+          ? validatedResponse
           : validatedResponse.schedules || [];
         const schedulesArray = Array.isArray(schedules) ? schedules : [];
-        
+
         mcpLog(LOG_LEVELS.INFO, 'Schedules fetched successfully', {
           method: 'getSchedules',
-          count: schedulesArray.length,
-          userId,
-          startDate,
-          endDate
+          count: schedulesArray.length
         });
 
         return schedulesArray;
@@ -2292,10 +2292,7 @@ export class MotionApiService {
           method: 'getSchedules',
           error: getErrorMessage(error),
           apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-          userId,
-          startDate,
-          endDate
+          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
         });
         throw this.formatApiError(error, 'fetch', 'schedule');
       }

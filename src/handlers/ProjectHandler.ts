@@ -13,8 +13,6 @@ interface CreateProjectParams {
   workspaceId?: string;
   workspaceName?: string;
   description?: string;
-  color?: string;
-  status?: string;
 }
 
 interface ListProjectParams {

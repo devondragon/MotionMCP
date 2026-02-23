@@ -5,7 +5,7 @@ import { sanitizeTextContent } from '../src/utils/sanitize';
 import { transformFrequencyToApiString, validateFrequencyObject, isValidFrequencyObject } from '../src/utils/frequencyTransform';
 
 describe('utils', () => {
-  it('createMinimalPayload removes null/empty values and preserves meaningful ones', () => {
+  it('createMinimalPayload removes undefined/empty-string values and preserves null, empty arrays, and meaningful values', () => {
     const input = {
       a: null,
       b: undefined as unknown as string,
@@ -22,6 +22,8 @@ describe('utils', () => {
     const result = createMinimalPayload(input);
 
     expect(result).toEqual({
+      a: null,
+      d: [],
       f: 0,
       g: false,
       h: 'text',

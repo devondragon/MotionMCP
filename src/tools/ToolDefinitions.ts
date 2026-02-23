@@ -38,19 +38,11 @@ export const projectsToolDefinition: McpToolDefinition = {
       },
       name: {
         type: "string",
-        description: "Project name"
+        description: "Project name (required for create)"
       },
       description: {
         type: "string",
         description: "Project description"
-      },
-      color: {
-        type: "string",
-        description: "Hex color code"
-      },
-      status: {
-        type: "string",
-        description: "Project status"
       },
       allWorkspaces: {
         type: "boolean",
@@ -332,7 +324,11 @@ export const customFieldsToolDefinition: McpToolDefinition = {
       },
       fieldId: {
         type: "string",
-        description: "Custom field instance ID (used for all operations)"
+        description: "Custom field definition ID (for delete, add_to_project, add_to_task). For remove_from_project/remove_from_task, use valueId instead."
+      },
+      valueId: {
+        type: "string",
+        description: "Custom field value ID (required for remove_from_project and remove_from_task — this is the ID of the specific value assignment, not the field definition)"
       },
       workspaceId: {
         type: "string",
@@ -369,7 +365,7 @@ export const customFieldsToolDefinition: McpToolDefinition = {
         description: "Field value"
       }
     },
-    required: ["operation", "workspaceId"]
+    required: ["operation"]
   }
 };
 
@@ -487,23 +483,10 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
 
 export const schedulesToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.SCHEDULES,
-  description: "Get user schedules showing their weekly working hours and time zones",
+  description: "Get all schedules showing weekly working hours and time zones. The Motion API returns all schedules with no filtering options.",
   inputSchema: {
     type: "object",
-    properties: {
-      userId: {
-        type: "string",
-        description: "User ID to get schedule for (optional, returns all schedules if not specified)"
-      },
-      startDate: {
-        type: "string",
-        description: "Start date for filtering schedules (optional)"
-      },
-      endDate: {
-        type: "string",
-        description: "End date for filtering schedules (optional)"
-      }
-    },
+    properties: {},
     additionalProperties: false
   }
 };
