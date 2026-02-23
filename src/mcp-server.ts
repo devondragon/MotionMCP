@@ -30,7 +30,7 @@ class MotionMCPServer {
     this.server = new Server(
       {
         name: "motion-mcp-server",
-        version: "2.4.0",
+        version: "2.5.0",
       },
       {
         capabilities: {

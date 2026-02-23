@@ -17,7 +17,7 @@ interface Env {
 
 export class MotionMCPAgent extends McpAgent<Env> {
   server = new McpServer(
-    { name: "motion-mcp-server", version: "2.4.0" },
+    { name: "motion-mcp-server", version: "2.5.0" },
     { instructions: SERVER_INSTRUCTIONS },
   );
 

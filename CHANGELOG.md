@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.0] - 2026-02-22
+
+### 🚀 New Features
+
+- **Default tool configuration changed to `complete`**: All 10 tools are now enabled by default. With only 10 consolidated tools and MCP clients supporting deferred tool loading, gating 3 useful tools behind opt-in provided no practical benefit. Users who explicitly set `MOTION_MCP_TOOLS` are unaffected. (#71, #73)
+- **MCP server instructions for tool discovery**: Both entry points (stdio and Cloudflare Worker) now include a keyword-rich `instructions` string in the MCP handshake, improving tool discoverability for clients that support `defer_loading` or tool search.
+
+### 🐛 Bug Fixes
+
+- **Handler test mock shape mismatch**: Fixed 4 handler test files where mocks returned plain arrays instead of `ListResult<T>` objects (`{ items, truncation }`), matching the refactored service method signatures. (#74, #75)
+- **`.env.example` default inconsistency**: Updated `.env.example` to reflect the new `complete` default instead of actively setting `essential`.
+
+### 🔧 Technical Improvements
+
+- **Version strings synced to 2.5.0**: Both `mcp-server.ts` and `worker.ts` now match `package.json`.
+- **Shared constants**: Added `src/constants.ts` with `SERVER_INSTRUCTIONS` used by both entry points.
+
+### 📖 Documentation
+
+- Updated README tool configuration section: reframed from "tool limits" to "reducing tool noise", marked `complete` as default, removed `MOTION_MCP_TOOLS` from primary setup examples.
+- Updated CLAUDE.md default reference from `essential` to `complete`.
+
 ## [2.4.0] - 2026-02-22
 
 ### 🚀 New Features
