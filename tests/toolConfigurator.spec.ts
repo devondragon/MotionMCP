@@ -58,9 +58,9 @@ describe('ToolConfigurator', () => {
     expect(names.length).toBe(10);
   });
 
-  it('invalid preset defaults to essential', () => {
+  it('invalid preset defaults to complete', () => {
     const cfg = new ToolConfigurator('bogus' as any, registry);
-    expect(cfg.getConfig()).toBe('essential');
+    expect(cfg.getConfig()).toBe('complete');
   });
 
   it('custom preset validates tool names', () => {

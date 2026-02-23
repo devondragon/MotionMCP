@@ -217,9 +217,9 @@ describe('ToolConfigurator', () => {
   });
 
   describe('invalid configuration handling', () => {
-    it('defaults to essential for invalid config', () => {
+    it('defaults to complete for invalid config', () => {
       const configurator = new ToolConfigurator('invalid', registry);
-      expect(configurator.getConfig()).toBe('essential');
+      expect(configurator.getConfig()).toBe('complete');
     });
   });
 
