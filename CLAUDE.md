@@ -12,10 +12,10 @@ The server supports different tool exposure levels via `MOTION_MCP_TOOLS` enviro
 
 - `minimal`: Core consolidated tools only - 3 tools
   - motion_tasks, motion_projects, motion_workspaces
-- `essential` (default): Core tools plus common features - 7 tools  
+- `essential`: Core tools plus common features - 7 tools
   - All minimal tools plus motion_users, motion_search, motion_comments, motion_schedules
-- `complete`: All consolidated tools - 10 tools
-  - All essential tools plus motion_custom_fields, motion_recurring_tasks, motion_statuses  
+- `complete` (default): All consolidated tools - 10 tools
+  - All essential tools plus motion_custom_fields, motion_recurring_tasks, motion_statuses
 - (removed: 'all' mode - no longer supported)
 - `custom:tool1,tool2`: Specify exact tools needed (e.g., `custom:motion_tasks,motion_projects,motion_search`)
 

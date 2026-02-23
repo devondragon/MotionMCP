@@ -28,8 +28,7 @@ Add to your `claude_desktop_config.json`:
       "command": "npx",
       "args": ["motionmcp"],
       "env": {
-        "MOTION_API_KEY": "your_api_key",
-        "MOTION_MCP_TOOLS": "essential"
+        "MOTION_API_KEY": "your_api_key"
       }
     }
   }
@@ -107,13 +106,13 @@ MOTION_API_KEY=your-key
 
 ## Tool Configuration
 
-MCP clients have tool limits (~100 tools across all servers), so the server lets you control how many tools are exposed via the `MOTION_MCP_TOOLS` environment variable:
+All 10 tools are enabled by default. If you run multiple MCP servers and want to reduce tool selection noise, you can limit which tools are exposed via the `MOTION_MCP_TOOLS` environment variable:
 
 | Level | Tools | Description |
 |---|---|---|
 | **minimal** | 3 | Tasks, projects, workspaces only |
-| **essential** (default) | 7 | Adds users, search, comments, schedules |
-| **complete** | 10 | Full API access including custom fields, recurring tasks, statuses |
+| **essential** | 7 | Adds users, search, comments, schedules |
+| **complete** (default) | 10 | Full API access including custom fields, recurring tasks, statuses |
 | **custom** | varies | Pick exactly the tools you need |
 
 Custom example:
@@ -261,8 +260,7 @@ List available statuses for a workspace.
       "args": ["run", "mcp:dev"],
       "cwd": "/absolute/path/to/your/MotionMCP",
       "env": {
-        "MOTION_API_KEY": "your_api_key",
-        "MOTION_MCP_TOOLS": "essential"
+        "MOTION_API_KEY": "your_api_key"
       }
     }
   }
