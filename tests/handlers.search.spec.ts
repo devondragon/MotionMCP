@@ -4,12 +4,18 @@ import type { HandlerContext } from '../src/handlers/base/HandlerInterface';
 
 function makeContext(): HandlerContext {
   const motionService = {
-    searchTasks: vi.fn().mockResolvedValue([
-      { id: 't1', name: 'Task', projectId: 'p1' },
-    ]),
-    searchProjects: vi.fn().mockResolvedValue([
-      { id: 'p1', name: 'Project', description: '', workspaceId: 'w1' },
-    ]),
+    searchTasks: vi.fn().mockResolvedValue({
+      items: [
+        { id: 't1', name: 'Task', projectId: 'p1' },
+      ],
+      truncation: undefined,
+    }),
+    searchProjects: vi.fn().mockResolvedValue({
+      items: [
+        { id: 'p1', name: 'Project', description: '', workspaceId: 'w1' },
+      ],
+      truncation: undefined,
+    }),
   } as any;
 
   const workspaceResolver = {

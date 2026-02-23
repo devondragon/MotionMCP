@@ -5,10 +5,13 @@ import type { MotionRecurringTasksArgs } from '../src/types/mcp-tool-args';
 
 function makeContext() {
   const motionService = {
-    getRecurringTasks: vi.fn().mockResolvedValue([
-      { id: 'rt1', name: 'Weekly Report', frequency: { type: 'weekly' }, priority: 'MEDIUM' },
-      { id: 'rt2', name: 'Daily Standup', frequency: { type: 'daily' }, priority: 'HIGH' },
-    ]),
+    getRecurringTasks: vi.fn().mockResolvedValue({
+      items: [
+        { id: 'rt1', name: 'Weekly Report', frequency: { type: 'weekly' }, priority: 'MEDIUM' },
+        { id: 'rt2', name: 'Daily Standup', frequency: { type: 'daily' }, priority: 'HIGH' },
+      ],
+      truncation: undefined,
+    }),
     createRecurringTask: vi.fn().mockResolvedValue({
       id: 'rt3',
       name: 'New Task',
