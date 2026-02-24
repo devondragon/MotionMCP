@@ -25,13 +25,13 @@ export class UserHandler extends BaseHandler {
     const workspace = await this.workspaceResolver.resolveWorkspace({ workspaceId, workspaceName });
     const users = await this.motionService.getUsers(workspace.id, teamId);
 
-    const userList = users.map(u => `- ${u.name} (${u.email}) [ID: ${u.id}]`).join('\n');
+    const userList = users.map(u => `- ${u.name} (${u.email || 'no email'}) [ID: ${u.id}]`).join('\n');
     return formatMcpSuccess(`Users in workspace "${workspace.name}":\n${userList}`);
   }
 
   private async handleGetCurrent(): Promise<McpToolResponse> {
     const currentUser = await this.motionService.getCurrentUser();
-    const userInfo = `Current user: ${currentUser.name || 'No name'} (${currentUser.email}) [ID: ${currentUser.id}]`;
+    const userInfo = `Current user: ${currentUser.name || 'No name'} (${currentUser.email || 'no email'}) [ID: ${currentUser.id}]`;
     return formatMcpSuccess(userInfo);
   }
 }

@@ -97,20 +97,48 @@ export interface MotionCustomFieldValue {
   value: any;   // The actual value, which can be of various types
 }
 
+export type MotionTaskStatusValue = string | {
+  name: string;
+  isDefaultStatus: boolean;
+  isResolvedStatus: boolean;
+};
+
+export type MotionTaskPriority = 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export type MotionTaskDuration = number | 'NONE' | 'REMINDER';
+
+export interface MotionTaskWritableFields {
+  name?: string;
+  description?: string;
+  projectId?: string;
+  status?: MotionTaskStatusValue;
+  priority?: MotionTaskPriority;
+  dueDate?: string;
+  duration?: MotionTaskDuration;
+  assigneeId?: string;
+  labels?: Array<string | {name: string}>;
+  autoScheduled?: Record<string, unknown> | null;
+  deadlineType?: 'HARD' | 'SOFT' | 'NONE';
+  startOn?: string;
+}
+
+export interface MotionTaskCreateData extends MotionTaskWritableFields {
+  name: string;
+  workspaceId: string;
+}
+
+export type MotionTaskUpdateData = MotionTaskWritableFields;
+
 export interface MotionTask {
   id: string;
   name: string;
   description?: string;
   workspaceId: string;
   projectId?: string;
-  status?: string | {
-    name: string;
-    isDefaultStatus: boolean;
-    isResolvedStatus: boolean;
-  };
-  priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
+  status?: MotionTaskStatusValue;
+  priority?: MotionTaskPriority;
   dueDate?: string;
-  duration?: number | 'NONE' | 'REMINDER';
+  duration?: MotionTaskDuration;
   assigneeId?: string;
   labels?: Array<string | {name: string}>;
   autoScheduled?: Record<string, unknown> | null;
@@ -125,7 +153,7 @@ export interface MotionTask {
   parentRecurringTaskId?: string;
   
   // Full nested objects with complete field definitions
-  creator?: {
+  creator: {
     id: string;
     name: string;
     email: string;
@@ -190,6 +218,7 @@ export interface MotionUser {
 
 export interface MotionCustomField {
   id: string;
+  name?: string;
   field: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 
          'phone' | 'select' | 'multiSelect' | 'number' |
          'email' | 'checkbox' | 'relatedTo';
@@ -200,6 +229,7 @@ export interface CreateCustomFieldData {
   field: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 
         'phone' | 'select' | 'multiSelect' | 'number' |
         'email' | 'checkbox' | 'relatedTo';
+  required?: boolean;
   metadata?: Record<string, unknown>;
 }
 
@@ -211,12 +241,12 @@ export interface MotionRecurringTask {
     name: string;
     email: string;
   };
-  assignee?: {
+  assignee: {
     id: string;
     name: string;
     email: string;
   };
-  project: {
+  project?: {
     id: string;
     name: string;
     description: string;

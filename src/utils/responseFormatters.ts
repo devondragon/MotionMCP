@@ -15,7 +15,8 @@ import { LIMITS } from './constants';
 const TRUNCATION_REASON_MESSAGES: Record<string, string> = {
   page_size_limit: 'due to page size limits',
   max_items: 'due to the maximum item limit',
-  max_pages: 'due to the maximum page limit'
+  max_pages: 'due to the maximum page limit',
+  error: 'due to an API error during data fetching'
 };
 
 /**
@@ -172,13 +173,28 @@ export function formatDetailResponse<T extends Record<string, any>>(
   itemType: string, 
   fields: (keyof T)[] = []
 ): CallToolResult {
+  const fieldsToRender = fields.length > 0 ? fields : (Object.keys(item) as (keyof T)[]);
+  const formatValue = (value: unknown): string => {
+    if (value === undefined || value === null) {
+      return 'N/A';
+    }
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  };
+
   let responseText = `${itemType} Details:\n`;
   
-  fields.forEach(field => {
+  fieldsToRender.forEach(field => {
     const value = item[field];
     const fieldStr = String(field);
     const displayName = fieldStr.charAt(0).toUpperCase() + fieldStr.slice(1);
-    const displayValue = value ?? 'N/A';
+    const displayValue = formatValue(value);
     responseText += `- ${displayName}: ${displayValue}\n`;
   });
   
@@ -205,7 +221,7 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
     task.assignees && task.assignees.length > 0
       ? `Assignees: ${task.assignees.map(a => `${a.name} (${a.email})`).join(', ')}`
       : 'Assignees: None',
-    task.creator ? `Creator: ${task.creator.name} (${task.creator.email})` : null,
+    `Creator: ${task.creator.name} (${task.creator.email})`,
     (task.labels && task.labels.length > 0)
       ? `Labels: ${task.labels.map(l => typeof l === 'string' ? l : l.name).join(', ')}`
       : null,
@@ -236,6 +252,7 @@ interface SearchOptions {
 interface SearchResult {
   id: string;
   name: string;
+  entityType?: 'task' | 'project';
   projectId?: string;
 }
 
@@ -250,7 +267,7 @@ export function formatSearchResults(
   const { limit, searchScope, truncation } = options;
 
   const resultFormatter = (result: SearchResult) => {
-    const type = result.projectId ? "task" : "project";
+    const type = result.entityType ?? 'unknown';
     return `- [${type}] ${result.name} (ID: ${result.id})`;
   };
 
@@ -320,7 +337,8 @@ export function formatCustomFieldList(fields: MotionCustomField[]): CallToolResu
   }
   
   const fieldFormatter = (field: MotionCustomField) => {
-    return `- ID: ${field.id} [Type: ${field.field}]`;
+    const name = field.name ? `${field.name} ` : '';
+    return `- ${name}ID: ${field.id} [Type: ${field.field}]`;
   };
   
   return formatListResponse(fields, `Found ${fields.length} custom field${fields.length === 1 ? '' : 's'}`, fieldFormatter);
@@ -332,9 +350,10 @@ export function formatCustomFieldList(fields: MotionCustomField[]): CallToolResu
 export function formatCustomFieldDetail(field: MotionCustomField): CallToolResult {
   const details = [
     `Custom field created successfully:`,
+    field.name ? `- Name: ${field.name}` : null,
     `- ID: ${field.id}`,
     `- Type: ${field.field}`
-  ].join('\n');
+  ].filter(Boolean).join('\n');
   
   return formatMcpSuccess(details);
 }
@@ -351,7 +370,9 @@ export function formatCustomFieldSuccess(operation: string, entityType?: string,
   if (apiResponse) {
     if (apiResponse.id) {
       message += `\nValue ID: ${apiResponse.id}`;
-      message += `\nTip: Use this valueId with remove_from_${entityType} to remove this custom field assignment.`;
+      if (entityType) {
+        message += `\nTip: Use this valueId with remove_from_${entityType} to remove this custom field assignment.`;
+      }
     } else {
       message += `\nNote: The API did not return a valueId. To find the valueId, use motion_tasks (operation: get) or inspect the task/project's customFieldValues.`;
     }
@@ -397,7 +418,7 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
     `- Creator: ${task.creator.name} (${task.creator.email})`,
     `- Workspace: ${task.workspace.name} (${task.workspace.id})`,
     task.project ? `- Project: ${task.project.name} (${task.project.id})` : `- Project: No project assigned`,
-    task.assignee ? `- Assignee: ${task.assignee.name} (${task.assignee.email})` : null,
+    `- Assignee: ${task.assignee.name} (${task.assignee.email})`,
     `- Status: ${typeof task.status === 'string' ? task.status : task.status?.name || 'Unknown'}`,
     (task.labels && task.labels.length > 0) ? `- Labels: ${task.labels.map(l => typeof l === 'string' ? l : l.name).join(', ')}` : null
   ].filter(Boolean).join('\n');

@@ -3,6 +3,8 @@ import {
   MotionWorkspace, 
   MotionProject, 
   MotionTask, 
+  MotionTaskCreateData,
+  MotionTaskUpdateData,
   MotionUser,
   MotionComment,
   CreateCommentData,
@@ -813,7 +815,7 @@ export class MotionApiService {
     }
   }
 
-  async createTask(taskData: Partial<MotionTask>): Promise<MotionTask> {
+  async createTask(taskData: MotionTaskCreateData): Promise<MotionTask> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Creating task in Motion API', {
         method: 'createTask',
@@ -858,7 +860,7 @@ export class MotionApiService {
 
   // Note: API docs list name and workspaceId as required for PATCH /tasks/{id},
   // but the API appears to accept partial updates without them. Not enforced here.
-  async updateTask(taskId: string, updates: Partial<MotionTask>): Promise<MotionTask> {
+  async updateTask(taskId: string, updates: MotionTaskUpdateData): Promise<MotionTask> {
     try {
       mcpLog(LOG_LEVELS.DEBUG, 'Updating task in Motion API', {
         method: 'updateTask',

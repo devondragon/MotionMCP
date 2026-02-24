@@ -13,6 +13,7 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
     "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*"],

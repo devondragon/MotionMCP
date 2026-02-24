@@ -50,6 +50,11 @@ export class CommentHandler extends BaseHandler {
       return this.handleError(new Error('content is required for create operation'));
     }
 
+    // Reject oversized content before sanitization so the check is never dead code
+    if (content.length > LIMITS.COMMENT_MAX_LENGTH) {
+      return this.handleError(new Error(`Comment content exceeds maximum length of ${LIMITS.COMMENT_MAX_LENGTH} characters`));
+    }
+
     // Sanitize and validate comment content
     const sanitizationResult = sanitizeCommentContent(content);
     if (!sanitizationResult.isValid) {
@@ -57,9 +62,6 @@ export class CommentHandler extends BaseHandler {
     }
 
     const sanitizedContent = sanitizationResult.sanitized;
-    if (sanitizedContent.length > LIMITS.COMMENT_MAX_LENGTH) {
-      return this.handleError(new Error(`Comment content exceeds maximum length of ${LIMITS.COMMENT_MAX_LENGTH} characters`));
-    }
 
     const commentData: CreateCommentData = {
       taskId,

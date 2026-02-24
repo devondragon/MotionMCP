@@ -1,7 +1,7 @@
 import { BaseHandler } from './base/BaseHandler';
 import { McpToolResponse } from '../types/mcp';
 import { MotionTasksArgs } from '../types/mcp-tool-args';
-import { MotionTask } from '../types/motion';
+import { MotionTaskUpdateData } from '../types/motion';
 import {
   formatMcpSuccess,
   parseTaskArgs,
@@ -87,6 +87,13 @@ interface ListAllUncompletedParams {
   limit?: number;
 }
 
+class AutoSchedulingValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AutoSchedulingValidationError';
+  }
+}
+
 /**
  * Handler for all task-related operations in the Motion API.
  *
@@ -151,6 +158,9 @@ export class TaskHandler extends BaseHandler {
     }
 
     const taskData = parseTaskArgs(params as unknown as Record<string, unknown>);
+    if (!taskData.name) {
+      return this.handleError(new Error('Task name is required for create operation'));
+    }
     const workspace = await this.workspaceResolver.resolveWorkspace(taskData);
 
     // Resolve project identifier (projectId or projectName) using the centralized utility
@@ -175,25 +185,17 @@ export class TaskHandler extends BaseHandler {
     // Convert types for Motion API
     let convertedDuration: number | 'NONE' | 'REMINDER' | undefined;
     if (taskData.duration !== undefined) {
-      if (typeof taskData.duration === 'string') {
-        if (taskData.duration === 'NONE' || taskData.duration === 'REMINDER') {
-          convertedDuration = taskData.duration;
-        } else {
-          const numDuration = parseInt(taskData.duration, 10);
-          if (!isNaN(numDuration)) {
-            convertedDuration = numDuration;
-          }
-        }
-      } else {
-        convertedDuration = taskData.duration;
-      }
+      convertedDuration = this.parseDurationValue(taskData.duration);
     }
 
     // API accepts labels as plain string array per docs
     const convertedLabels = taskData.labels;
 
-    // Validate auto-scheduling configuration
-    await this.validateAutoScheduling(taskData.autoScheduled, targetWorkspaceId);
+    // Validate and normalize auto-scheduling configuration
+    taskData.autoScheduled = await this.validateAndNormalizeAutoScheduling(
+      taskData.autoScheduled,
+      targetWorkspaceId
+    );
 
     const task = await this.motionService.createTask({
       name: taskData.name,
@@ -361,7 +363,7 @@ export class TaskHandler extends BaseHandler {
     }
 
     // Create update object with only valid MotionTask fields
-    const updateData: Partial<MotionTask> = {};
+    const updateData: MotionTaskUpdateData = {};
     if (params.name !== undefined) updateData.name = params.name;
     if (params.description !== undefined) updateData.description = params.description;
     if (params.status !== undefined) updateData.status = params.status;
@@ -377,19 +379,7 @@ export class TaskHandler extends BaseHandler {
       updateData.dueDate = normalizeDueDateForApi(params.dueDate);
     }
     if (params.duration !== undefined) {
-      // Convert string duration to number or keep special values
-      if (typeof params.duration === 'string') {
-        if (params.duration === 'NONE' || params.duration === 'REMINDER') {
-          updateData.duration = params.duration;
-        } else {
-          const numDuration = parseInt(params.duration, 10);
-          if (!isNaN(numDuration)) {
-            updateData.duration = numDuration;
-          }
-        }
-      } else {
-        updateData.duration = params.duration;
-      }
+      updateData.duration = this.parseDurationValue(params.duration);
     }
     // API accepts labels as plain string array per docs
     if (params.labels !== undefined) updateData.labels = params.labels;
@@ -400,7 +390,10 @@ export class TaskHandler extends BaseHandler {
       // Validate auto-scheduling (same as create): catches "true" → {} silent no-op
       if (updateData.autoScheduled !== null && updateData.autoScheduled !== undefined) {
         const task = await this.motionService.getTask(params.taskId!);
-        await this.validateAutoScheduling(updateData.autoScheduled, task.workspaceId);
+        updateData.autoScheduled = await this.validateAndNormalizeAutoScheduling(
+          updateData.autoScheduled,
+          task.workspaceId
+        );
       }
     }
 
@@ -516,9 +509,13 @@ export class TaskHandler extends BaseHandler {
       }
 
       if (workspaceId) {
-        const user = await this.motionService.resolveUserIdentifier({ userName: input }, workspaceId);
+        const user = await this.motionService.resolveUserIdentifier(
+          { userName: input },
+          workspaceId,
+          { strictWorkspace: true }
+        );
         if (!user) {
-          throw new Error(`Assignee "${input}" not found in any workspace`);
+          throw new Error(`Assignee "${input}" not found in workspace "${workspaceId}"`);
         }
         return { resolvedId: user.id, display: displayFromUser(user) };
       }
@@ -526,7 +523,11 @@ export class TaskHandler extends BaseHandler {
       // Cross-workspace lookup
       const workspaces = await this.motionService.getWorkspaces();
       for (const ws of workspaces) {
-        const user = await this.motionService.resolveUserIdentifier({ userName: input }, ws.id);
+        const user = await this.motionService.resolveUserIdentifier(
+          { userName: input },
+          ws.id,
+          { strictWorkspace: true }
+        );
         if (user) {
           return { resolvedId: user.id, display: displayFromUser(user) };
         }
@@ -538,23 +539,49 @@ export class TaskHandler extends BaseHandler {
   }
 
   /**
-   * Validate auto-scheduling configuration and provide helpful error messages
+   * Parse and validate task duration from user input.
+   * Accepts non-negative integer minutes or special values NONE/REMINDER.
+   */
+  private parseDurationValue(duration: string | number): number | 'NONE' | 'REMINDER' {
+    if (typeof duration === 'number') {
+      if (!Number.isInteger(duration) || duration < 0) {
+        throw new Error('Duration must be a non-negative integer number of minutes, or "NONE"/"REMINDER".');
+      }
+      return duration;
+    }
+
+    const trimmed = duration.trim();
+    if (trimmed === 'NONE' || trimmed === 'REMINDER') {
+      return trimmed;
+    }
+
+    if (!/^\d+$/.test(trimmed)) {
+      throw new Error('Duration must be a non-negative integer number of minutes, or "NONE"/"REMINDER".');
+    }
+
+    return parseInt(trimmed, 10);
+  }
+
+  /**
+   * Validate and normalize auto-scheduling configuration and provide helpful error messages
    * @param autoScheduled - The autoScheduled configuration
    * @param workspaceId - The workspace ID for context
+   * @returns Normalized autoScheduled object (with canonical schedule casing), or original null/undefined
    * @throws Error if validation fails with helpful guidance
    */
-  private async validateAutoScheduling(
+  private async validateAndNormalizeAutoScheduling(
     autoScheduled: Record<string, unknown> | null | undefined,
     workspaceId: string
-  ): Promise<void> {
+  ): Promise<Record<string, unknown> | null | undefined> {
     // If auto-scheduling is not enabled, no validation needed
     if (!autoScheduled || autoScheduled === null) {
-      return;
+      return autoScheduled;
     }
 
     // If it's an object, check if schedule is provided
     if (typeof autoScheduled === 'object' && autoScheduled !== null) {
-      const schedule = autoScheduled.schedule as string | undefined;
+      const scheduleValue = autoScheduled.schedule;
+      const schedule = typeof scheduleValue === 'string' ? scheduleValue.trim() : '';
 
       // If no schedule provided, show available schedules
       if (!schedule) {
@@ -562,7 +589,7 @@ export class TaskHandler extends BaseHandler {
           const availableSchedules = await this.motionService.getAvailableScheduleNames(workspaceId);
 
           if (availableSchedules.length === 0) {
-            throw new Error(
+            throw new AutoSchedulingValidationError(
               'Auto-scheduling requires a schedule, but no schedules are available. Please create a schedule in Motion first.'
             );
           }
@@ -571,15 +598,15 @@ export class TaskHandler extends BaseHandler {
             .map((name, i) => `${i + 1}. "${name}"`)
             .join('\n');
 
-          throw new Error(
+          throw new AutoSchedulingValidationError(
             `Auto-scheduling requires a schedule. Available schedules:\n${scheduleList}\n\nExample usage:\n• Set autoScheduled to {"schedule": "${availableSchedules[0]}"}\n• Or pass schedule name directly: autoScheduled = "${availableSchedules[0]}"`
           );
         } catch (error) {
           // If we can't fetch schedules, provide a generic error
-          if (error instanceof Error && error.message.includes('Auto-scheduling requires a schedule')) {
+          if (error instanceof AutoSchedulingValidationError) {
             throw error; // Re-throw our formatted error
           }
-          throw new Error(
+          throw new AutoSchedulingValidationError(
             'Auto-scheduling requires a schedule, but unable to fetch available schedules. Please specify a schedule name in autoScheduled parameter.'
           );
         }
@@ -617,8 +644,11 @@ export class TaskHandler extends BaseHandler {
           throw new Error(errorMessage);
         }
 
-        // Update the schedule with the exact match (fixes casing)
-        autoScheduled.schedule = matchingSchedule;
+        // Return a normalized copy with exact casing from Motion
+        return {
+          ...autoScheduled,
+          schedule: matchingSchedule
+        };
       } catch (error) {
         if (error instanceof Error) {
           throw error; // Re-throw validation errors
@@ -628,5 +658,7 @@ export class TaskHandler extends BaseHandler {
         );
       }
     }
+
+    return autoScheduled;
   }
 }

@@ -17,9 +17,15 @@ function makeContext() {
     removeCustomFieldFromTask: vi.fn().mockResolvedValue(undefined),
   } as any;
 
+  const workspaceResolver = {
+    resolveWorkspace: vi.fn().mockImplementation(({ workspaceId }: { workspaceId?: string; workspaceName?: string }) =>
+      Promise.resolve({ id: workspaceId || 'default-ws', name: 'Test Workspace' })
+    ),
+  };
+
   const ctx: HandlerContext = {
     motionService,
-    workspaceResolver: {} as any,
+    workspaceResolver: workspaceResolver as any,
     validator: {} as any,
   };
   return { ctx, motionService };
@@ -52,7 +58,7 @@ describe('CustomFieldHandler', () => {
 
       expect(res.isError).toBe(true);
       const text = (res.content?.[0] as any)?.text || '';
-      expect(text).toContain('Workspace ID is required');
+      expect(text).toContain('Workspace ID or workspace name is required');
     });
   });
 
@@ -219,6 +225,22 @@ describe('CustomFieldHandler', () => {
       expect(res.isError).toBe(true);
       const text = (res.content?.[0] as any)?.text || '';
       expect(text).toContain('Project ID');
+    });
+
+    it('allows clearing project custom field with null value without field type', async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new CustomFieldHandler(ctx);
+      const args: MotionCustomFieldsArgs = {
+        operation: 'add_to_project',
+        projectId: 'proj1',
+        fieldId: 'cf1',
+        value: null,
+      };
+
+      const res = await handler.handle(args);
+
+      expect(motionService.addCustomFieldToProject).toHaveBeenCalledWith('proj1', 'cf1', null, undefined);
+      expect(res.isError).toBeFalsy();
     });
   });
 

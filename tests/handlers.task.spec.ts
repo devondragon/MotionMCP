@@ -88,4 +88,37 @@ describe('TaskHandler', () => {
     const text = (res.content?.[0] as any)?.text || '';
     expect(text).toContain('Successfully updated task');
   });
+
+  it('returns error for invalid create duration strings', async () => {
+    const ctx = makeContext();
+    const handler = new TaskHandler(ctx);
+
+    const res = await handler.handle({
+      operation: 'create',
+      name: 'Hello',
+      workspaceName: 'Dev',
+      duration: '5 minutes'
+    } as any);
+
+    expect(res.isError).toBe(true);
+    expect(ctx.motionService.createTask).not.toHaveBeenCalled();
+    const text = (res.content?.[0] as any)?.text || '';
+    expect(text).toContain('Duration must be a non-negative integer');
+  });
+
+  it('returns error for invalid update duration strings', async () => {
+    const ctx = makeContext();
+    const handler = new TaskHandler(ctx);
+
+    const res = await handler.handle({
+      operation: 'update',
+      taskId: 't1',
+      duration: 'abc'
+    } as any);
+
+    expect(res.isError).toBe(true);
+    expect(ctx.motionService.updateTask).not.toHaveBeenCalled();
+    const text = (res.content?.[0] as any)?.text || '';
+    expect(text).toContain('Duration must be a non-negative integer');
+  });
 });

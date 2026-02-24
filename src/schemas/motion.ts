@@ -88,7 +88,7 @@ export const MotionTaskSchema = z.object({
     id: z.string(),
     name: z.string(),
     email: z.string()
-  }).optional(),
+  }),
   
   workspace: z.object({
     id: z.string(),
@@ -182,7 +182,7 @@ export const MotionRecurringTaskSchema = z.object({
     id: z.string(),
     name: z.string(),
     email: z.string()
-  }).optional(),
+  }),
   project: z.object({
     id: z.string(),
     name: z.string(),
@@ -197,7 +197,7 @@ export const MotionRecurringTaskSchema = z.object({
       type: z.string(),
       value: z.unknown()
     })).optional()
-  }),
+  }).optional(),
   workspace: z.object({
     id: z.string(),
     name: z.string(),

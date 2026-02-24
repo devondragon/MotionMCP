@@ -57,7 +57,8 @@ export class ProjectHandler extends BaseHandler {
     });
 
     const project = await this.motionService.createProject({
-      ...projectData,
+      name: projectData.name,
+      description: projectData.description,
       workspaceId: workspace.id
     });
 

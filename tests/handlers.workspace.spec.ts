@@ -28,5 +28,16 @@ describe('WorkspaceHandler', () => {
     expect(text).toContain('(ID: w1)');
     expect(text).toContain('(ID: w2)');
   });
-});
 
+  it('gets workspace details with populated fields', async () => {
+    const ctx = makeContext();
+    const handler = new WorkspaceHandler(ctx);
+    const res = await handler.handle({ operation: 'get', workspaceId: 'w1' } as any);
+    const text = (res.content?.[0] as any)?.text || '';
+
+    expect(text).toContain('Workspace details for "Personal" Details:');
+    expect(text).toContain('- Id: w1');
+    expect(text).toContain('- Name: Personal');
+    expect(text).toContain('- TeamId: N/A');
+  });
+});
