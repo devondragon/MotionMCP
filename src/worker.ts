@@ -6,7 +6,7 @@ import { InputValidator } from "./utils/validator";
 import { HandlerFactory } from "./handlers/HandlerFactory";
 import { ToolRegistry, ToolConfigurator } from "./tools";
 import { jsonSchemaToZodShape } from "./utils/jsonSchemaToZod";
-import { SERVER_INSTRUCTIONS } from "./utils/constants";
+import { SERVER_INSTRUCTIONS } from "./utils/serverInstructions";
 
 interface Env {
   MOTION_API_KEY: string;

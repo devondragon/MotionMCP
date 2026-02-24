@@ -82,12 +82,7 @@ describe('SimpleCache', () => {
       smallCache.set('key2', 'value2');
       smallCache.set('key3', 'value3');
 
-      // All three should be present
-      expect(smallCache.get('key1')).toBe('value1');
-      expect(smallCache.get('key2')).toBe('value2');
-      expect(smallCache.get('key3')).toBe('value3');
-
-      // Add fourth, should evict key1 (oldest)
+      // Add fourth without accessing existing keys — evicts key1 (oldest by insertion order)
       smallCache.set('key4', 'value4');
 
       expect(smallCache.get('key1')).toBeNull();

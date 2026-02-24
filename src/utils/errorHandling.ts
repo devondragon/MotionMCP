@@ -119,4 +119,3 @@ export function formatMcpSuccess(text: string): CallToolResult {
     ]
   };
 }
-

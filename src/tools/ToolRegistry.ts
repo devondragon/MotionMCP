@@ -110,5 +110,4 @@ export class ToolRegistry {
         throw new Error(`Unexpected tools configuration: ${config}`);
     }
   }
-
 }
