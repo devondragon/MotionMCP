@@ -17,9 +17,15 @@ function makeContext() {
     removeCustomFieldFromTask: vi.fn().mockResolvedValue(undefined),
   } as any;
 
+  const workspaceResolver = {
+    resolveWorkspace: vi.fn().mockImplementation(({ workspaceId }: { workspaceId?: string; workspaceName?: string }) =>
+      Promise.resolve({ id: workspaceId || 'default-ws', name: 'Test Workspace' })
+    ),
+  };
+
   const ctx: HandlerContext = {
     motionService,
-    workspaceResolver: {} as any,
+    workspaceResolver: workspaceResolver as any,
     validator: {} as any,
   };
   return { ctx, motionService };
@@ -52,7 +58,7 @@ describe('CustomFieldHandler', () => {
 
       expect(res.isError).toBe(true);
       const text = (res.content?.[0] as any)?.text || '';
-      expect(text).toContain('Workspace ID is required');
+      expect(text).toContain('Workspace ID or workspace name is required');
     });
   });
 
@@ -141,7 +147,24 @@ describe('CustomFieldHandler', () => {
 
       expect(res.isError).toBe(true);
       const text = (res.content?.[0] as any)?.text || '';
-      expect(text).toContain('Options parameter only allowed');
+      expect(text).toContain('only allowed for select/multiSelect');
+    });
+
+    it('returns error when select field created without options', async () => {
+      const { ctx } = makeContext();
+      const handler = new CustomFieldHandler(ctx);
+      const args: MotionCustomFieldsArgs = {
+        operation: 'create',
+        workspaceId: 'ws1',
+        name: 'Category',
+        field: 'select',
+      };
+
+      const res = await handler.handle(args);
+
+      expect(res.isError).toBe(true);
+      const text = (res.content?.[0] as any)?.text || '';
+      expect(text).toContain('required for select/multiSelect');
     });
   });
 
@@ -183,11 +206,12 @@ describe('CustomFieldHandler', () => {
         projectId: 'proj1',
         fieldId: 'cf1',
         value: 'test value',
+        field: 'text',
       };
 
       const res = await handler.handle(args);
 
-      expect(motionService.addCustomFieldToProject).toHaveBeenCalledWith('proj1', 'cf1', 'test value');
+      expect(motionService.addCustomFieldToProject).toHaveBeenCalledWith('proj1', 'cf1', 'test value', 'text');
       expect(res.isError).toBeFalsy();
     });
 
@@ -202,6 +226,22 @@ describe('CustomFieldHandler', () => {
       const text = (res.content?.[0] as any)?.text || '';
       expect(text).toContain('Project ID');
     });
+
+    it('allows clearing project custom field with null value without field type', async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new CustomFieldHandler(ctx);
+      const args: MotionCustomFieldsArgs = {
+        operation: 'add_to_project',
+        projectId: 'proj1',
+        fieldId: 'cf1',
+        value: null,
+      };
+
+      const res = await handler.handle(args);
+
+      expect(motionService.addCustomFieldToProject).toHaveBeenCalledWith('proj1', 'cf1', null, undefined);
+      expect(res.isError).toBeFalsy();
+    });
   });
 
   describe('remove_from_project operation', () => {
@@ -211,13 +251,29 @@ describe('CustomFieldHandler', () => {
       const args: MotionCustomFieldsArgs = {
         operation: 'remove_from_project',
         projectId: 'proj1',
+        valueId: 'val1',
+      };
+
+      const res = await handler.handle(args);
+
+      expect(motionService.removeCustomFieldFromProject).toHaveBeenCalledWith('proj1', 'val1');
+      expect(res.isError).toBeFalsy();
+    });
+
+    it('returns error when valueId missing', async () => {
+      const { ctx } = makeContext();
+      const handler = new CustomFieldHandler(ctx);
+      const args: MotionCustomFieldsArgs = {
+        operation: 'remove_from_project',
+        projectId: 'proj1',
         fieldId: 'cf1',
       };
 
       const res = await handler.handle(args);
 
-      expect(motionService.removeCustomFieldFromProject).toHaveBeenCalledWith('proj1', 'cf1');
-      expect(res.isError).toBeFalsy();
+      expect(res.isError).toBe(true);
+      const text = (res.content?.[0] as any)?.text || '';
+      expect(text).toContain('valueId');
     });
   });
 
@@ -230,11 +286,12 @@ describe('CustomFieldHandler', () => {
         taskId: 'task1',
         fieldId: 'cf1',
         value: '42',
+        field: 'number',
       };
 
       const res = await handler.handle(args);
 
-      expect(motionService.addCustomFieldToTask).toHaveBeenCalledWith('task1', 'cf1', '42');
+      expect(motionService.addCustomFieldToTask).toHaveBeenCalledWith('task1', 'cf1', '42', 'number');
       expect(res.isError).toBeFalsy();
     });
 
@@ -258,13 +315,29 @@ describe('CustomFieldHandler', () => {
       const args: MotionCustomFieldsArgs = {
         operation: 'remove_from_task',
         taskId: 'task1',
+        valueId: 'val1',
+      };
+
+      const res = await handler.handle(args);
+
+      expect(motionService.removeCustomFieldFromTask).toHaveBeenCalledWith('task1', 'val1');
+      expect(res.isError).toBeFalsy();
+    });
+
+    it('returns error when valueId missing', async () => {
+      const { ctx } = makeContext();
+      const handler = new CustomFieldHandler(ctx);
+      const args: MotionCustomFieldsArgs = {
+        operation: 'remove_from_task',
+        taskId: 'task1',
         fieldId: 'cf1',
       };
 
       const res = await handler.handle(args);
 
-      expect(motionService.removeCustomFieldFromTask).toHaveBeenCalledWith('task1', 'cf1');
-      expect(res.isError).toBeFalsy();
+      expect(res.isError).toBe(true);
+      const text = (res.content?.[0] as any)?.text || '';
+      expect(text).toContain('valueId');
     });
   });
 

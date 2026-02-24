@@ -8,9 +8,9 @@
 import { AxiosResponse } from 'axios';
 import { mcpLog } from './logger';
 import { LOG_LEVELS, LIMITS } from './constants';
-import { unwrapApiResponse, supportsPagination, UnwrappedResponse } from './responseWrapper';
+import { unwrapApiResponse, UnwrappedResponse } from './responseWrapper';
 import { TruncationInfo } from '../types/mcp';
-// MotionPaginationMeta is imported from responseWrapper via UnwrappedResponse
+
 
 export interface PaginatedResponse<T> {
   items: T[];
@@ -110,7 +110,7 @@ export async function fetchAllPages<T>(
         const newCursor = unwrapped.meta.nextCursor;
         
         // Additional safety: detect cursor not advancing (API bug protection)
-        if (pageCount > 1 && cursor === newCursor) {
+        if (cursor !== undefined && cursor === newCursor) {
           mcpLog(LOG_LEVELS.WARN, `Cursor not advancing for ${apiEndpoint}, stopping pagination`, {
             oldCursor: cursor,
             newCursor,
@@ -147,9 +147,12 @@ export async function fetchAllPages<T>(
         cursor,
         endpoint: apiEndpoint
       });
-      
-      // Don't completely fail - return what we have so far
+
+      // Don't completely fail - return what we have so far, but mark as truncated
       hasMore = false;
+      if (allItems.length > 0) {
+        truncation = { wasTruncated: true, returnedCount: allItems.length, reason: 'error', limit: 0 };
+      }
     }
   }
   
@@ -192,16 +195,6 @@ export async function fetchSinglePage<T>(
   const response = await fetchPage(cursor);
   return unwrapApiResponse<T>(response.data, apiEndpoint);
 }
-
-/**
- * Check if an endpoint supports pagination
- */
-export function endpointSupportsPagination(apiEndpoint: string): boolean {
-  return supportsPagination(apiEndpoint);
-}
-
-// Legacy compatibility exports (to be removed when migration is complete)
-export { UnwrappedResponse } from './responseWrapper';
 
 /**
  * Calculate adaptive fetch limit for search operations with overfetching.

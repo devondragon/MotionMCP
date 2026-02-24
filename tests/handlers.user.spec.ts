@@ -28,7 +28,7 @@ describe('UserHandler', () => {
     const { ctx, motionService } = makeContext();
     const handler = new UserHandler(ctx);
     const res = await handler.handle({ operation: 'list', workspaceName: 'Dev' } as any);
-    expect(motionService.getUsers).toHaveBeenCalledWith('w1');
+    expect(motionService.getUsers).toHaveBeenCalledWith('w1', undefined);
     const text = (res.content?.[0] as any)?.text || '';
     expect(text).toContain('Users in workspace "Dev"');
     expect(text).toContain('Alice');
@@ -43,5 +43,23 @@ describe('UserHandler', () => {
     const text = (res.content?.[0] as any)?.text || '';
     expect(text).toContain('Current user: Alice');
   });
-});
 
+  it('renders missing emails as "no email"', async () => {
+    const { ctx, motionService } = makeContext();
+    motionService.getUsers.mockResolvedValueOnce([
+      { id: 'u3', name: 'NoEmail User' },
+    ]);
+    motionService.getCurrentUser.mockResolvedValueOnce({ id: 'u3', name: 'NoEmail User' });
+    const handler = new UserHandler(ctx);
+
+    const listRes = await handler.handle({ operation: 'list', workspaceName: 'Dev' } as any);
+    const listText = (listRes.content?.[0] as any)?.text || '';
+    expect(listText).toContain('(no email)');
+    expect(listText).not.toContain('(undefined)');
+
+    const currentRes = await handler.handle({ operation: 'current' } as any);
+    const currentText = (currentRes.content?.[0] as any)?.text || '';
+    expect(currentText).toContain('(no email)');
+    expect(currentText).not.toContain('(undefined)');
+  });
+});

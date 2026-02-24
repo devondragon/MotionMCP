@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.0] - 2026-02-24
+
+### 🚀 New Features
+
+- **Auto-generated tool argument types**: New `scripts/generate-types.ts` derives `mcp-tool-args.ts` from JSON Schema definitions, eliminating manual type maintenance and ensuring handler argument types always match tool schemas. (#76)
+- **Integration test suite**: Added real-API integration tests (`api-contracts.integration.test.ts`, `enum-values.integration.test.ts`) that verify response shapes, enum casing, and parameter semantics against the live Motion API. Skipped gracefully when `MOTION_API_KEY` is absent.
+- **Client-side-filter-aware truncation notices**: When priority or due-date filtering is applied client-side after paginated fetching, the truncation notice now accurately reports the post-filter count and warns that matching tasks may exist on unfetched pages.
+
+### 🐛 Bug Fixes
+
+- **API alignment**: Corrected Motion API call patterns, parameter naming, and response handling to match official documentation — including custom field endpoints, task search, and pagination cursor handling.
+- **Custom field `valueId` exposure**: The `add_to_task` / `add_to_project` responses now surface the `valueId` needed for subsequent removal operations.
+- **`autoScheduled` validation on update**: Task updates now validate `autoScheduled` parameters (schedule name, deadline type) the same way task creation does.
+- **Integration test cleanup**: Removed incorrect `removeCustomFieldFromTask` calls that passed a field definition ID where a value assignment ID was expected; task deletion handles cleanup.
+
+### 🔧 Technical Improvements
+
+- **Dead code removal**: Removed unused stubs, placeholder comments, `validateArgs`/`ValidationResult` from handler base, and legacy search operations (`context`, `smart`).
+- **Hardened types and validation**: Strengthened TypeScript types across Motion API types, handler arguments, and service methods; improved runtime validation for priorities, durations, frequencies, and custom field operations.
+- **Parameter and caching fixes**: Corrected parameter naming inconsistencies, cache key construction, and log levels throughout the service layer.
+- **Response formatting improvements**: Enriched recurring task and schedule formatters with full object details; improved workspace resolver fuzzy matching.
+
+### 📖 Documentation
+
+- Condensed CLAUDE.md to remove duplication, updated tool default references to `complete`.
+
 ## [2.5.0] - 2026-02-22
 
 ### 🚀 New Features

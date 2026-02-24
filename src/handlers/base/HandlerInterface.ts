@@ -3,11 +3,6 @@ import { MotionApiService } from '../../services/motionApi';
 import { WorkspaceResolver } from '../../utils/workspaceResolver';
 import { InputValidator } from '../../utils/validator';
 
-export interface ValidationResult {
-  valid: boolean;
-  errors?: string;
-}
-
 export interface HandlerContext {
   motionService: MotionApiService;
   workspaceResolver: WorkspaceResolver;
@@ -16,5 +11,4 @@ export interface HandlerContext {
 
 export interface IHandler {
   handle(args: unknown): Promise<McpToolResponse>;
-  validateArgs(args: unknown): ValidationResult;
 }

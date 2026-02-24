@@ -74,7 +74,7 @@ const API_RESPONSE_PATTERNS: Record<string, ApiResponseConfig> = {
     apiName: 'Workspaces' 
   },
   users: { 
-    isWrapped: false, // TODO: Verify this - may be wrapped with 'users' key
+    isWrapped: false,
     apiName: 'Users' 
   }
 };

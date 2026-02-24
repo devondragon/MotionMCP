@@ -7,8 +7,40 @@ function makeContext() {
   const motionService = {
     getRecurringTasks: vi.fn().mockResolvedValue({
       items: [
-        { id: 'rt1', name: 'Weekly Report', frequency: { type: 'weekly' }, priority: 'MEDIUM' },
-        { id: 'rt2', name: 'Daily Standup', frequency: { type: 'daily' }, priority: 'HIGH' },
+        {
+          id: 'rt1',
+          name: 'Weekly Report',
+          frequency: { type: 'weekly' },
+          priority: 'MEDIUM',
+          assignee: { id: 'user1', name: 'Owner 1', email: 'owner1@example.com' },
+          creator: { id: 'user1', name: 'Owner 1', email: 'owner1@example.com' },
+          workspace: {
+            id: 'ws1',
+            name: 'Test Workspace',
+            teamId: null,
+            type: 'WORKSPACE',
+            labels: []
+          },
+          status: { name: 'Backlog', isDefaultStatus: true, isResolvedStatus: false },
+          labels: []
+        },
+        {
+          id: 'rt2',
+          name: 'Daily Standup',
+          frequency: { type: 'daily' },
+          priority: 'HIGH',
+          assignee: { id: 'user2', name: 'Owner 2', email: 'owner2@example.com' },
+          creator: { id: 'user2', name: 'Owner 2', email: 'owner2@example.com' },
+          workspace: {
+            id: 'ws1',
+            name: 'Test Workspace',
+            teamId: null,
+            type: 'WORKSPACE',
+            labels: []
+          },
+          status: { name: 'Backlog', isDefaultStatus: true, isResolvedStatus: false },
+          labels: []
+        },
       ],
       truncation: undefined,
     }),
@@ -17,9 +49,17 @@ function makeContext() {
       name: 'New Task',
       frequency: { type: 'weekly' },
       priority: 'MEDIUM',
-      creator: { name: 'Test User', email: 'test@example.com' },
-      workspace: { id: 'ws1', name: 'Test Workspace' },
-      status: { name: 'In Progress' },
+      creator: { id: 'user1', name: 'Test User', email: 'test@example.com' },
+      assignee: { id: 'user1', name: 'Test User', email: 'test@example.com' },
+      workspace: {
+        id: 'ws1',
+        name: 'Test Workspace',
+        teamId: null,
+        type: 'WORKSPACE',
+        labels: []
+      },
+      status: { name: 'In Progress', isDefaultStatus: false, isResolvedStatus: false },
+      labels: [],
     }),
     deleteRecurringTask: vi.fn().mockResolvedValue(undefined),
   } as any;
@@ -52,7 +92,7 @@ describe('RecurringTaskHandler', () => {
       expect(text).toContain('Daily Standup');
     });
 
-    it('returns error when workspaceId missing', async () => {
+    it('returns error when workspace identifier missing', async () => {
       const { ctx } = makeContext();
       const handler = new RecurringTaskHandler(ctx);
       const args: MotionRecurringTasksArgs = { operation: 'list' };
@@ -61,7 +101,7 @@ describe('RecurringTaskHandler', () => {
 
       expect(res.isError).toBe(true);
       const text = (res.content?.[0] as any)?.text || '';
-      expect(text).toContain('Workspace ID is required');
+      expect(text).toContain('Workspace ID or workspace name is required');
     });
   });
 
@@ -119,6 +159,60 @@ describe('RecurringTaskHandler', () => {
         priority: 'HIGH',
       }));
       expect(res.isError).toBeFalsy();
+    });
+
+    it('preserves duration 0 in create payload', async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new RecurringTaskHandler(ctx);
+      const args: MotionRecurringTasksArgs = {
+        operation: 'create',
+        name: 'Zero Duration Task',
+        workspaceId: 'ws1',
+        assigneeId: 'user1',
+        frequency: { type: 'daily' },
+        duration: 0,
+      };
+
+      const res = await handler.handle(args);
+
+      expect(motionService.createRecurringTask).toHaveBeenCalledWith(expect.objectContaining({
+        duration: 0,
+      }));
+      expect(res.isError).toBeFalsy();
+    });
+
+    it('formats creator and assignee details from create response', async () => {
+      const { ctx, motionService } = makeContext();
+      motionService.createRecurringTask.mockResolvedValueOnce({
+        id: 'rt4',
+        name: 'Formatted Task',
+        priority: 'MEDIUM',
+        creator: { id: 'user9', name: 'Creator Name', email: 'creator@example.com' },
+        assignee: { id: 'user8', name: 'Assignee Name', email: 'assignee@example.com' },
+        workspace: {
+          id: 'ws1',
+          name: 'Test Workspace',
+          teamId: null,
+          type: 'WORKSPACE',
+          labels: []
+        },
+        status: { name: 'In Progress', isDefaultStatus: false, isResolvedStatus: false },
+        labels: [],
+      });
+      const handler = new RecurringTaskHandler(ctx);
+      const args: MotionRecurringTasksArgs = {
+        operation: 'create',
+        name: 'Formatted Task',
+        workspaceId: 'ws1',
+        assigneeId: 'user1',
+        frequency: { type: 'weekly' },
+      };
+
+      const res = await handler.handle(args);
+      const text = (res.content?.[0] as any)?.text || '';
+      expect(res.isError).toBeFalsy();
+      expect(text).toContain('- Creator: Creator Name (creator@example.com)');
+      expect(text).toContain('- Assignee: Assignee Name (assignee@example.com)');
     });
 
     it('returns error when required params missing', async () => {

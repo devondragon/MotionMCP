@@ -88,7 +88,7 @@ export const MotionTaskSchema = z.object({
     id: z.string(),
     name: z.string(),
     email: z.string()
-  }).optional(),
+  }),
   
   workspace: z.object({
     id: z.string(),
@@ -182,7 +182,7 @@ export const MotionRecurringTaskSchema = z.object({
     id: z.string(),
     name: z.string(),
     email: z.string()
-  }).optional(),
+  }),
   project: z.object({
     id: z.string(),
     name: z.string(),
@@ -197,7 +197,7 @@ export const MotionRecurringTaskSchema = z.object({
       type: z.string(),
       value: z.unknown()
     })).optional()
-  }),
+  }).optional(),
   workspace: z.object({
     id: z.string(),
     name: z.string(),
@@ -315,25 +315,9 @@ export const UsersResponseSchema = z.union([
   })
 ]);
 
-// Legacy schemas for backward compatibility
-export const ProjectsListResponseSchema = z.union([
-  ProjectsResponseSchema,
-  z.array(MotionProjectSchema)
-]);
-
-export const TasksListResponseSchema = z.union([
-  TasksResponseSchema,
-  z.array(MotionTaskSchema)
-]);
-
 export const WorkspacesListResponseSchema = z.union([
   WorkspacesResponseSchema,
   z.array(MotionWorkspaceSchema)
-]);
-
-export const UsersListResponseSchema = z.union([
-  UsersResponseSchema,
-  z.array(MotionUserSchema)
 ]);
 
 export const SchedulesListResponseSchema = z.union([
@@ -345,18 +329,6 @@ export const StatusesListResponseSchema = z.union([
   StatusesResponseSchema,
   z.array(MotionStatusSchema)
 ]);
-
-// Type inference from schemas
-export type MotionWorkspaceValidated = z.infer<typeof MotionWorkspaceSchema>;
-export type MotionProjectValidated = z.infer<typeof MotionProjectSchema>;
-export type MotionTaskValidated = z.infer<typeof MotionTaskSchema>;
-export type MotionUserValidated = z.infer<typeof MotionUserSchema>;
-export type MotionCommentValidated = z.infer<typeof MotionCommentSchema>;
-export type MotionCustomFieldValidated = z.infer<typeof MotionCustomFieldSchema>;
-export type MotionRecurringTaskValidated = z.infer<typeof MotionRecurringTaskSchema>;
-export type MotionScheduleValidated = z.infer<typeof MotionScheduleSchema>;
-export type MotionStatusValidated = z.infer<typeof MotionStatusSchema>;
-export type MotionPaginationMetaValidated = z.infer<typeof MotionPaginationMetaSchema>;
 
 // Validation configuration
 export const VALIDATION_CONFIG = {

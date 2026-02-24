@@ -6,11 +6,11 @@ import { formatMcpSuccess } from '../utils';
 export class UserHandler extends BaseHandler {
   async handle(args: MotionUsersArgs): Promise<McpToolResponse> {
     try {
-      const { operation, workspaceId, workspaceName } = args;
+      const { operation, workspaceId, workspaceName, teamId } = args;
 
       switch(operation) {
         case 'list':
-          return await this.handleList(workspaceId, workspaceName);
+          return await this.handleList(workspaceId, workspaceName, teamId);
         case 'current':
           return await this.handleGetCurrent();
         default:
@@ -21,17 +21,17 @@ export class UserHandler extends BaseHandler {
     }
   }
 
-  private async handleList(workspaceId?: string, workspaceName?: string): Promise<McpToolResponse> {
+  private async handleList(workspaceId?: string, workspaceName?: string, teamId?: string): Promise<McpToolResponse> {
     const workspace = await this.workspaceResolver.resolveWorkspace({ workspaceId, workspaceName });
-    const users = await this.motionService.getUsers(workspace.id);
+    const users = await this.motionService.getUsers(workspace.id, teamId);
 
-    const userList = users.map(u => `- ${u.name} (${u.email}) [ID: ${u.id}]`).join('\n');
+    const userList = users.map(u => `- ${u.name} (${u.email || 'no email'}) [ID: ${u.id}]`).join('\n');
     return formatMcpSuccess(`Users in workspace "${workspace.name}":\n${userList}`);
   }
 
   private async handleGetCurrent(): Promise<McpToolResponse> {
     const currentUser = await this.motionService.getCurrentUser();
-    const userInfo = `Current user: ${currentUser.name || 'No name'} (${currentUser.email}) [ID: ${currentUser.id}]`;
+    const userInfo = `Current user: ${currentUser.name || 'No name'} (${currentUser.email || 'no email'}) [ID: ${currentUser.id}]`;
     return formatMcpSuccess(userInfo);
   }
 }

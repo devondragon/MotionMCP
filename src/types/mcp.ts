@@ -39,8 +39,12 @@ export interface McpToolRegistry {
 export interface TruncationInfo {
   wasTruncated: boolean;
   returnedCount: number;
-  reason?: 'page_size_limit' | 'max_items' | 'max_pages';
+  reason?: 'page_size_limit' | 'max_items' | 'max_pages' | 'error';
   limit?: number;
+  /** True when client-side filters (priority/dueDate) reduced the result set after pagination */
+  clientFiltered?: boolean;
+  /** Number of items fetched before client-side filtering was applied */
+  fetchedCount?: number;
 }
 
 export interface ListResult<T> {

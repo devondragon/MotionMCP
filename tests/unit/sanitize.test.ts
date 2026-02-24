@@ -133,10 +133,10 @@ describe('sanitizeTextContent', () => {
   });
 
   describe('length limits', () => {
-    it('truncates content exceeding 5000 characters', () => {
+    it('does not truncate content — length policy is the caller\'s responsibility', () => {
       const longString = 'a'.repeat(6000);
       const result = sanitizeTextContent(longString);
-      expect(result.length).toBe(5000);
+      expect(result.length).toBe(6000);
     });
 
     it('preserves content at exactly 5000 characters', () => {

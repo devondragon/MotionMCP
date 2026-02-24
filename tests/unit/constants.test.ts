@@ -3,8 +3,6 @@ import {
   parseFilterDate,
   isValidPriority,
   createMinimalPayload,
-  convertUndefinedToNull,
-  convertNullToUndefined,
   VALID_PRIORITIES
 } from '../../src/utils/constants';
 
@@ -129,10 +127,10 @@ describe('isValidPriority', () => {
 });
 
 describe('createMinimalPayload', () => {
-  it('removes null values', () => {
+  it('preserves null values (API distinguishes absent vs null)', () => {
     const result = createMinimalPayload({ name: 'test', value: null });
-    expect(result).toEqual({ name: 'test' });
-    expect('value' in result).toBe(false);
+    expect(result).toEqual({ name: 'test', value: null });
+    expect('value' in result).toBe(true);
   });
 
   it('removes undefined values', () => {
@@ -147,10 +145,10 @@ describe('createMinimalPayload', () => {
     expect('description' in result).toBe(false);
   });
 
-  it('removes empty arrays', () => {
+  it('preserves empty arrays (e.g., labels: [] to clear labels)', () => {
     const result = createMinimalPayload({ name: 'test', labels: [] });
-    expect(result).toEqual({ name: 'test' });
-    expect('labels' in result).toBe(false);
+    expect(result).toEqual({ name: 'test', labels: [] });
+    expect('labels' in result).toBe(true);
   });
 
   it('removes empty objects', () => {
@@ -188,55 +186,7 @@ describe('createMinimalPayload', () => {
       d: [],
       e: {}
     });
-    expect(result).toEqual({ name: 'test' });
+    expect(result).toEqual({ name: 'test', a: null, d: [] });
   });
 });
 
-describe('convertUndefinedToNull', () => {
-  it('converts undefined values to null', () => {
-    const result = convertUndefinedToNull({ a: undefined, b: 'test' });
-    expect(result.a).toBeNull();
-    expect(result.b).toBe('test');
-  });
-
-  it('preserves null values', () => {
-    const result = convertUndefinedToNull({ a: null });
-    expect(result.a).toBeNull();
-  });
-
-  it('preserves other values', () => {
-    const result = convertUndefinedToNull({ a: 0, b: false, c: '' });
-    expect(result).toEqual({ a: 0, b: false, c: '' });
-  });
-
-  it('does not modify original object', () => {
-    const original = { a: undefined };
-    convertUndefinedToNull(original);
-    expect(original.a).toBeUndefined();
-  });
-});
-
-describe('convertNullToUndefined', () => {
-  it('removes null values (makes them undefined)', () => {
-    const result = convertNullToUndefined({ a: null, b: 'test' });
-    expect(result.a).toBeUndefined();
-    expect('a' in result).toBe(false);
-    expect(result.b).toBe('test');
-  });
-
-  it('preserves undefined as undefined', () => {
-    const result = convertNullToUndefined({ a: undefined });
-    expect(result.a).toBeUndefined();
-  });
-
-  it('preserves other values', () => {
-    const result = convertNullToUndefined({ a: 0, b: false, c: '' });
-    expect(result).toEqual({ a: 0, b: false, c: '' });
-  });
-
-  it('does not modify original object', () => {
-    const original = { a: null };
-    convertNullToUndefined(original);
-    expect(original.a).toBeNull();
-  });
-});

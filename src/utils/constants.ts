@@ -34,32 +34,16 @@ export const WORKSPACE_TYPES = {
   UNKNOWN: 'unknown'
 } as const;
 
-export type WorkspaceType = typeof WORKSPACE_TYPES[keyof typeof WORKSPACE_TYPES];
-
 // MCP response types
 export const MCP_RESPONSE_TYPES = {
   TEXT: 'text',
   JSON: 'json'
 } as const;
 
-export type McpResponseType = typeof MCP_RESPONSE_TYPES[keyof typeof MCP_RESPONSE_TYPES];
-
 // Default values for common parameters
 export const DEFAULTS = {
   WORKSPACE_FALLBACK_TO_DEFAULT: true,
   WORKSPACE_VALIDATE_ACCESS: false,
-  WORKSPACE_USE_CACHE: true,
-  
-  // Search defaults
-  SEARCH_LIMIT: 40,
-  SEARCH_SCOPE: 'both' as 'both' | 'tasks' | 'projects',
-  
-  // Suggestion defaults
-  MAX_SUGGESTIONS: 5,
-  
-  // Workload analysis defaults
-  TIMEFRAME: 'this_week' as 'today' | 'this_week' | 'this_month',
-  INCLUDE_PROJECTS: true
 } as const;
 
 // Retry configuration
@@ -113,32 +97,6 @@ export const LOG_LEVELS = {
 
 export type LogLevel = typeof LOG_LEVELS[keyof typeof LOG_LEVELS];
 
-// Null vs Undefined Policy
-export const NULL_UNDEFINED_POLICY = {
-  // Use undefined for:
-  // - Optional parameters that weren't provided
-  // - Missing object properties
-  // - Function returns when item not found
-  // - Uninitialized values
-  
-  // Use null for:
-  // - Explicit absence of value from API
-  // - Database null values
-  // - Cleared/reset state (e.g., cache reset)
-  // - Values that need to be explicitly sent as null to external APIs
-} as const;
-
-// Helper to convert undefined to null for API compatibility
-export function convertUndefinedToNull<T extends Record<string, any>>(obj: T): T {
-  const result = { ...obj };
-  for (const key in result) {
-    if (result[key] === undefined) {
-      (result as any)[key] = null;
-    }
-  }
-  return result;
-}
-
 /**
  * Creates a minimal payload by removing null, undefined, and empty values
  * This prevents API validation errors from unexpected fields
@@ -151,35 +109,21 @@ export function createMinimalPayload<T extends Record<string, any>>(obj: T): Par
   for (const key in obj) {
     const value = obj[key];
 
-    // Skip null, undefined, empty strings, and empty arrays
-    if (value === null || value === undefined || value === '') {
-      continue;
-    }
-
-    // Skip empty arrays
-    if (Array.isArray(value) && value.length === 0) {
+    // Skip undefined and empty strings only.
+    // Preserve null (API may distinguish absent vs null, e.g., autoScheduled: null).
+    // Preserve empty arrays (e.g., labels: [] to clear all labels).
+    if (value === undefined || value === '') {
       continue;
     }
 
     // Skip empty objects (but preserve objects with properties)
-    if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length === 0) {
       continue;
     }
 
     result[key] = value;
   }
 
-  return result;
-}
-
-// Helper to convert null to undefined for internal consistency
-export function convertNullToUndefined<T extends Record<string, any>>(obj: T): T {
-  const result = { ...obj };
-  for (const key in result) {
-    if (result[key] === null) {
-      delete result[key]; // This makes it undefined
-    }
-  }
   return result;
 }
 
@@ -202,15 +146,15 @@ export function parseFilterDate(dateInput: string): string | null {
 
   switch (normalizedInput) {
     case 'today':
-      return today.toISOString().split('T')[0];
+      return today.toISOString().split('T')[0]!;
     case 'tomorrow':
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
-      return tomorrow.toISOString().split('T')[0];
+      return tomorrow.toISOString().split('T')[0]!;
     case 'yesterday':
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
-      return yesterday.toISOString().split('T')[0];
+      return yesterday.toISOString().split('T')[0]!;
   }
 
   // Validate YYYY-MM-DD format

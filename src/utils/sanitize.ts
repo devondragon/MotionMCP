@@ -5,7 +5,8 @@
  * to prevent injection attacks and ensure data integrity.
  */
 
-import { LIMITS } from './constants';
+// sanitizeTextContent intentionally does NOT enforce length limits.
+// Length policy (truncation vs rejection) is the caller's responsibility.
 
 /**
  * Sanitize user-provided text content for safe storage and transmission
@@ -42,11 +43,6 @@ export function sanitizeTextContent(input: string | undefined | null): string {
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-
-  // Limit length to prevent abuse - use consistent limit from constants
-  if (sanitized.length > LIMITS.COMMENT_MAX_LENGTH) {
-    sanitized = sanitized.substring(0, LIMITS.COMMENT_MAX_LENGTH);
-  }
 
   return sanitized;
 }

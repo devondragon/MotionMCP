@@ -1,6 +1,6 @@
 {
   "name": "motionmcp",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "MCP server for Motion API integration - manage projects, tasks, and workspaces from LLMs",
   "main": "dist/mcp-server.js",
   "bin": {
@@ -52,12 +52,15 @@
     "wrangler": "^4.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "generate:types": "npx tsx scripts/generate-types.ts",
+    "build": "npm run generate:types && tsc",
     "mcp": "node dist/mcp-server.js",
     "mcp:dev": "ts-node src/mcp-server.ts",
     "watch": "tsc --watch",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest --config vitest.integration.config.ts",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",
     "worker:type-check": "tsc --noEmit -p tsconfig.worker.json",

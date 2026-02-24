@@ -40,6 +40,7 @@ describe('ProjectHandler', () => {
       name: 'Proj',
       workspaceId: 'w1',
     }));
+    expect(ctx.motionService.createProject.mock.calls[0][0]).not.toHaveProperty('workspaceName');
 
     const text = (res.content?.[0] as any)?.text || '';
     expect(text).toContain('Successfully created project');
@@ -55,5 +56,17 @@ describe('ProjectHandler', () => {
     expect(text).toContain('(ID: p1)');
     expect(text).toContain('(ID: p2)');
   });
-});
 
+  it('gets project details with populated fields', async () => {
+    const ctx = makeContext();
+    const handler = new ProjectHandler(ctx);
+    const res = await handler.handle({ operation: 'get', projectId: 'p1' } as any);
+
+    expect(ctx.motionService.getProject).toHaveBeenCalledWith('p1');
+    const text = (res.content?.[0] as any)?.text || '';
+    expect(text).toContain('Project details for "A" Details:');
+    expect(text).toContain('- Id: p1');
+    expect(text).toContain('- Name: A');
+    expect(text).toContain('- WorkspaceId: w1');
+  });
+});

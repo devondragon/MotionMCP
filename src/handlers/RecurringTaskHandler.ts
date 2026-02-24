@@ -25,26 +25,31 @@ export class RecurringTaskHandler extends BaseHandler {
   }
 
   private async handleList(args: MotionRecurringTasksArgs): Promise<McpToolResponse> {
-    if (!args.workspaceId) {
-      return this.handleError(new Error('Workspace ID is required for list operation'));
+    if (!args.workspaceId && !args.workspaceName) {
+      return this.handleError(new Error('Workspace ID or workspace name is required for list operation'));
     }
-    const { items: recurringTasks, truncation } = await this.motionService.getRecurringTasks(args.workspaceId);
+    const workspace = await this.workspaceResolver.resolveWorkspace({
+      workspaceId: args.workspaceId,
+      workspaceName: args.workspaceName
+    });
+    const { items: recurringTasks, truncation } = await this.motionService.getRecurringTasks(workspace.id);
     return formatRecurringTaskList(recurringTasks, truncation);
   }
 
   private async handleCreate(args: MotionRecurringTasksArgs): Promise<McpToolResponse> {
-    if (!args.name || !args.workspaceId || !args.assigneeId || !args.frequency) {
-      return this.handleError(new Error('Name, workspace ID, assignee ID, and frequency are required for create operation'));
+    if (!args.name || (!args.workspaceId && !args.workspaceName) || !args.assigneeId || !args.frequency) {
+      return this.handleError(new Error('Name, workspace ID/workspace name, assignee ID, and frequency are required for create operation'));
     }
 
     // Validate frequency
-    if (!args.frequency.type || !['daily', 'weekly', 'monthly', 'yearly'].includes(args.frequency.type)) {
-      return this.handleError(new Error('Frequency type must be one of: daily, weekly, monthly, yearly'));
+    if (!args.frequency.type || !['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', 'custom'].includes(args.frequency.type)) {
+      return this.handleError(new Error('Frequency type must be one of: daily, weekly, biweekly, monthly, quarterly, yearly, custom'));
     }
 
-    // Additional validations would go here...
-    
-    const workspace = await this.workspaceResolver.resolveWorkspace({ workspaceId: args.workspaceId });
+    const workspace = await this.workspaceResolver.resolveWorkspace({
+      workspaceId: args.workspaceId,
+      workspaceName: args.workspaceName
+    });
 
     const taskData: CreateRecurringTaskData = {
       name: args.name,
@@ -54,7 +59,7 @@ export class RecurringTaskHandler extends BaseHandler {
       ...(args.description && { description: args.description }),
       ...(args.projectId && { projectId: args.projectId }),
       ...(args.deadlineType && { deadlineType: args.deadlineType }),
-      ...(args.duration && { duration: args.duration }),
+      ...(args.duration !== undefined && args.duration !== null && { duration: args.duration }),
       ...(args.startingOn && { startingOn: args.startingOn }),
       ...(args.idealTime && { idealTime: args.idealTime }),
       ...(args.schedule && { schedule: args.schedule }),

@@ -6,19 +6,13 @@
  * ensuring consistent parameter handling.
  */
 
-import { DEFAULTS, parseFilterDate } from './constants';
+import { parseFilterDate } from './constants';
 import { ValidationError } from './errorHandling';
 import { sanitizeName, sanitizeDescription } from './sanitize';
 
 interface WorkspaceArgs {
   workspaceId?: string;
   workspaceName?: string;
-}
-
-interface SearchArgs extends WorkspaceArgs {
-  query?: string;
-  searchScope?: 'both' | 'tasks' | 'projects';
-  limit?: number;
 }
 
 interface TaskArgs extends WorkspaceArgs {
@@ -38,8 +32,6 @@ interface TaskArgs extends WorkspaceArgs {
 interface ProjectArgs extends WorkspaceArgs {
   name?: string;
   description?: string;
-  color?: string;
-  status?: string;
 }
 
 /**
@@ -49,18 +41,6 @@ export function parseWorkspaceArgs(args: Record<string, unknown> = {}): Workspac
   return {
     workspaceId: (args.workspaceId as string) || undefined,
     workspaceName: args.workspaceName ? sanitizeName(args.workspaceName as string) : undefined
-  };
-}
-
-/**
- * Parse search-related arguments from MCP request
- */
-export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs {
-  return {
-    query: args.query ? sanitizeName(args.query as string) : '',
-    searchScope: (args.searchScope as 'both' | 'tasks' | 'projects') || DEFAULTS.SEARCH_SCOPE,
-    limit: (args.limit as number) || DEFAULTS.SEARCH_LIMIT,
-    ...parseWorkspaceArgs(args)
   };
 }
 
@@ -79,7 +59,7 @@ export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs 
  * @param value - The autoScheduled value from MCP request
  * @returns Proper autoScheduled value for Motion API, or undefined for invalid types
  */
-function parseAutoScheduledParam(value: unknown): Record<string, unknown> | null | undefined {
+export function parseAutoScheduledParam(value: unknown): Record<string, unknown> | null | undefined {
   // If undefined, leave as undefined (field not provided)
   if (value === undefined) {
     return undefined;
@@ -170,10 +150,9 @@ export function normalizeDueDateForApi(dueDate?: string | null): string | undefi
   }
 
   // If the string looks like a datetime without timezone info (e.g. 'YYYY-MM-DDTHH:mm:ss')
+  // Treat as UTC by appending Z — preserve the user's intended time
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/.test(trimmed)) {
-    // Treat as end-of-day UTC for the given date
-    const datePart = trimmed.split('T')[0];
-    return `${datePart}T23:59:59.000Z`;
+    return `${trimmed}Z`;
   }
 
   // Otherwise, just return the original string (unparseable or unexpected format)
@@ -187,8 +166,6 @@ export function parseProjectArgs(args: Record<string, unknown> = {}): ProjectArg
   return {
     name: args.name ? sanitizeName(args.name as string) : undefined,
     description: sanitizeDescription(args.description as string),
-    color: (args.color as string) || undefined,
-    status: (args.status as string) || undefined,
     ...parseWorkspaceArgs(args)
   };
 }
@@ -258,7 +235,7 @@ export function validateParameterTypes(
 
 /**
  * Sanitize string parameters (trim whitespace, handle empty strings)
- * Following NULL_UNDEFINED_POLICY: empty strings become undefined (deleted)
+ * Empty strings become undefined (deleted)
  */
 export function sanitizeStringParams<T extends Record<string, any>>(
   args: T = {} as T, 

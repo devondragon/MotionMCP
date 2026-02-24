@@ -13,8 +13,6 @@ interface CreateProjectParams {
   workspaceId?: string;
   workspaceName?: string;
   description?: string;
-  color?: string;
-  status?: string;
 }
 
 interface ListProjectParams {
@@ -59,7 +57,8 @@ export class ProjectHandler extends BaseHandler {
     });
 
     const project = await this.motionService.createProject({
-      ...projectData,
+      name: projectData.name,
+      description: projectData.description,
       workspaceId: workspace.id
     });
 

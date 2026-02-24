@@ -38,19 +38,11 @@ export const projectsToolDefinition: McpToolDefinition = {
       },
       name: {
         type: "string",
-        description: "Project name"
+        description: "Project name (required for create)"
       },
       description: {
         type: "string",
         description: "Project description"
-      },
-      color: {
-        type: "string",
-        description: "Hex color code"
-      },
-      status: {
-        type: "string",
-        description: "Project status"
       },
       allWorkspaces: {
         type: "boolean",
@@ -105,7 +97,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       assigneeId: {
         type: "string",
-        description: "Filter by assignee (for list and list_all_uncompleted)"
+        description: "Filter by assignee (for list/list_all_uncompleted), set assignee (for create/update), or reassign (for move)"
       },
       assignee: {
         type: "string",
@@ -113,12 +105,12 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       priority: {
         type: "string",
-        description: "Filter by priority level (for list): ASAP, HIGH, MEDIUM, LOW",
+        description: "Filter by priority level (for list, filtered client-side): ASAP, HIGH, MEDIUM, LOW",
         enum: ["ASAP", "HIGH", "MEDIUM", "LOW"]
       },
       dueDate: {
         type: "string",
-        description: "Due date (for create/update) or filter (for list). Date-only values are stored as end-of-day UTC. Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
+        description: "Due date (for create/update) or filter (for list, filtered client-side — returns tasks due on or before this date). Date-only values are stored as end-of-day UTC. Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
       },
       labels: {
         type: "array",
@@ -129,7 +121,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       name: {
         type: "string",
-        description: "Task name (required for create)"
+        description: "Task name (required for create, optional for list as case-insensitive substring search)"
       },
       description: {
         type: "string",
@@ -168,13 +160,9 @@ export const tasksToolDefinition: McpToolDefinition = {
         ],
         description: "Auto-scheduling configuration. Requires a schedule name. Use motion_schedules to see available schedules. Examples: 'Work Hours' or {schedule: 'Work Hours', deadlineType: 'SOFT'}"
       },
-      targetProjectId: {
-        type: "string",
-        description: "Target project for move operation"
-      },
       targetWorkspaceId: {
         type: "string",
-        description: "Target workspace for move operation"
+        description: "Target workspace ID (required for move operation). Move transfers a task between workspaces — project-level targeting is not supported by the Motion API."
       },
       limit: {
         type: "number",
@@ -187,18 +175,18 @@ export const tasksToolDefinition: McpToolDefinition = {
 
 export const workspacesToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.WORKSPACES,
-  description: "Manage Motion workspaces - supports list, get, and set_default operations",
+  description: "Manage Motion workspaces - supports list and get operations",
   inputSchema: {
     type: "object",
     properties: {
       operation: {
         type: "string",
-        enum: ["list", "get", "set_default"],
+        enum: ["list", "get"],
         description: "Operation to perform"
       },
       workspaceId: {
         type: "string",
-        description: "Workspace ID (required for get and set_default operations)"
+        description: "Workspace ID (required for get operation)"
       }
     },
     required: ["operation"]
@@ -207,27 +195,27 @@ export const workspacesToolDefinition: McpToolDefinition = {
 
 export const searchToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.SEARCH,
-  description: "Search and context utilities for Motion - supports content, context, and smart operations",
+  description: "Search Motion tasks and projects by query",
   inputSchema: {
     type: "object",
     properties: {
       operation: {
         type: "string",
-        enum: ["content", "context", "smart"],
+        enum: ["content"],
         description: "Operation to perform"
       },
       query: {
         type: "string",
-        description: "Search query (required for content and smart operations)"
+        description: "Search query (required)"
       },
       searchScope: {
         type: "string",
         enum: ["tasks", "projects", "both"],
-        description: "What to search for content operation (default: both)"
+        description: "What to search (default: both)"
       },
       workspaceId: {
         type: "string",
-        description: "Workspace ID to limit search/context"
+        description: "Workspace ID to limit search"
       },
       workspaceName: {
         type: "string",
@@ -235,32 +223,7 @@ export const searchToolDefinition: McpToolDefinition = {
       },
       limit: {
         type: "number",
-        description: "Maximum number of results for content operation"
-      },
-      includeProjects: {
-        type: "boolean",
-        description: "Include project information for context operation"
-      },
-      includeTasks: {
-        type: "boolean",
-        description: "Include task information for context operation"
-      },
-      includeUsers: {
-        type: "boolean",
-        description: "Include user information for context operation"
-      },
-      entityType: {
-        type: "string",
-        enum: ["project", "task"],
-        description: "Entity type for smart operation"
-      },
-      entityId: {
-        type: "string",
-        description: "Entity ID for smart operation"
-      },
-      includeRelated: {
-        type: "boolean",
-        description: "Include related entities for smart operation"
+        description: "Maximum number of results"
       }
     },
     required: ["operation"]
@@ -285,6 +248,10 @@ export const usersToolDefinition: McpToolDefinition = {
       workspaceName: {
         type: "string",
         description: "Workspace name (alternative to workspaceId, ignored for current)"
+      },
+      teamId: {
+        type: "string",
+        description: "Team ID to filter users by (optional for list operation)"
       }
     },
     required: ["operation"]
@@ -321,7 +288,7 @@ export const commentsToolDefinition: McpToolDefinition = {
 
 export const customFieldsToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.CUSTOM_FIELDS,
-  description: "Manage custom fields for tasks and projects",
+  description: "Manage custom fields for tasks and projects. Required params per operation: list: workspaceId or workspaceName. create: workspaceId/workspaceName + name + field (type); options[] also required for select/multiSelect. delete: workspaceId/workspaceName + fieldId. add_to_project: projectId + fieldId. remove_from_project: projectId + valueId. add_to_task: taskId + fieldId. remove_from_task: taskId + valueId.",
   inputSchema: {
     type: "object",
     properties: {
@@ -332,50 +299,64 @@ export const customFieldsToolDefinition: McpToolDefinition = {
       },
       fieldId: {
         type: "string",
-        description: "Custom field ID"
+        description: "Custom field definition ID. Required for: delete, add_to_project, add_to_task. For remove operations, use valueId instead."
+      },
+      valueId: {
+        type: "string",
+        description: "Custom field value assignment ID (not the field definition ID). Required for: remove_from_project, remove_from_task."
       },
       workspaceId: {
         type: "string",
-        description: "Workspace ID"
+        description: "Workspace ID. Required for: list, create, delete."
+      },
+      workspaceName: {
+        type: "string",
+        description: "Workspace name (alternative to workspaceId). Required for: list, create, delete."
       },
       name: {
         type: "string",
-        description: "Field name (for create)"
+        description: "Field name. Required for: create."
       },
       field: {
         type: "string",
         enum: ["text", "url", "date", "person", "multiPerson", "phone", "select", "multiSelect", "number", "email", "checkbox", "relatedTo"],
-        description: "Field type (for create)"
+        description: "Field type. Required for: create. Also needed for add_to_project/add_to_task when providing a non-null value."
       },
       options: {
         type: "array",
         items: { type: "string" },
-        description: "Options for select/multiselect fields"
+        description: "Option labels. Required for: create when field is select or multiSelect."
       },
       required: {
         type: "boolean",
-        description: "Whether field is required"
+        description: "Whether field is required on tasks/projects."
       },
       projectId: {
         type: "string",
-        description: "Project ID (for add/remove operations)"
+        description: "Project ID. Required for: add_to_project, remove_from_project."
       },
       taskId: {
         type: "string",
-        description: "Task ID (for add/remove operations)"
+        description: "Task ID. Required for: add_to_task, remove_from_task."
       },
       value: {
-        type: ["string", "number", "boolean", "array", "null"],
-        description: "Field value"
+        oneOf: [
+          { type: "string" },
+          { type: "number" },
+          { type: "boolean" },
+          { type: "array", items: { type: "string" } },
+          { type: "null" }
+        ],
+        description: "Field value to set. Optional for add_to_project/add_to_task. When provided and non-null, the field param (type) is also required."
       }
     },
-    required: ["operation", "workspaceId"]
+    required: ["operation"]
   }
 };
 
 export const recurringTasksToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.RECURRING_TASKS,
-  description: "Manage recurring tasks",
+  description: "Manage recurring tasks. Required params per operation: list: workspaceId or workspaceName. create: workspaceId/workspaceName + name + assigneeId + frequency (with frequency.type). delete: recurringTaskId.",
   inputSchema: {
     type: "object",
     properties: {
@@ -386,27 +367,31 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
       },
       recurringTaskId: {
         type: "string",
-        description: "Recurring task ID (for delete)"
+        description: "Recurring task ID. Required for: delete."
       },
       workspaceId: {
         type: "string",
-        description: "Workspace ID"
+        description: "Workspace ID. Required for: list, create."
+      },
+      workspaceName: {
+        type: "string",
+        description: "Workspace name (alternative to workspaceId). Required for: list, create."
       },
       name: {
         type: "string",
-        description: "Task name (for create)"
+        description: "Task name. Required for: create."
       },
       description: {
         type: "string",
-        description: "Task description"
+        description: "Task description."
       },
       projectId: {
         type: "string",
-        description: "Project ID"
+        description: "Project ID."
       },
       assigneeId: {
         type: "string",
-        description: "User ID to assign the recurring task to (required for create)"
+        description: "User ID to assign the recurring task to. Required for: create."
       },
       frequency: {
         type: "object",
@@ -487,21 +472,14 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
 
 export const schedulesToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.SCHEDULES,
-  description: "Get user schedules showing their weekly working hours and time zones",
+  description: "Get all schedules showing weekly working hours and time zones. The Motion API returns all schedules with no filtering options.",
   inputSchema: {
     type: "object",
     properties: {
-      userId: {
+      operation: {
         type: "string",
-        description: "User ID to get schedule for (optional, returns all schedules if not specified)"
-      },
-      startDate: {
-        type: "string",
-        description: "Start date for filtering schedules (optional)"
-      },
-      endDate: {
-        type: "string",
-        description: "End date for filtering schedules (optional)"
+        enum: ["list"],
+        description: "Operation to perform"
       }
     },
     additionalProperties: false

@@ -5,7 +5,6 @@ import {
   validateRequiredParams,
   sanitizeStringParams,
   parseWorkspaceArgs,
-  parseSearchArgs,
   parseProjectArgs,
   setDefaults,
   validateParameterTypes,
@@ -97,20 +96,20 @@ describe('normalizeDueDateForApi', () => {
   });
 
   describe('ISO without timezone (datetime without offset)', () => {
-    it('converts datetime without timezone to end-of-day UTC', () => {
-      expect(normalizeDueDateForApi('2024-06-15T10:30:00')).toBe('2024-06-15T23:59:59.000Z');
+    it('preserves time and appends Z for datetime without timezone', () => {
+      expect(normalizeDueDateForApi('2024-06-15T10:30:00')).toBe('2024-06-15T10:30:00Z');
     });
 
     it('handles datetime with seconds', () => {
-      expect(normalizeDueDateForApi('2024-06-15T10:30:45')).toBe('2024-06-15T23:59:59.000Z');
+      expect(normalizeDueDateForApi('2024-06-15T10:30:45')).toBe('2024-06-15T10:30:45Z');
     });
 
     it('handles datetime with milliseconds', () => {
-      expect(normalizeDueDateForApi('2024-06-15T10:30:45.123')).toBe('2024-06-15T23:59:59.000Z');
+      expect(normalizeDueDateForApi('2024-06-15T10:30:45.123')).toBe('2024-06-15T10:30:45.123Z');
     });
 
     it('handles datetime without seconds', () => {
-      expect(normalizeDueDateForApi('2024-06-15T10:30')).toBe('2024-06-15T23:59:59.000Z');
+      expect(normalizeDueDateForApi('2024-06-15T10:30')).toBe('2024-06-15T10:30Z');
     });
   });
 
@@ -311,34 +310,15 @@ describe('parseWorkspaceArgs', () => {
   });
 });
 
-describe('parseSearchArgs', () => {
-  it('sets default search scope to "both"', () => {
-    const result = parseSearchArgs({});
-    expect(result.searchScope).toBe('both');
-  });
-
-  it('sets default limit to 40', () => {
-    const result = parseSearchArgs({});
-    expect(result.limit).toBe(40);
-  });
-
-  it('parses custom values', () => {
-    const result = parseSearchArgs({ searchScope: 'tasks', limit: 20, query: 'test' });
-    expect(result.searchScope).toBe('tasks');
-    expect(result.limit).toBe(20);
-    expect(result.query).toBe('test');
-  });
-});
-
 describe('parseProjectArgs', () => {
   it('sanitizes name', () => {
     const result = parseProjectArgs({ name: '  Project  ' });
     expect(result.name).toBe('Project');
   });
 
-  it('parses color', () => {
-    const result = parseProjectArgs({ color: '#ff0000' });
-    expect(result.color).toBe('#ff0000');
+  it('parses description', () => {
+    const result = parseProjectArgs({ description: 'A test project' });
+    expect(result.description).toBe('A test project');
   });
 });
 
