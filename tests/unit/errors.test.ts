@@ -266,6 +266,14 @@ describe('formatMcpError', () => {
       text: 'Error [INTERNAL_ERROR]: a string'
     });
   });
+
+  it('falls back to default message when error message is empty', () => {
+    const result = formatMcpError(new Error(''));
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: 'Error [INTERNAL_ERROR]: An unknown error occurred'
+    });
+  });
 });
 
 describe('formatMcpSuccess', () => {

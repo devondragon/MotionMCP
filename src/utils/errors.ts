@@ -11,7 +11,8 @@ import { ERROR_CODES, MCP_RESPONSE_TYPES, ErrorCode, LOG_LEVELS, LogLevel } from
 import { mcpLog } from './logger';
 
 // Generic open-ended context for attaching debug metadata to errors.
-// See also ApiErrorContext below, which is a structured shape used by the
+// Used by ValidationError, WorkspaceError, and extractErrorInfo.
+// See also ApiErrorContext below — a structured shape used only by the
 // user-facing error factories to build human-readable messages.
 interface ErrorContext {
   [key: string]: any;
@@ -168,6 +169,7 @@ export function extractErrorInfo(error: unknown): { message: string; code: Error
  * Format an error for MCP protocol response
  */
 export function formatMcpError(error: Error | unknown): CallToolResult {
+  // For UserFacingError, message is the user-friendly text (not technicalMessage)
   const { message, code } = extractErrorInfo(error);
   const errorMessage = message || 'An unknown error occurred';
   const errorText = `Error [${code}]: ${errorMessage}`;
