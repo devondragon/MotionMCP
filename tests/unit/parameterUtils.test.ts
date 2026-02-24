@@ -96,20 +96,20 @@ describe('normalizeDueDateForApi', () => {
   });
 
   describe('ISO without timezone (datetime without offset)', () => {
-    it('converts datetime without timezone to end-of-day UTC', () => {
-      expect(normalizeDueDateForApi('2024-06-15T10:30:00')).toBe('2024-06-15T23:59:59.000Z');
+    it('preserves time and appends Z for datetime without timezone', () => {
+      expect(normalizeDueDateForApi('2024-06-15T10:30:00')).toBe('2024-06-15T10:30:00Z');
     });
 
     it('handles datetime with seconds', () => {
-      expect(normalizeDueDateForApi('2024-06-15T10:30:45')).toBe('2024-06-15T23:59:59.000Z');
+      expect(normalizeDueDateForApi('2024-06-15T10:30:45')).toBe('2024-06-15T10:30:45Z');
     });
 
     it('handles datetime with milliseconds', () => {
-      expect(normalizeDueDateForApi('2024-06-15T10:30:45.123')).toBe('2024-06-15T23:59:59.000Z');
+      expect(normalizeDueDateForApi('2024-06-15T10:30:45.123')).toBe('2024-06-15T10:30:45.123Z');
     });
 
     it('handles datetime without seconds', () => {
-      expect(normalizeDueDateForApi('2024-06-15T10:30')).toBe('2024-06-15T23:59:59.000Z');
+      expect(normalizeDueDateForApi('2024-06-15T10:30')).toBe('2024-06-15T10:30Z');
     });
   });
 

@@ -97,7 +97,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       assigneeId: {
         type: "string",
-        description: "Filter by assignee (for list and list_all_uncompleted), or new assignee (for move)"
+        description: "Filter by assignee (for list/list_all_uncompleted), set assignee (for create/update), or reassign (for move)"
       },
       assignee: {
         type: "string",
@@ -288,7 +288,7 @@ export const commentsToolDefinition: McpToolDefinition = {
 
 export const customFieldsToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.CUSTOM_FIELDS,
-  description: "Manage custom fields for tasks and projects",
+  description: "Manage custom fields for tasks and projects. Required params per operation: list: workspaceId or workspaceName. create: workspaceId/workspaceName + name + field (type); options[] also required for select/multiSelect. delete: workspaceId/workspaceName + fieldId. add_to_project: projectId + fieldId. remove_from_project: projectId + valueId. add_to_task: taskId + fieldId. remove_from_task: taskId + valueId.",
   inputSchema: {
     type: "object",
     properties: {
@@ -299,45 +299,45 @@ export const customFieldsToolDefinition: McpToolDefinition = {
       },
       fieldId: {
         type: "string",
-        description: "Custom field definition ID (for delete, add_to_project, add_to_task). For remove_from_project/remove_from_task, use valueId instead."
+        description: "Custom field definition ID. Required for: delete, add_to_project, add_to_task. For remove operations, use valueId instead."
       },
       valueId: {
         type: "string",
-        description: "Custom field value ID (required for remove_from_project and remove_from_task — this is the ID of the specific value assignment, not the field definition)"
+        description: "Custom field value assignment ID (not the field definition ID). Required for: remove_from_project, remove_from_task."
       },
       workspaceId: {
         type: "string",
-        description: "Workspace ID"
+        description: "Workspace ID. Required for: list, create, delete."
       },
       workspaceName: {
         type: "string",
-        description: "Workspace name (alternative to workspaceId for list/create)"
+        description: "Workspace name (alternative to workspaceId). Required for: list, create, delete."
       },
       name: {
         type: "string",
-        description: "Field name (for create)"
+        description: "Field name. Required for: create."
       },
       field: {
         type: "string",
         enum: ["text", "url", "date", "person", "multiPerson", "phone", "select", "multiSelect", "number", "email", "checkbox", "relatedTo"],
-        description: "Field type (required for create; also used to specify the value type when providing a value in add_to_project/add_to_task)"
+        description: "Field type. Required for: create. Also needed for add_to_project/add_to_task when providing a non-null value."
       },
       options: {
         type: "array",
         items: { type: "string" },
-        description: "Options for select/multiselect fields"
+        description: "Option labels. Required for: create when field is select or multiSelect."
       },
       required: {
         type: "boolean",
-        description: "Whether field is required"
+        description: "Whether field is required on tasks/projects."
       },
       projectId: {
         type: "string",
-        description: "Project ID (for add/remove operations)"
+        description: "Project ID. Required for: add_to_project, remove_from_project."
       },
       taskId: {
         type: "string",
-        description: "Task ID (for add/remove operations)"
+        description: "Task ID. Required for: add_to_task, remove_from_task."
       },
       value: {
         oneOf: [
@@ -347,7 +347,7 @@ export const customFieldsToolDefinition: McpToolDefinition = {
           { type: "array", items: { type: "string" } },
           { type: "null" }
         ],
-        description: "Field value"
+        description: "Field value to set. Optional for add_to_project/add_to_task. When provided and non-null, the field param (type) is also required."
       }
     },
     required: ["operation"]
@@ -356,7 +356,7 @@ export const customFieldsToolDefinition: McpToolDefinition = {
 
 export const recurringTasksToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.RECURRING_TASKS,
-  description: "Manage recurring tasks",
+  description: "Manage recurring tasks. Required params per operation: list: workspaceId or workspaceName. create: workspaceId/workspaceName + name + assigneeId + frequency (with frequency.type). delete: recurringTaskId.",
   inputSchema: {
     type: "object",
     properties: {
@@ -367,31 +367,31 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
       },
       recurringTaskId: {
         type: "string",
-        description: "Recurring task ID (for delete)"
+        description: "Recurring task ID. Required for: delete."
       },
       workspaceId: {
         type: "string",
-        description: "Workspace ID"
+        description: "Workspace ID. Required for: list, create."
       },
       workspaceName: {
         type: "string",
-        description: "Workspace name (alternative to workspaceId)"
+        description: "Workspace name (alternative to workspaceId). Required for: list, create."
       },
       name: {
         type: "string",
-        description: "Task name (for create)"
+        description: "Task name. Required for: create."
       },
       description: {
         type: "string",
-        description: "Task description"
+        description: "Task description."
       },
       projectId: {
         type: "string",
-        description: "Project ID"
+        description: "Project ID."
       },
       assigneeId: {
         type: "string",
-        description: "User ID to assign the recurring task to (required for create)"
+        description: "User ID to assign the recurring task to. Required for: create."
       },
       frequency: {
         type: "object",
@@ -475,7 +475,13 @@ export const schedulesToolDefinition: McpToolDefinition = {
   description: "Get all schedules showing weekly working hours and time zones. The Motion API returns all schedules with no filtering options.",
   inputSchema: {
     type: "object",
-    properties: {},
+    properties: {
+      operation: {
+        type: "string",
+        enum: ["list"],
+        description: "Operation to perform"
+      }
+    },
     additionalProperties: false
   }
 };

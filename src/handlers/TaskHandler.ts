@@ -61,6 +61,7 @@ interface UpdateTaskParams {
   duration?: string | number;
   labels?: string[];
   autoScheduled?: Record<string, unknown> | null;
+  assigneeId?: string;
 }
 
 /** Parameters for deleting a task */
@@ -383,6 +384,7 @@ export class TaskHandler extends BaseHandler {
     }
     // API accepts labels as plain string array per docs
     if (params.labels !== undefined) updateData.labels = params.labels;
+    if (params.assigneeId !== undefined) updateData.assigneeId = params.assigneeId;
     if (params.autoScheduled !== undefined) {
       // Normalize string shorthand (e.g., "Work Hours") to { schedule: "Work Hours" }
       updateData.autoScheduled = parseAutoScheduledParam(params.autoScheduled);

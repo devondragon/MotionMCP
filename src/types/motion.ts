@@ -132,33 +132,33 @@ export type MotionTaskUpdateData = MotionTaskWritableFields;
 export interface MotionTask {
   id: string;
   name: string;
-  description?: string;
+  description: string;
   workspaceId: string;
   projectId?: string;
-  status?: MotionTaskStatusValue;
-  priority?: MotionTaskPriority;
+  status: MotionTaskStatusValue;
+  priority: MotionTaskPriority;
   dueDate?: string;
   duration?: MotionTaskDuration;
   assigneeId?: string;
-  labels?: Array<string | {name: string}>;
+  labels: Array<string | {name: string}>;
   autoScheduled?: Record<string, unknown> | null;
-  completed?: boolean;
+  completed: boolean;
   completedTime?: string;
-  createdTime?: string;
+  createdTime: string;
   updatedTime?: string;
   startOn?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
-  deadlineType?: 'HARD' | 'SOFT' | 'NONE';
-  parentRecurringTaskId?: string;
-  
+  deadlineType: 'HARD' | 'SOFT' | 'NONE';
+  parentRecurringTaskId: string;
+
   // Full nested objects with complete field definitions
   creator: {
     id: string;
     name: string;
     email: string;
   };
-  
+
   project?: {
     id: string;
     name: string;
@@ -170,21 +170,21 @@ export interface MotionTask {
       isResolvedStatus: boolean;
     };
   };
-  
+
   workspace: {
     id: string;
     name: string;
-    teamId: string | null; // Updated to accept null
+    teamId: string | null;
     type: string;
   };
-  
-  assignees?: Array<{
+
+  assignees: Array<{
     id: string;
     name: string;
     email: string;
   }>;
-  
-  schedulingIssue?: boolean;
+
+  schedulingIssue: boolean;
   lastInteractedTime?: string;
   customFieldValues?: Record<string, MotionCustomFieldValue>;
   chunks?: Array<{
