@@ -125,15 +125,6 @@ export class SimpleCache<T = any> {
     }
   }
 
-  // Utility method to get cache statistics
-  getStats(): { size: number; maxSize: number; ttlSeconds: number } {
-    return {
-      size: this.cache.size,
-      maxSize: this.maxSize,
-      ttlSeconds: this.ttlMs / 1000
-    };
-  }
-
   // Clean up expired entries (can be called periodically if needed)
   cleanup(): void {
     const now = Date.now();

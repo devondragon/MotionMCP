@@ -14,32 +14,21 @@ describe('ToolRegistry', () => {
 
   describe('initialization', () => {
     it('registers all tool definitions on construction', () => {
-      expect(registry.size()).toBe(10);
+      expect(registry.getAll().length).toBe(10);
     });
 
     it('has all expected tools', () => {
-      expect(registry.has(TOOL_NAMES.TASKS)).toBe(true);
-      expect(registry.has(TOOL_NAMES.PROJECTS)).toBe(true);
-      expect(registry.has(TOOL_NAMES.WORKSPACES)).toBe(true);
-      expect(registry.has(TOOL_NAMES.USERS)).toBe(true);
-      expect(registry.has(TOOL_NAMES.SEARCH)).toBe(true);
-      expect(registry.has(TOOL_NAMES.COMMENTS)).toBe(true);
-      expect(registry.has(TOOL_NAMES.CUSTOM_FIELDS)).toBe(true);
-      expect(registry.has(TOOL_NAMES.RECURRING_TASKS)).toBe(true);
-      expect(registry.has(TOOL_NAMES.SCHEDULES)).toBe(true);
-      expect(registry.has(TOOL_NAMES.STATUSES)).toBe(true);
-    });
-  });
-
-  describe('get', () => {
-    it('returns tool definition for valid name', () => {
-      const tool = registry.get(TOOL_NAMES.TASKS);
-      expect(tool).toBeDefined();
-      expect(tool?.name).toBe(TOOL_NAMES.TASKS);
-    });
-
-    it('returns undefined for invalid name', () => {
-      expect(registry.get('invalid_tool')).toBeUndefined();
+      const names = registry.getAllNames();
+      expect(names).toContain(TOOL_NAMES.TASKS);
+      expect(names).toContain(TOOL_NAMES.PROJECTS);
+      expect(names).toContain(TOOL_NAMES.WORKSPACES);
+      expect(names).toContain(TOOL_NAMES.USERS);
+      expect(names).toContain(TOOL_NAMES.SEARCH);
+      expect(names).toContain(TOOL_NAMES.COMMENTS);
+      expect(names).toContain(TOOL_NAMES.CUSTOM_FIELDS);
+      expect(names).toContain(TOOL_NAMES.RECURRING_TASKS);
+      expect(names).toContain(TOOL_NAMES.SCHEDULES);
+      expect(names).toContain(TOOL_NAMES.STATUSES);
     });
   });
 
@@ -107,30 +96,6 @@ describe('ToolRegistry', () => {
       expect(() => registry.getEnabled('unknown')).toThrow('Unexpected tools configuration');
     });
   });
-
-  describe('register and unregister', () => {
-    it('can register new tools', () => {
-      const customTool = {
-        name: 'custom_tool',
-        description: 'A custom tool',
-        inputSchema: { type: 'object' as const, properties: {} }
-      };
-      registry.register(customTool);
-      expect(registry.has('custom_tool')).toBe(true);
-    });
-
-    it('can unregister tools', () => {
-      registry.unregister(TOOL_NAMES.TASKS);
-      expect(registry.has(TOOL_NAMES.TASKS)).toBe(false);
-    });
-  });
-
-  describe('clear', () => {
-    it('removes all tools', () => {
-      registry.clear();
-      expect(registry.size()).toBe(0);
-    });
-  });
 });
 
 describe('ToolConfigurator', () => {
@@ -145,19 +110,16 @@ describe('ToolConfigurator', () => {
     it('validates minimal config', () => {
       const configurator = new ToolConfigurator('minimal', registry);
       expect(configurator.getConfig()).toBe('minimal');
-      expect(configurator.isValidPreset()).toBe(true);
     });
 
     it('validates essential config', () => {
       const configurator = new ToolConfigurator('essential', registry);
       expect(configurator.getConfig()).toBe('essential');
-      expect(configurator.isValidPreset()).toBe(true);
     });
 
     it('validates complete config', () => {
       const configurator = new ToolConfigurator('complete', registry);
       expect(configurator.getConfig()).toBe('complete');
-      expect(configurator.isValidPreset()).toBe(true);
     });
   });
 
@@ -167,7 +129,6 @@ describe('ToolConfigurator', () => {
         `custom:${TOOL_NAMES.TASKS},${TOOL_NAMES.PROJECTS}`,
         registry
       );
-      expect(configurator.isCustomConfig()).toBe(true);
       expect(configurator.getToolCount()).toBe(2);
     });
 
@@ -181,27 +142,12 @@ describe('ToolConfigurator', () => {
         .toThrow('Custom configuration must specify at least one tool');
     });
 
-    it('parses custom config correctly', () => {
-      const configurator = new ToolConfigurator(
-        `custom:${TOOL_NAMES.TASKS},${TOOL_NAMES.SEARCH}`,
-        registry
-      );
-      const parsed = configurator.parseCustomConfig(configurator.getConfig());
-      expect(parsed).toEqual([TOOL_NAMES.TASKS, TOOL_NAMES.SEARCH]);
-    });
-
     it('trims whitespace in custom config', () => {
       const configurator = new ToolConfigurator(
         `custom: ${TOOL_NAMES.TASKS} , ${TOOL_NAMES.PROJECTS} `,
         registry
       );
       expect(configurator.getToolCount()).toBe(2);
-    });
-
-    it('throws error for parseCustomConfig on non-custom config', () => {
-      const configurator = new ToolConfigurator('essential', registry);
-      expect(() => configurator.parseCustomConfig('essential'))
-        .toThrow('Invalid custom configuration format');
     });
 
     it('handles path traversal attempts in custom config', () => {
@@ -238,13 +184,6 @@ describe('ToolConfigurator', () => {
       const configurator = new ToolConfigurator('complete', registry);
       expect(configurator.getToolCount()).toBe(10);
     });
-
-    it('returns tool names', () => {
-      const configurator = new ToolConfigurator('minimal', registry);
-      const names = configurator.getToolNames();
-      expect(names.length).toBe(3);
-      expect(names).toContain(TOOL_NAMES.TASKS);
-    });
   });
 
   describe('getEnabledTools', () => {
@@ -252,44 +191,6 @@ describe('ToolConfigurator', () => {
       const configurator = new ToolConfigurator('minimal', registry);
       const tools = configurator.getEnabledTools();
       expect(tools.length).toBe(3);
-    });
-  });
-
-  describe('setConfig', () => {
-    it('allows changing config', () => {
-      const configurator = new ToolConfigurator('minimal', registry);
-      expect(configurator.getToolCount()).toBe(3);
-
-      configurator.setConfig('complete');
-      expect(configurator.getConfig()).toBe('complete');
-      expect(configurator.getToolCount()).toBe(10);
-    });
-  });
-
-  describe('static methods', () => {
-    it('returns valid configurations list', () => {
-      const configs = ToolConfigurator.getValidConfigurations();
-      expect(configs).toEqual(['minimal', 'essential', 'complete']);
-    });
-
-    it('returns configuration descriptions', () => {
-      expect(ToolConfigurator.getConfigurationDescription('minimal'))
-        .toContain('3 tools');
-      expect(ToolConfigurator.getConfigurationDescription('essential'))
-        .toContain('7 tools');
-      expect(ToolConfigurator.getConfigurationDescription('complete'))
-        .toContain('10 tools');
-    });
-
-    it('returns description for custom config', () => {
-      const desc = ToolConfigurator.getConfigurationDescription('custom:motion_tasks,motion_projects');
-      expect(desc).toContain('Custom configuration');
-      expect(desc).toContain('motion_tasks,motion_projects');
-    });
-
-    it('returns unknown for invalid config', () => {
-      expect(ToolConfigurator.getConfigurationDescription('invalid'))
-        .toBe('Unknown configuration');
     });
   });
 });

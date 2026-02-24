@@ -44,13 +44,6 @@ export class UserFacingError extends Error {
   }
 
   /**
-   * Get a comprehensive error message for logging
-   */
-  getFullMessage(): string {
-    return `${this.userMessage} (Technical: ${this.technicalMessage})`;
-  }
-
-  /**
    * Log this error with full details
    */
   log(level: LogLevel = LOG_LEVELS.ERROR): void {
@@ -193,21 +186,6 @@ function buildUserMessage(
 
   // Generic message
   return `Unable to ${action} ${resource}${resourceInfo}. Please try again or contact support if the problem persists.`;
-}
-
-/**
- * Formats an error for MCP response with user-friendly message
- */
-export function formatUserFacingErrorForMcp(error: unknown): string {
-  if (error instanceof UserFacingError) {
-    return error.userMessage;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
 }
 
 /**

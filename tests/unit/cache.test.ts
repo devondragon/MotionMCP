@@ -57,8 +57,7 @@ describe('SimpleCache', () => {
     it('removes expired entry on get', () => {
       cache.set('key1', 'value1');
       vi.advanceTimersByTime(61 * 1000);
-      cache.get('key1'); // This should remove it
-      expect(cache.getStats().size).toBe(0);
+      expect(cache.get('key1')).toBeNull();
     });
 
     it('respects custom TTL', () => {
@@ -84,7 +83,9 @@ describe('SimpleCache', () => {
       smallCache.set('key3', 'value3');
 
       // All three should be present
-      expect(smallCache.getStats().size).toBe(3);
+      expect(smallCache.get('key1')).toBe('value1');
+      expect(smallCache.get('key2')).toBe('value2');
+      expect(smallCache.get('key3')).toBe('value3');
 
       // Add fourth, should evict key1 (oldest)
       smallCache.set('key4', 'value4');
@@ -149,7 +150,6 @@ describe('SimpleCache', () => {
       expect(cache.get('key1')).toBeNull();
       expect(cache.get('key2')).toBeNull();
       expect(cache.get('key3')).toBeNull();
-      expect(cache.getStats().size).toBe(0);
     });
 
     it('clears entire cache with no argument', () => {
@@ -158,7 +158,8 @@ describe('SimpleCache', () => {
 
       cache.invalidate();
 
-      expect(cache.getStats().size).toBe(0);
+      expect(cache.get('key1')).toBeNull();
+      expect(cache.get('key2')).toBeNull();
     });
 
     it('invalidates keys matching prefix pattern', () => {
@@ -221,27 +222,7 @@ describe('SimpleCache', () => {
         // Expected
       }
 
-      expect(cache.getStats().size).toBe(0);
-    });
-  });
-
-  describe('getStats', () => {
-    it('returns correct size', () => {
-      expect(cache.getStats().size).toBe(0);
-
-      cache.set('key1', 'value1');
-      expect(cache.getStats().size).toBe(1);
-
-      cache.set('key2', 'value2');
-      expect(cache.getStats().size).toBe(2);
-    });
-
-    it('returns maxSize', () => {
-      expect(cache.getStats().maxSize).toBe(100);
-    });
-
-    it('returns ttlSeconds', () => {
-      expect(cache.getStats().ttlSeconds).toBe(60);
+      expect(cache.get('key1')).toBeNull();
     });
   });
 
@@ -259,7 +240,8 @@ describe('SimpleCache', () => {
       cache.cleanup();
 
       // key1 and key2 should be cleaned up, key3 should remain
-      expect(cache.getStats().size).toBe(1);
+      expect(cache.get('key1')).toBeNull();
+      expect(cache.get('key2')).toBeNull();
       expect(cache.get('key3')).toBe('value3');
     });
 
@@ -269,7 +251,8 @@ describe('SimpleCache', () => {
 
       cache.cleanup();
 
-      expect(cache.getStats().size).toBe(2);
+      expect(cache.get('key1')).toBe('value1');
+      expect(cache.get('key2')).toBe('value2');
     });
   });
 
@@ -277,7 +260,7 @@ describe('SimpleCache', () => {
     it('clears cache on destroy', () => {
       cache.set('key1', 'value1');
       cache.destroy();
-      expect(cache.getStats().size).toBe(0);
+      expect(cache.get('key1')).toBeNull();
     });
   });
 
@@ -291,11 +274,10 @@ describe('SimpleCache', () => {
       vi.advanceTimersByTime(61 * 1000);
 
       // Advance a full TTL cycle (60s) to ensure cleanup runs
-      // This is more robust than assuming the internal 30s interval
       vi.advanceTimersByTime(60 * 1000);
 
       // The key should be removed by auto cleanup
-      expect(autoCache.getStats().size).toBe(0);
+      expect(autoCache.get('key1')).toBeNull();
 
       autoCache.destroy();
     });

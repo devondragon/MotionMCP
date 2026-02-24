@@ -18,7 +18,8 @@ describe('ToolConfigurator', () => {
 
   it('minimal preset exposes core tools', () => {
     const cfg = new ToolConfigurator('minimal', registry);
-    const names = cfg.getToolNames();
+    const tools = cfg.getEnabledTools();
+    const names = tools.map(t => t.name);
     expect(names).toContain(TOOL_NAMES.TASKS);
     expect(names).toContain(TOOL_NAMES.PROJECTS);
     expect(names).toContain(TOOL_NAMES.WORKSPACES);
@@ -27,7 +28,8 @@ describe('ToolConfigurator', () => {
 
   it('essential preset exposes expected 7 tools', () => {
     const cfg = new ToolConfigurator('essential', registry);
-    const names = cfg.getToolNames();
+    const tools = cfg.getEnabledTools();
+    const names = tools.map(t => t.name);
     expect(names).toEqual(expect.arrayContaining([
       TOOL_NAMES.TASKS,
       TOOL_NAMES.PROJECTS,
@@ -42,7 +44,8 @@ describe('ToolConfigurator', () => {
 
   it('complete preset exposes expected 10 tools', () => {
     const cfg = new ToolConfigurator('complete', registry);
-    const names = cfg.getToolNames();
+    const tools = cfg.getEnabledTools();
+    const names = tools.map(t => t.name);
     expect(names).toEqual(expect.arrayContaining([
       TOOL_NAMES.TASKS,
       TOOL_NAMES.PROJECTS,
@@ -65,7 +68,8 @@ describe('ToolConfigurator', () => {
 
   it('custom preset validates tool names', () => {
     const good = new ToolConfigurator('custom:motion_tasks,motion_projects', registry);
-    expect(good.getToolNames()).toEqual(expect.arrayContaining([
+    const names = good.getEnabledTools().map(t => t.name);
+    expect(names).toEqual(expect.arrayContaining([
       TOOL_NAMES.TASKS,
       TOOL_NAMES.PROJECTS,
     ]));
@@ -73,4 +77,3 @@ describe('ToolConfigurator', () => {
     expect(() => new ToolConfigurator('custom:nonexistent_tool', registry)).toThrow();
   });
 });
-
