@@ -10,6 +10,7 @@ export const ERROR_CODES = {
   NO_DEFAULT_WORKSPACE: 'NO_DEFAULT_WORKSPACE',
   
   // Access errors
+  AUTH_FAILED: 'AUTH_FAILED',
   ACCESS_DENIED: 'ACCESS_DENIED',
 
   // Validation errors

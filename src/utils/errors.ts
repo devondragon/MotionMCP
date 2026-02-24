@@ -10,8 +10,9 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { ERROR_CODES, MCP_RESPONSE_TYPES, ErrorCode, LOG_LEVELS, LogLevel } from './constants';
 import { mcpLog } from './logger';
 
-// ─── Generic ErrorContext (used by ValidationError, WorkspaceError, formatMcpError) ─
-
+// Generic open-ended context for attaching debug metadata to errors.
+// See also ApiErrorContext below, which is a structured shape used by the
+// user-facing error factories to build human-readable messages.
 interface ErrorContext {
   [key: string]: any;
 }
@@ -65,7 +66,8 @@ interface ApiErrorContext {
  */
 function httpStatusToErrorCode(statusCode?: number): ErrorCode {
   if (!statusCode) return ERROR_CODES.INTERNAL_ERROR;
-  if (statusCode === 401 || statusCode === 403) return ERROR_CODES.ACCESS_DENIED;
+  if (statusCode === 401) return ERROR_CODES.AUTH_FAILED;
+  if (statusCode === 403) return ERROR_CODES.ACCESS_DENIED;
   if (statusCode === 404) return ERROR_CODES.RESOURCE_NOT_FOUND;
   if (statusCode === 400 || statusCode === 422) return ERROR_CODES.INVALID_PARAMETERS;
   if (statusCode === 429) return ERROR_CODES.RATE_LIMIT_EXCEEDED;
@@ -163,19 +165,11 @@ export function extractErrorInfo(error: unknown): { message: string; code: Error
 // ─── MCP Response Formatters ────────────────────────────────────────────────
 
 /**
- * Format an error for MCP protocol response with full context
+ * Format an error for MCP protocol response
  */
-export function formatMcpError(error: Error | unknown, additionalContext: ErrorContext = {}): CallToolResult {
-  const { message, code, context } = extractErrorInfo(error);
+export function formatMcpError(error: Error | unknown): CallToolResult {
+  const { message, code } = extractErrorInfo(error);
   const errorMessage = message || 'An unknown error occurred';
-  const errorContext: ErrorContext = { ...context, ...additionalContext };
-
-  // Add parameter info for validation errors
-  if (error instanceof ValidationError && error.parameter) {
-    errorContext.parameter = error.parameter;
-  }
-
-  // Build error message
   const errorText = `Error [${code}]: ${errorMessage}`;
 
   return {
