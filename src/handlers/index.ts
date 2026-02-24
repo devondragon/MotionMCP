@@ -1,6 +1,6 @@
 // Base handler exports
 export { BaseHandler } from './base/BaseHandler';
-export { IHandler, HandlerContext, ValidationResult } from './base/HandlerInterface';
+export { IHandler, HandlerContext } from './base/HandlerInterface';
 
 // Handler Factory
 export { HandlerFactory } from './HandlerFactory';

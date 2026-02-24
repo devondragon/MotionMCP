@@ -1,6 +1,9 @@
+import { MotionApiService } from '../../services/motionApi';
+import { WorkspaceResolver } from '../../utils/workspaceResolver';
+import { InputValidator } from '../../utils/validator';
 import { McpToolResponse } from '../../types/mcp';
 import { formatMcpError } from '../../utils';
-import { IHandler, HandlerContext, ValidationResult } from './HandlerInterface';
+import { IHandler, HandlerContext } from './HandlerInterface';
 
 export abstract class BaseHandler implements IHandler {
   protected motionService: MotionApiService;
@@ -22,23 +25,4 @@ export abstract class BaseHandler implements IHandler {
   protected handleUnknownOperation(operation: string): McpToolResponse {
     return formatMcpError(new Error(`Unknown operation: ${operation}`));
   }
-
-  validateArgs(args: unknown): ValidationResult {
-    // Base validation - subclasses can override for specific validation
-    if (!args || typeof args !== 'object') {
-      return {
-        valid: false,
-        errors: 'Arguments must be a valid object'
-      };
-    }
-
-    return {
-      valid: true
-    };
-  }
 }
-
-// Re-export the required types to avoid circular imports
-import { MotionApiService } from '../../services/motionApi';
-import { WorkspaceResolver } from '../../utils/workspaceResolver';
-import { InputValidator } from '../../utils/validator';
