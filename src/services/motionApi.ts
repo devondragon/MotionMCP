@@ -338,7 +338,7 @@ export class MotionApiService {
       throw new Error('limit must be a non-negative integer');
     }
 
-    const cacheKey = `projects:workspace:${workspaceId}:maxPages:${maxPages}:limit:${limit ?? 'none'}`;
+    const cacheKey = `projects:workspace:${workspaceId}:maxPages:${maxPages ?? 'default'}:limit:${limit ?? 'none'}`;
 
     // Check cache - return items only (no stale truncation info)
     const cachedItems = this.projectCache.get(cacheKey);

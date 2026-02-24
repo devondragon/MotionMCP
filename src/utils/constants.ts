@@ -146,15 +146,15 @@ export function parseFilterDate(dateInput: string): string | null {
 
   switch (normalizedInput) {
     case 'today':
-      return today.toISOString().split('T')[0] ?? null;
+      return today.toISOString().split('T')[0]!;
     case 'tomorrow':
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
-      return tomorrow.toISOString().split('T')[0] ?? null;
+      return tomorrow.toISOString().split('T')[0]!;
     case 'yesterday':
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
-      return yesterday.toISOString().split('T')[0] ?? null;
+      return yesterday.toISOString().split('T')[0]!;
   }
 
   // Validate YYYY-MM-DD format

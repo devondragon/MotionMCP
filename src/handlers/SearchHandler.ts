@@ -74,6 +74,10 @@ export class SearchHandler extends BaseHandler {
     if (results.length > limit) {
       // Combined results exceeded limit — report truncation for the combined result
       mergedTruncation = { wasTruncated: true, returnedCount: slicedResults.length, reason: 'max_items', limit };
+    } else if (mergedTruncation) {
+      // A source was truncated but combined results fit within the limit —
+      // update returnedCount to reflect the actual number of results returned
+      mergedTruncation.returnedCount = slicedResults.length;
     }
 
     return formatSearchResults(slicedResults, args.query, {

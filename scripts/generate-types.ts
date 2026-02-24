@@ -2,6 +2,13 @@
  * Generates src/types/mcp-tool-args.ts from the JSON Schemas in ToolDefinitions.ts.
  *
  * Run: npx tsx scripts/generate-types.ts
+ *
+ * Limitation: handles type, enum, oneOf, array, and nested object schemas.
+ * Does NOT handle $ref, allOf, anyOf, not, or additionalProperties — these
+ * will silently emit `unknown`. Extend schemaToTs() if schemas evolve to use them.
+ *
+ * Note: __dirname is a CommonJS global provided by tsx. This script would need
+ * import.meta.dirname (Node 21+) or a fileURLToPath shim under a pure ESM runner.
  */
 
 import * as fs from 'fs';

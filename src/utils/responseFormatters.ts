@@ -227,7 +227,7 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
     task.assignees && task.assignees.length > 0
       ? `Assignees: ${task.assignees.map(a => `${a.name} (${a.email})`).join(', ')}`
       : 'Assignees: None',
-    `Creator: ${task.creator.name} (${task.creator.email})`,
+    task.creator ? `Creator: ${task.creator.name} (${task.creator.email})` : null,
     (task.labels && task.labels.length > 0)
       ? `Labels: ${task.labels.map(l => typeof l === 'string' ? l : l.name).join(', ')}`
       : null,
@@ -421,10 +421,10 @@ export function formatRecurringTaskDetail(task: MotionRecurringTask): CallToolRe
     `- ID: ${task.id}`,
     `- Name: ${task.name}`,
     `- Priority: ${task.priority}`,
-    `- Creator: ${task.creator.name} (${task.creator.email})`,
+    task.creator ? `- Creator: ${task.creator.name} (${task.creator.email})` : null,
     `- Workspace: ${task.workspace.name} (${task.workspace.id})`,
     task.project ? `- Project: ${task.project.name} (${task.project.id})` : `- Project: No project assigned`,
-    `- Assignee: ${task.assignee.name} (${task.assignee.email})`,
+    task.assignee ? `- Assignee: ${task.assignee.name} (${task.assignee.email})` : null,
     `- Status: ${typeof task.status === 'string' ? task.status : task.status?.name || 'Unknown'}`,
     (task.labels && task.labels.length > 0) ? `- Labels: ${task.labels.map(l => typeof l === 'string' ? l : l.name).join(', ')}` : null
   ].filter(Boolean).join('\n');

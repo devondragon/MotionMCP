@@ -53,6 +53,7 @@ interface GetTaskParams {
 /** Parameters for updating an existing task */
 interface UpdateTaskParams {
   taskId?: string;
+  workspaceId?: string;
   name?: string;
   description?: string;
   status?: string;
@@ -391,10 +392,15 @@ export class TaskHandler extends BaseHandler {
 
       // Validate auto-scheduling (same as create): catches "true" → {} silent no-op
       if (updateData.autoScheduled !== null && updateData.autoScheduled !== undefined) {
-        const task = await this.motionService.getTask(params.taskId!);
+        // Use provided workspaceId to avoid an extra GET; fall back to fetching if not supplied
+        let workspaceId = params.workspaceId;
+        if (!workspaceId) {
+          const task = await this.motionService.getTask(params.taskId!);
+          workspaceId = task.workspaceId;
+        }
         updateData.autoScheduled = await this.validateAndNormalizeAutoScheduling(
           updateData.autoScheduled,
-          task.workspaceId
+          workspaceId
         );
       }
     }

@@ -132,7 +132,7 @@ export type MotionTaskUpdateData = MotionTaskWritableFields;
 export interface MotionTask {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   workspaceId: string;
   projectId?: string;
   status: MotionTaskStatusValue;
@@ -149,11 +149,11 @@ export interface MotionTask {
   startOn?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
-  deadlineType: 'HARD' | 'SOFT' | 'NONE';
-  parentRecurringTaskId: string;
+  deadlineType?: 'HARD' | 'SOFT' | 'NONE';
+  parentRecurringTaskId?: string;
 
   // Full nested objects with complete field definitions
-  creator: {
+  creator?: {
     id: string;
     name: string;
     email: string;
@@ -178,13 +178,13 @@ export interface MotionTask {
     type: string;
   };
 
-  assignees: Array<{
+  assignees?: Array<{
     id: string;
     name: string;
     email: string;
   }>;
 
-  schedulingIssue: boolean;
+  schedulingIssue?: boolean;
   lastInteractedTime?: string;
   customFieldValues?: Record<string, MotionCustomFieldValue>;
   chunks?: Array<{
@@ -236,12 +236,12 @@ export interface CreateCustomFieldData {
 export interface MotionRecurringTask {
   id: string;
   name: string;
-  creator: {
+  creator?: {
     id: string;
     name: string;
     email: string;
   };
-  assignee: {
+  assignee?: {
     id: string;
     name: string;
     email: string;
