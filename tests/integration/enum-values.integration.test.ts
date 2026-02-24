@@ -172,6 +172,7 @@ describeIf('Enum values and parameter semantics (real Motion API)', () => {
         name: '[Integration Test] Deadline via autoScheduled',
         workspaceId,
         projectId: testProject.id,
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!,
         autoScheduled: {
           schedule: scheduleName,
           deadlineType: 'HARD',
