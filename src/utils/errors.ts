@@ -129,7 +129,7 @@ export class UserFacingError extends Error {
 /**
  * Type guard to check if an error has an error code
  */
-export function isCodedError(error: unknown): error is { code: ErrorCode; context: ErrorContext } {
+export function isCodedError(error: unknown): error is ValidationError | WorkspaceError | UserFacingError {
   return (
     error instanceof ValidationError ||
     error instanceof WorkspaceError ||
@@ -306,8 +306,7 @@ export function createUserFacingError(
       action: context.action,
       resourceType: context.resourceType,
       resourceId: context.resourceId,
-      resourceName: context.resourceName,
-      statusCode
+      resourceName: context.resourceName
     }
   );
 

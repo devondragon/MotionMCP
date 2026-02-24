@@ -9,9 +9,9 @@ export const ERROR_CODES = {
   WORKSPACE_ACCESS_DENIED: 'WORKSPACE_ACCESS_DENIED',
   NO_DEFAULT_WORKSPACE: 'NO_DEFAULT_WORKSPACE',
   
-  // Access errors
-  AUTH_FAILED: 'AUTH_FAILED',
-  ACCESS_DENIED: 'ACCESS_DENIED',
+  // Auth/access errors
+  AUTH_FAILED: 'AUTH_FAILED',         // 401 – invalid or missing credentials
+  ACCESS_DENIED: 'ACCESS_DENIED',    // 403 – valid credentials, insufficient permissions
 
   // Validation errors
   INVALID_PARAMETERS: 'INVALID_PARAMETERS',
