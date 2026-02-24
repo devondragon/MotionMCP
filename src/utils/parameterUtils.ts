@@ -7,7 +7,7 @@
  */
 
 import { parseFilterDate } from './constants';
-import { ValidationError } from './errorHandling';
+import { ValidationError } from './errors';
 import { sanitizeName, sanitizeDescription } from './sanitize';
 
 interface WorkspaceArgs {

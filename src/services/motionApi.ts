@@ -26,7 +26,7 @@ import { SimpleCache } from '../utils/cache';
 import { fetchAllPages as fetchAllPagesNew, calculateAdaptiveFetchLimit } from '../utils/paginationNew';
 import { unwrapApiResponse } from '../utils/responseWrapper';
 import { TruncationInfo, ListResult } from '../types/mcp';
-import { createUserFacingError, createErrorContext, UserFacingError } from '../utils/userFacingErrors';
+import { createUserFacingError, createErrorContext, UserFacingError } from '../utils/errors';
 import { z } from 'zod';
 import { 
   WorkspacesListResponseSchema,

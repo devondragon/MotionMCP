@@ -8,7 +8,7 @@
 
 import { ERROR_CODES, DEFAULTS, LOG_LEVELS, WORKSPACE_TYPES } from './constants';
 import { MotionWorkspace } from '../types/motion';
-import { WorkspaceError } from './errorHandling';
+import { WorkspaceError } from './errors';
 import { MotionApiService } from '../services/motionApi';
 import { mcpLog } from './logger';
 
