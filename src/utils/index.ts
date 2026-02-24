@@ -11,11 +11,8 @@ export * from './constants';
 // Export server instructions (kept separate to avoid loading in utility-only code paths)
 export { SERVER_INSTRUCTIONS } from './serverInstructions';
 
-// Export error handling utilities
-export * from './errorHandling';
-
-// Export user-facing error utilities
-export * from './userFacingErrors';
+// Export error utilities
+export * from './errors';
 
 // Export response formatters
 export * from './responseFormatters';
