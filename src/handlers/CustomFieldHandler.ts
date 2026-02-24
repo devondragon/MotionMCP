@@ -84,8 +84,8 @@ export class CustomFieldHandler extends BaseHandler {
       return this.handleError(new Error('Field type (field) is required when providing a value. Use "text", "number", "multiSelect", etc.'));
     }
 
-    await this.motionService.addCustomFieldToProject(args.projectId, args.fieldId, args.value, args.field);
-    return formatCustomFieldSuccess('added', 'project', args.projectId);
+    const result = await this.motionService.addCustomFieldToProject(args.projectId, args.fieldId, args.value, args.field);
+    return formatCustomFieldSuccess('added', 'project', args.projectId, result);
   }
 
   private async handleRemoveFromProject(args: MotionCustomFieldsArgs): Promise<McpToolResponse> {
@@ -105,8 +105,8 @@ export class CustomFieldHandler extends BaseHandler {
       return this.handleError(new Error('Field type (field) is required when providing a value. Use "text", "number", "multiSelect", etc.'));
     }
 
-    await this.motionService.addCustomFieldToTask(args.taskId, args.fieldId, args.value, args.field);
-    return formatCustomFieldSuccess('added', 'task', args.taskId);
+    const result = await this.motionService.addCustomFieldToTask(args.taskId, args.fieldId, args.value, args.field);
+    return formatCustomFieldSuccess('added', 'task', args.taskId, result);
   }
 
   private async handleRemoveFromTask(args: MotionCustomFieldsArgs): Promise<McpToolResponse> {

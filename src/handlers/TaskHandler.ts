@@ -396,6 +396,12 @@ export class TaskHandler extends BaseHandler {
     if (params.autoScheduled !== undefined) {
       // Normalize string shorthand (e.g., "Work Hours") to { schedule: "Work Hours" }
       updateData.autoScheduled = parseAutoScheduledParam(params.autoScheduled);
+
+      // Validate auto-scheduling (same as create): catches "true" → {} silent no-op
+      if (updateData.autoScheduled !== null && updateData.autoScheduled !== undefined) {
+        const task = await this.motionService.getTask(params.taskId!);
+        await this.validateAutoScheduling(updateData.autoScheduled, task.workspaceId);
+      }
     }
 
     const updatedTask = await this.motionService.updateTask(params.taskId, updateData);

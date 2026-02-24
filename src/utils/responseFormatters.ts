@@ -8,7 +8,7 @@
 
 import { formatMcpSuccess } from './errorHandling';
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionRecurringTask, MotionSchedule, MotionScheduleDetails, MotionStatus } from '../types/motion';
+import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionCustomFieldValue, MotionRecurringTask, MotionSchedule, MotionScheduleDetails, MotionStatus } from '../types/motion';
 import { TruncationInfo } from '../types/mcp';
 import { LIMITS } from './constants';
 
@@ -216,6 +216,11 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
     task.parentRecurringTaskId ? `Recurring Task ID: ${task.parentRecurringTaskId}` : null,
     task.chunks && task.chunks.length > 0
       ? `Scheduled Chunks: ${task.chunks.length} time block(s)`
+      : null,
+    task.customFieldValues && Object.keys(task.customFieldValues).length > 0
+      ? `Custom Fields:\n${Object.entries(task.customFieldValues).map(([valueId, cfv]) =>
+          `  - valueId: ${valueId} | Type: ${cfv.type} | Value: ${JSON.stringify(cfv.value)}`
+        ).join('\n')}`
       : null
   ].filter(Boolean).join('\n');
 
@@ -337,10 +342,25 @@ export function formatCustomFieldDetail(field: MotionCustomField): CallToolResul
 /**
  * Format success message for custom field operations
  */
-export function formatCustomFieldSuccess(operation: string, entityType?: string, entityId?: string): CallToolResult {
+export function formatCustomFieldSuccess(operation: string, entityType?: string, entityId?: string, apiResponse?: MotionCustomFieldValue): CallToolResult {
   let message = `Custom field ${operation} successfully`;
   if (entityType && entityId) {
     message += ` for ${entityType} ${entityId}`;
+  }
+  // For add operations, include the API response so users can obtain the valueId for later removal
+  if (apiResponse) {
+    if (apiResponse.id) {
+      message += `\nValue ID: ${apiResponse.id}`;
+      message += `\nTip: Use this valueId with remove_from_${entityType} to remove this custom field assignment.`;
+    } else {
+      message += `\nNote: The API did not return a valueId. To find the valueId, use motion_tasks (operation: get) or inspect the task/project's customFieldValues.`;
+    }
+    if (apiResponse.type) {
+      message += `\nType: ${apiResponse.type}`;
+    }
+    if (apiResponse.value !== undefined) {
+      message += `\nValue: ${JSON.stringify(apiResponse.value)}`;
+    }
   }
   return formatMcpSuccess(message);
 }

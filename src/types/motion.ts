@@ -92,6 +92,7 @@ export interface MotionProject {
  * A custom field value in Motion, with type and value information
  */
 export interface MotionCustomFieldValue {
+  id?: string;  // Assignment ID (valueId) — needed for remove_from_task/remove_from_project
   type: string; // e.g., 'SELECT', 'TEXT', 'NUMBER', 'DATE', etc.
   value: any;   // The actual value, which can be of various types
 }
