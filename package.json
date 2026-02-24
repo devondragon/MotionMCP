@@ -52,7 +52,8 @@
     "wrangler": "^4.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "generate:types": "npx tsx scripts/generate-types.ts",
+    "build": "npm run generate:types && tsc",
     "mcp": "node dist/mcp-server.js",
     "mcp:dev": "ts-node src/mcp-server.ts",
     "watch": "tsc --watch",

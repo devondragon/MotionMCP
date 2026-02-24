@@ -1,70 +1,86 @@
-/**
- * Type definitions for consolidated MCP tool arguments
- * All individual tool types removed - only consolidated tools remain
- */
+// AUTO-GENERATED — DO NOT EDIT MANUALLY
+// Source: scripts/generate-types.ts  |  Run: npm run generate:types
 
 import { FrequencyObject } from './motion';
 
-// Consolidated tool operation types
-export type ProjectOperation = 'create' | 'list' | 'get';
-export type TaskOperation = 'create' | 'list' | 'get' | 'update' | 'delete' | 'move' | 'unassign' | 'list_all_uncompleted';
+export type ProjectsOperation = 'create' | 'list' | 'get';
 
 export interface MotionProjectsArgs {
-  operation: ProjectOperation;
-  // Common params
+  operation: ProjectsOperation;
   projectId?: string;
   workspaceId?: string;
   workspaceName?: string;
-  allWorkspaces?: boolean;
-  // Create params
   name?: string;
   description?: string;
+  allWorkspaces?: boolean;
 }
 
+export type TasksOperation = 'create' | 'list' | 'get' | 'update' | 'delete' | 'move' | 'unassign' | 'list_all_uncompleted';
+
 export interface MotionTasksArgs {
-  operation: TaskOperation;
-  // Common params
+  operation: TasksOperation;
   taskId?: string;
   workspaceId?: string;
   workspaceName?: string;
-  // List params
   projectId?: string;
   projectName?: string;
+  status?: string | string[];
+  includeAllStatuses?: boolean;
   assigneeId?: string;
   assignee?: string;
-  limit?: number;
-  // List-only params
-  includeAllStatuses?: boolean;
-  // Create/Update params
-  name?: string;
-  description?: string;
-  // status accepts an array for list (multi-status filter) but only string for create/update
-  status?: string | string[];
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate?: string;
-  duration?: string | number;
   labels?: string[];
-  autoScheduled?: object | string | null;
-  // Move params
+  name?: string;
+  description?: string;
+  duration?: 'NONE' | 'REMINDER' | number;
+  autoScheduled?: {
+    schedule: string;
+    startDate?: string;
+    deadlineType?: 'HARD' | 'SOFT' | 'NONE';
+  } | null | string;
   targetWorkspaceId?: string;
+  limit?: number;
 }
 
+export type WorkspacesOperation = 'list' | 'get';
+
+export interface MotionWorkspacesArgs {
+  operation: WorkspacesOperation;
+  workspaceId?: string;
+}
+
+export interface MotionSearchArgs {
+  operation: 'content';
+  query?: string;
+  searchScope?: 'tasks' | 'projects' | 'both';
+  workspaceId?: string;
+  workspaceName?: string;
+  limit?: number;
+}
+
+export type UsersOperation = 'list' | 'current';
+
 export interface MotionUsersArgs {
-  operation: 'list' | 'current';
+  operation: UsersOperation;
   workspaceId?: string;
   workspaceName?: string;
   teamId?: string;
 }
 
+export type CommentsOperation = 'list' | 'create';
+
 export interface MotionCommentsArgs {
-  operation: 'list' | 'create';
-  taskId?: string;
+  operation: CommentsOperation;
+  taskId: string;
   content?: string;
   cursor?: string;
 }
 
+export type CustomFieldsOperation = 'list' | 'create' | 'delete' | 'add_to_project' | 'remove_from_project' | 'add_to_task' | 'remove_from_task';
+
 export interface MotionCustomFieldsArgs {
-  operation: 'list' | 'create' | 'delete' | 'add_to_project' | 'remove_from_project' | 'add_to_task' | 'remove_from_task';
+  operation: CustomFieldsOperation;
   fieldId?: string;
   valueId?: string;
   workspaceId?: string;
@@ -78,16 +94,18 @@ export interface MotionCustomFieldsArgs {
   value?: string | number | boolean | string[] | null;
 }
 
+export type RecurringTasksOperation = 'list' | 'create' | 'delete';
+
 export interface MotionRecurringTasksArgs {
-  operation: 'list' | 'create' | 'delete';
+  operation: RecurringTasksOperation;
   recurringTaskId?: string;
   workspaceId?: string;
   workspaceName?: string;
   name?: string;
+  description?: string;
   projectId?: string;
   assigneeId?: string;
   frequency?: FrequencyObject;
-  description?: string;
   deadlineType?: 'HARD' | 'SOFT';
   duration?: number | 'REMINDER';
   startingOn?: string;
@@ -97,27 +115,9 @@ export interface MotionRecurringTasksArgs {
 }
 
 export interface MotionSchedulesArgs {
-  // The Motion API GET /schedules accepts no query parameters
+  operation?: 'list';
 }
 
 export interface MotionStatusesArgs {
   workspaceId?: string;
 }
-
-// New consolidated tool argument types
-export type WorkspaceOperation = 'list' | 'get';
-export interface MotionWorkspacesArgs {
-  operation: WorkspaceOperation;
-  workspaceId?: string;
-}
-
-export type SearchOperation = 'content';
-export interface MotionSearchArgs {
-  operation: SearchOperation;
-  query?: string;
-  searchScope?: 'tasks' | 'projects' | 'both';
-  limit?: number;
-  workspaceId?: string;
-  workspaceName?: string;
-}
-
