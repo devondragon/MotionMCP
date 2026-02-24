@@ -13,21 +13,6 @@ interface ErrorContext {
 }
 
 /**
- * Base error class for Motion API related errors
- */
-export class MotionApiError extends Error {
-  public readonly code: ErrorCode;
-  public readonly context: ErrorContext;
-
-  constructor(message: string, code: ErrorCode = ERROR_CODES.MOTION_API_ERROR, context: ErrorContext = {}) {
-    super(message);
-    this.name = 'MotionApiError';
-    this.code = code;
-    this.context = context;
-  }
-}
-
-/**
  * Error class for parameter validation failures
  */
 export class ValidationError extends Error {
@@ -64,7 +49,6 @@ export class WorkspaceError extends Error {
  */
 export function isCodedError(error: unknown): error is { code: ErrorCode; context: ErrorContext } {
   return (
-    error instanceof MotionApiError ||
     error instanceof ValidationError ||
     error instanceof WorkspaceError
   );
@@ -134,16 +118,4 @@ export function formatMcpSuccess(text: string): CallToolResult {
       }
     ]
   };
-}
-
-/**
- * Create a standardized error response with context
- */
-export function createErrorResponse(
-  message: string, 
-  code: ErrorCode = ERROR_CODES.INTERNAL_ERROR, 
-  context: ErrorContext = {}
-): CallToolResult {
-  const error = new MotionApiError(message, code, context);
-  return formatMcpError(error, context);
 }

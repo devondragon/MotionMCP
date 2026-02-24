@@ -44,24 +44,4 @@ export class HandlerFactory {
     }
     return new HandlerClass(this.context);
   }
-
-  hasHandler(toolName: string): boolean {
-    return this.handlers.has(toolName);
-  }
-
-  getRegisteredToolNames(): string[] {
-    return Array.from(this.handlers.keys());
-  }
-
-  registerHandler(toolName: string, handlerClass: new(context: HandlerContext) => BaseHandler): void {
-    this.handlers.set(toolName, handlerClass);
-  }
-
-  unregisterHandler(toolName: string): boolean {
-    return this.handlers.delete(toolName);
-  }
-
-  getHandlerCount(): number {
-    return this.handlers.size;
-  }
 }

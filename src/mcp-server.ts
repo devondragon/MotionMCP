@@ -10,11 +10,11 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { MotionApiService } from './services/motionApi';
 import { WorkspaceResolver, formatMcpError, mcpLog, LOG_LEVELS } from './utils';
+import { SERVER_INSTRUCTIONS } from './utils/serverInstructions';
 import { InputValidator } from './utils/validator';
 import { HandlerContext } from './handlers/base/HandlerInterface';
 import { HandlerFactory } from './handlers/HandlerFactory';
 import { ToolRegistry, ToolConfigurator } from './tools';
-import { SERVER_INSTRUCTIONS } from './constants';
 import * as dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });

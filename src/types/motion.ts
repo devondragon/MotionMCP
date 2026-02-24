@@ -357,11 +357,3 @@ export interface MotionApiErrorResponse {
   details?: Record<string, unknown>;
   statusCode?: number;
 }
-
-export interface MotionApiError extends Error {
-  response?: {
-    status: number;
-    statusText: string;
-    data?: MotionApiErrorResponse;
-  };
-}

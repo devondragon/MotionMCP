@@ -53,7 +53,7 @@ export class ToolConfigurator {
     return this.registry.getEnabled(this.config);
   }
 
-  parseCustomConfig(config: string): string[] {
+  private parseCustomConfig(config: string): string[] {
     if (!config.startsWith('custom:')) {
       throw new Error('Invalid custom configuration format. Must start with "custom:"');
     }
@@ -65,44 +65,7 @@ export class ToolConfigurator {
     return this.config;
   }
 
-  setConfig(config: string): void {
-    this.config = config;
-    this.validateConfig();
-  }
-
-  isCustomConfig(): boolean {
-    return this.config.startsWith('custom:');
-  }
-
-  isValidPreset(): boolean {
-    return ['minimal', 'essential', 'complete'].includes(this.config);
-  }
-
   getToolCount(): number {
     return this.getEnabledTools().length;
-  }
-
-  getToolNames(): string[] {
-    return this.getEnabledTools().map(tool => tool.name);
-  }
-
-  static getValidConfigurations(): string[] {
-    return ['minimal', 'essential', 'complete'];
-  }
-
-  static getConfigurationDescription(config: string): string {
-    switch(config) {
-      case 'minimal':
-        return 'Core consolidated tools only - 3 tools (tasks, projects, workspaces)';
-      case 'essential':
-        return 'Core tools plus common features - 7 tools (adds users, search, comments, schedules)';
-      case 'complete':
-        return 'All consolidated tools - 10 tools (adds custom fields, recurring tasks, statuses)';
-      default:
-        if (config.startsWith('custom:')) {
-          return `Custom configuration with specific tools: ${config.substring(7)}`;
-        }
-        return 'Unknown configuration';
-    }
   }
 }

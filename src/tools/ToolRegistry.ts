@@ -38,23 +38,6 @@ export class ToolRegistry {
     this.tools.set(tool.name, tool);
   }
 
-  /**
-   * Removes a tool from the registry by name.
-   * @param name - The name of the tool to remove
-   */
-  unregister(name: string): void {
-    this.tools.delete(name);
-  }
-
-  /**
-   * Retrieves a tool definition by name.
-   * @param name - The tool name to look up
-   * @returns The tool definition if found, undefined otherwise
-   */
-  get(name: string): McpToolDefinition | undefined {
-    return this.tools.get(name);
-  }
-
   /** Returns all registered tool definitions */
   getAll(): McpToolDefinition[] {
     return Array.from(this.tools.values());
@@ -126,24 +109,5 @@ export class ToolRegistry {
         // Validated upstream by ToolConfigurator, but throw if unexpected value reaches here
         throw new Error(`Unexpected tools configuration: ${config}`);
     }
-  }
-
-  /**
-   * Checks if a tool is registered.
-   * @param name - The tool name to check
-   * @returns True if the tool exists in the registry
-   */
-  has(name: string): boolean {
-    return this.tools.has(name);
-  }
-
-  /** Returns the number of registered tools */
-  size(): number {
-    return this.tools.size;
-  }
-
-  /** Removes all tools from the registry */
-  clear(): void {
-    this.tools.clear();
   }
 }
