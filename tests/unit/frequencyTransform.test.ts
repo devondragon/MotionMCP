@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   transformFrequencyToApiString,
-  validateFrequencyObject,
-  isValidFrequencyObject
+  validateFrequencyObject
 } from '../../src/utils/frequencyTransform';
 import { FrequencyObject } from '../../src/types/motion';
 
@@ -507,12 +506,3 @@ describe('validateFrequencyObject', () => {
   });
 });
 
-describe('isValidFrequencyObject', () => {
-  it('returns true for valid frequency object', () => {
-    expect(isValidFrequencyObject({ type: 'daily' })).toBe(true);
-  });
-
-  it('returns false for invalid frequency object', () => {
-    expect(isValidFrequencyObject({ type: 'invalid' } as any)).toBe(false);
-  });
-});

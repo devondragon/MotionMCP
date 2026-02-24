@@ -175,18 +175,18 @@ export const tasksToolDefinition: McpToolDefinition = {
 
 export const workspacesToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.WORKSPACES,
-  description: "Manage Motion workspaces - supports list, get, and set_default operations",
+  description: "Manage Motion workspaces - supports list and get operations",
   inputSchema: {
     type: "object",
     properties: {
       operation: {
         type: "string",
-        enum: ["list", "get", "set_default"],
+        enum: ["list", "get"],
         description: "Operation to perform"
       },
       workspaceId: {
         type: "string",
-        description: "Workspace ID (required for get and set_default operations)"
+        description: "Workspace ID (required for get operation)"
       }
     },
     required: ["operation"]
@@ -195,27 +195,27 @@ export const workspacesToolDefinition: McpToolDefinition = {
 
 export const searchToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.SEARCH,
-  description: "Search and context utilities for Motion - supports content, context, and smart operations",
+  description: "Search Motion tasks and projects by query",
   inputSchema: {
     type: "object",
     properties: {
       operation: {
         type: "string",
-        enum: ["content", "context", "smart"],
+        enum: ["content"],
         description: "Operation to perform"
       },
       query: {
         type: "string",
-        description: "Search query (required for content and smart operations)"
+        description: "Search query (required)"
       },
       searchScope: {
         type: "string",
         enum: ["tasks", "projects", "both"],
-        description: "What to search for content operation (default: both)"
+        description: "What to search (default: both)"
       },
       workspaceId: {
         type: "string",
-        description: "Workspace ID to limit search/context"
+        description: "Workspace ID to limit search"
       },
       workspaceName: {
         type: "string",
@@ -223,32 +223,7 @@ export const searchToolDefinition: McpToolDefinition = {
       },
       limit: {
         type: "number",
-        description: "Maximum number of results for content operation"
-      },
-      includeProjects: {
-        type: "boolean",
-        description: "Include project information for context operation"
-      },
-      includeTasks: {
-        type: "boolean",
-        description: "Include task information for context operation"
-      },
-      includeUsers: {
-        type: "boolean",
-        description: "Include user information for context operation"
-      },
-      entityType: {
-        type: "string",
-        enum: ["project", "task"],
-        description: "Entity type for smart operation"
-      },
-      entityId: {
-        type: "string",
-        description: "Entity ID for smart operation"
-      },
-      includeRelated: {
-        type: "boolean",
-        description: "Include related entities for smart operation"
+        description: "Maximum number of results"
       }
     },
     required: ["operation"]
@@ -334,6 +309,10 @@ export const customFieldsToolDefinition: McpToolDefinition = {
         type: "string",
         description: "Workspace ID"
       },
+      workspaceName: {
+        type: "string",
+        description: "Workspace name (alternative to workspaceId for list/create)"
+      },
       name: {
         type: "string",
         description: "Field name (for create)"
@@ -361,7 +340,13 @@ export const customFieldsToolDefinition: McpToolDefinition = {
         description: "Task ID (for add/remove operations)"
       },
       value: {
-        type: ["string", "number", "boolean", "array", "null"],
+        oneOf: [
+          { type: "string" },
+          { type: "number" },
+          { type: "boolean" },
+          { type: "array", items: { type: "string" } },
+          { type: "null" }
+        ],
         description: "Field value"
       }
     },
@@ -387,6 +372,10 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
       workspaceId: {
         type: "string",
         description: "Workspace ID"
+      },
+      workspaceName: {
+        type: "string",
+        description: "Workspace name (alternative to workspaceId)"
       },
       name: {
         type: "string",

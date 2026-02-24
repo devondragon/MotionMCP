@@ -15,7 +15,6 @@ import {
   MotionStatus,
   ListResponse,
   MotionApiErrorResponse,
-  MotionApiError,
   MotionPaginatedResponse
 } from '../types/motion';
 import { LOG_LEVELS, createMinimalPayload, RETRY_CONFIG, CACHE_TTL, LIMITS, ValidPriority, API_CONFIG } from '../utils/constants';
@@ -56,6 +55,10 @@ interface GetTasksOptions {
   labels?: string[];
   limit?: number;
   maxPages?: number;
+}
+
+interface ResolveUserIdentifierOptions {
+  strictWorkspace?: boolean;
 }
 
 export class MotionApiService {
@@ -174,19 +177,9 @@ export class MotionApiService {
 
         mcpLog(LOG_LEVELS.ERROR, 'Motion API request failed', errorDetails);
 
-        // Create typed error for better handling
-        const typedError: MotionApiError = Object.assign(
-          new Error(errorData?.message || error.message),
-          {
-            response: error.response ? {
-              status: error.response.status,
-              statusText: error.response.statusText,
-              data: error.response.data
-            } : undefined
-          }
-        );
-
-        throw typedError;
+        // Re-throw original AxiosError so requestWithRetry can detect it
+        // via axios.isAxiosError() for retry/rate-limit handling
+        return Promise.reject(error);
       }
     );
   }
@@ -217,7 +210,10 @@ export class MotionApiService {
 
   /**
    * Wraps an axios request with a retry mechanism featuring exponential backoff.
-   * Only retries on 5xx server errors or 429 rate-limiting errors.
+   * Retries only safe/read-only requests (GET) on transient failures:
+   * - HTTP 5xx
+   * - HTTP 429
+   * - Network errors with no HTTP response
    */
   private async requestWithRetry<T>(request: () => Promise<AxiosResponse<T>>): Promise<AxiosResponse<T>> {
     for (let attempt = 1; attempt <= RETRY_CONFIG.MAX_RETRIES; attempt++) {
@@ -229,11 +225,16 @@ export class MotionApiService {
         }
 
         const status = error.response?.status;
-        const isRetryable = (status && status >= 500) || status === 429;
+        const requestMethod = error.config?.method?.toUpperCase() || 'GET';
+        const isSafeMethod = requestMethod === 'GET';
+        const isNetworkError = !error.response;
+        const isRetryableStatus = status === 429 || (status !== undefined && status >= 500);
+        const isRetryable = isSafeMethod && (isNetworkError || isRetryableStatus);
 
         if (!isRetryable || attempt === RETRY_CONFIG.MAX_RETRIES) {
           mcpLog(LOG_LEVELS.WARN, `Request failed and will not be retried`, {
             status,
+            httpMethod: requestMethod,
             attempt,
             maxRetries: RETRY_CONFIG.MAX_RETRIES,
             isRetryable,
@@ -244,12 +245,18 @@ export class MotionApiService {
         }
 
         // Handle Retry-After header for 429
-        const retryAfterHeader = error.response?.headers['retry-after'];
+        const retryAfterHeaderRaw = error.response?.headers['retry-after'];
+        const retryAfterHeader = Array.isArray(retryAfterHeaderRaw) ? retryAfterHeaderRaw[0] : retryAfterHeaderRaw;
         let delay = 0;
         if (status === 429 && retryAfterHeader) {
-          const retryAfterSeconds = parseInt(retryAfterHeader, 10);
-          if (!isNaN(retryAfterSeconds)) {
+          const retryAfterSeconds = Number(retryAfterHeader);
+          if (!isNaN(retryAfterSeconds) && retryAfterSeconds >= 0) {
             delay = retryAfterSeconds * 1000;
+          } else {
+            const retryAfterDate = Date.parse(retryAfterHeader);
+            if (!isNaN(retryAfterDate)) {
+              delay = Math.max(0, retryAfterDate - Date.now());
+            }
           }
         }
 
@@ -266,6 +273,8 @@ export class MotionApiService {
           delayMs: Math.round(delay),
           error: error.message,
           status,
+          httpMethod: requestMethod,
+          isNetworkError,
           component: 'MotionApiService',
           method: 'requestWithRetry'
         });
@@ -276,6 +285,43 @@ export class MotionApiService {
     
     // Should never reach here, but TypeScript requires a return or throw
     throw new Error('Max retries exceeded');
+  }
+
+  /**
+   * Merge truncation metadata from multiple paginated sources without mutating source objects.
+   * If sources disagree on reason/limit, drop those fields to avoid misleading aggregate metadata.
+   */
+  private mergeTruncationMetadata(
+    aggregate: TruncationInfo | undefined,
+    source: TruncationInfo | undefined
+  ): TruncationInfo | undefined {
+    if (!source?.wasTruncated) {
+      return aggregate;
+    }
+
+    if (!aggregate?.wasTruncated) {
+      return { ...source };
+    }
+
+    const merged: TruncationInfo = { ...aggregate, wasTruncated: true };
+
+    if (aggregate.reason !== source.reason) {
+      delete merged.reason;
+      delete merged.limit;
+      return merged;
+    }
+
+    if (source.reason !== undefined) {
+      merged.reason = source.reason;
+    }
+
+    if (aggregate.limit !== source.limit) {
+      delete merged.limit;
+    } else if (source.limit !== undefined) {
+      merged.limit = source.limit;
+    }
+
+    return merged;
   }
 
   // ========================================
@@ -290,7 +336,7 @@ export class MotionApiService {
       throw new Error('limit must be a non-negative integer');
     }
 
-    const cacheKey = `projects:workspace:${workspaceId}`;
+    const cacheKey = `projects:workspace:${workspaceId}:maxPages:${maxPages}:limit:${limit ?? 'none'}`;
 
     // Check cache - return items only (no stale truncation info)
     const cachedItems = this.projectCache.get(cacheKey);
@@ -358,8 +404,7 @@ export class MotionApiService {
         workspaceId
       });
 
-      // Cache only items
-      this.projectCache.set(cacheKey, projects);
+      // Do not cache fallback results. If pagination failed, this may be only the first page.
       return { items: projects };
     } catch (error: unknown) {
       mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects', {
@@ -386,9 +431,7 @@ export class MotionApiService {
         try {
           const { items, truncation } = await this.getProjects(workspace.id);
           allProjects.push(...items);
-          if (truncation?.wasTruncated && !aggregateTruncation) {
-            aggregateTruncation = { ...truncation, returnedCount: allProjects.length };
-          }
+          aggregateTruncation = this.mergeTruncationMetadata(aggregateTruncation, truncation);
         } catch (workspaceError: unknown) {
           // Log error but continue with other workspaces
           mcpLog(LOG_LEVELS.WARN, 'Failed to fetch projects from workspace', {
@@ -511,6 +554,7 @@ export class MotionApiService {
       
       // Invalidate cache after successful update
       this.projectCache.invalidate(`projects:workspace:${response.data.workspaceId}`);
+      this.singleProjectCache.invalidate(`project:${projectId}`);
       
       mcpLog(LOG_LEVELS.INFO, 'Project updated successfully', {
         method: 'updateProject',
@@ -543,6 +587,7 @@ export class MotionApiService {
       
       // Invalidate all project caches since we don't know the workspace ID
       this.projectCache.invalidate();
+      this.singleProjectCache.invalidate(`project:${projectId}`);
       
       mcpLog(LOG_LEVELS.INFO, 'Project deleted successfully', {
         method: 'deleteProject',
@@ -792,9 +837,6 @@ export class MotionApiService {
 
       const response: AxiosResponse<MotionTask> = await this.requestWithRetry(() => this.client.post('/tasks', minimalPayload));
       
-      // Invalidate task-related caches after successful creation
-      // Note: Task cache would need to be implemented separately if needed
-      
       mcpLog(LOG_LEVELS.INFO, 'Task created successfully', {
         method: 'createTask',
         taskId: response.data.id,
@@ -898,8 +940,6 @@ export class MotionApiService {
         assigneeId
       });
 
-      // Note: No task cache currently implemented - tasks are not cached due to frequent updates
-
       // Docs say 200 with task object, but handle 204 No Content defensively
       return response.status === 204 ? undefined : response.data;
     } catch (error: unknown) {
@@ -931,8 +971,6 @@ export class MotionApiService {
         method: 'unassignTask',
         taskId
       });
-
-      // Note: No task cache currently implemented - tasks are not cached due to frequent updates
 
       // Response undocumented — handle 204 No Content defensively
       return response.status === 204 ? undefined : response.data;
@@ -1038,11 +1076,19 @@ export class MotionApiService {
         const url = queryString ? `/users?${queryString}` : '/users';
         
         const response: AxiosResponse<ListResponse<MotionUser>> = await this.requestWithRetry(() => this.client.get(url));
-        
+
         // The Motion API might wrap the users in a 'users' array
         const usersData = response.data?.users || response.data || [];
         const users = Array.isArray(usersData) ? usersData : [];
-        
+
+        if (!Array.isArray(response.data?.users) && !Array.isArray(response.data)) {
+          mcpLog(LOG_LEVELS.WARN, 'Unexpected users response shape', {
+            method: 'getUsers',
+            workspaceId,
+            responseType: response.data === null ? 'null' : typeof response.data
+          });
+        }
+
         mcpLog(LOG_LEVELS.INFO, 'Users fetched successfully', {
           method: 'getUsers',
           count: users.length,
@@ -1094,7 +1140,11 @@ export class MotionApiService {
       }
     });
     
-    return cachedUsers[0]; // Return just the user object
+    const user = cachedUsers[0];
+    if (!user) {
+      throw this.formatApiError(new Error('No user returned from API'), 'fetch', 'user');
+    }
+    return user;
   }
 
   // ========================================
@@ -1176,44 +1226,59 @@ export class MotionApiService {
 
   /**
    * Resolves a user identifier (either userId or userName/email) to a MotionUser
-   * Searches across all workspaces if not found in the specified workspace
+   * Searches across all workspaces if not found in the specified workspace unless strictWorkspace is true
    * @param identifier Object containing either userId or userName
    * @param workspaceId Workspace to start searching in (optional)
+   * @param options Resolution behavior options
    * @returns Resolved MotionUser with workspace info, or undefined if not found
    */
   async resolveUserIdentifier(
     identifier: { userId?: string; userName?: string },
-    workspaceId?: string
+    workspaceId?: string,
+    options?: ResolveUserIdentifierOptions
   ): Promise<MotionUser | undefined> {
     try {
+      const strictWorkspace = options?.strictWorkspace === true;
       mcpLog(LOG_LEVELS.DEBUG, 'Resolving user identifier', {
         method: 'resolveUserIdentifier',
         userId: identifier.userId,
         userName: identifier.userName,
-        workspaceId
+        workspaceId,
+        strictWorkspace
       });
 
-      // Build ordered list of workspaces to search: specified workspace first, then others
+      // Build ordered workspace IDs: specified workspace first (or only when strict).
       const allWorkspaces = await this.getWorkspaces();
-      const orderedWorkspaces = workspaceId
-        ? [
-            ...allWorkspaces.filter(w => w.id === workspaceId),
-            ...allWorkspaces.filter(w => w.id !== workspaceId),
-          ]
-        : allWorkspaces;
+      let orderedWorkspaceIds: string[];
+      if (workspaceId) {
+        if (strictWorkspace) {
+          orderedWorkspaceIds = [workspaceId];
+        } else {
+          const allWorkspaceIds = allWorkspaces.map(workspace => workspace.id);
+          if (allWorkspaceIds.includes(workspaceId)) {
+            const otherWorkspaceIds = allWorkspaceIds.filter(id => id !== workspaceId);
+            orderedWorkspaceIds = [workspaceId, ...otherWorkspaceIds];
+          } else {
+            // Keep prior behavior when workspaceId is unknown: search known workspaces.
+            orderedWorkspaceIds = allWorkspaceIds;
+          }
+        }
+      } else {
+        orderedWorkspaceIds = allWorkspaces.map(workspace => workspace.id);
+      }
 
       // If userId is provided, search by ID
       if (identifier.userId) {
-        for (const workspace of orderedWorkspaces) {
+        for (const searchWorkspaceId of orderedWorkspaceIds) {
           try {
-            const users = await this.getUsers(workspace.id);
+            const users = await this.getUsers(searchWorkspaceId);
             const user = users.find(u => u.id === identifier.userId);
             if (user) {
               mcpLog(LOG_LEVELS.INFO, 'User resolved by ID', {
                 method: 'resolveUserIdentifier',
                 userId: identifier.userId,
                 userName: user.name,
-                foundInWorkspaceId: workspace.id
+                foundInWorkspaceId: searchWorkspaceId
               });
               return user;
             }
@@ -1221,7 +1286,7 @@ export class MotionApiService {
             mcpLog(LOG_LEVELS.WARN, 'Failed to search workspace for user by ID', {
               method: 'resolveUserIdentifier',
               userId: identifier.userId,
-              workspaceId: workspace.id,
+              workspaceId: searchWorkspaceId,
               error: getErrorMessage(workspaceError)
             });
           }
@@ -1232,9 +1297,9 @@ export class MotionApiService {
       if (identifier.userName) {
         const searchTerm = identifier.userName.toLowerCase();
 
-        for (const workspace of orderedWorkspaces) {
+        for (const searchWorkspaceId of orderedWorkspaceIds) {
           try {
-            const users = await this.getUsers(workspace.id);
+            const users = await this.getUsers(searchWorkspaceId);
             const user = users.find(u =>
               u.name?.toLowerCase().includes(searchTerm) ||
               u.email?.toLowerCase().includes(searchTerm)
@@ -1244,7 +1309,7 @@ export class MotionApiService {
                 method: 'resolveUserIdentifier',
                 userName: identifier.userName,
                 userId: user.id,
-                foundInWorkspaceId: workspace.id
+                foundInWorkspaceId: searchWorkspaceId
               });
               return user;
             }
@@ -1252,7 +1317,7 @@ export class MotionApiService {
             mcpLog(LOG_LEVELS.WARN, 'Failed to search workspace for user by name', {
               method: 'resolveUserIdentifier',
               userName: identifier.userName,
-              workspaceId: workspace.id,
+              workspaceId: searchWorkspaceId,
               error: getErrorMessage(workspaceError)
             });
           }
@@ -1387,9 +1452,7 @@ export class MotionApiService {
         limit: calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit),
         maxPages: LIMITS.MAX_PAGES
       });
-      if (primaryTruncation?.wasTruncated && !aggregateTruncation) {
-        aggregateTruncation = primaryTruncation;
-      }
+      aggregateTruncation = this.mergeTruncationMetadata(aggregateTruncation, primaryTruncation);
       const primaryMatches = primaryTasks.filter(task =>
         task.name?.toLowerCase().includes(lowerQuery) ||
         task.description?.toLowerCase().includes(lowerQuery)
@@ -1432,9 +1495,7 @@ export class MotionApiService {
                 limit: fetchLimit,
                 maxPages: LIMITS.MAX_PAGES
               });
-              if (wsTruncation?.wasTruncated && !aggregateTruncation) {
-                aggregateTruncation = wsTruncation;
-              }
+              aggregateTruncation = this.mergeTruncationMetadata(aggregateTruncation, wsTruncation);
               const workspaceMatches = workspaceTasks.filter(task =>
                 task.name?.toLowerCase().includes(lowerQuery) ||
                 task.description?.toLowerCase().includes(lowerQuery)
@@ -1516,9 +1577,7 @@ export class MotionApiService {
         maxPages: LIMITS.MAX_PAGES,
         limit: calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit)
       });
-      if (primaryTruncation?.wasTruncated && !aggregateTruncation) {
-        aggregateTruncation = primaryTruncation;
-      }
+      aggregateTruncation = this.mergeTruncationMetadata(aggregateTruncation, primaryTruncation);
       const primaryMatches = primaryProjects.filter(project =>
         project.name?.toLowerCase().includes(lowerQuery) ||
         project.description?.toLowerCase().includes(lowerQuery)
@@ -1560,9 +1619,7 @@ export class MotionApiService {
                 maxPages: LIMITS.MAX_PAGES,
                 limit: fetchLimit
               });
-              if (wsTruncation?.wasTruncated && !aggregateTruncation) {
-                aggregateTruncation = wsTruncation;
-              }
+              aggregateTruncation = this.mergeTruncationMetadata(aggregateTruncation, wsTruncation);
               const workspaceMatches = workspaceProjects.filter(project =>
                 project.name?.toLowerCase().includes(lowerQuery) ||
                 project.description?.toLowerCase().includes(lowerQuery)
@@ -1700,9 +1757,9 @@ export class MotionApiService {
         this.client.post('/comments', minimalPayload)
       );
       
-      // Invalidate cache after successful creation
-      const cacheKey = `comments:${JSON.stringify({ taskId: commentData.taskId, cursor: null })}`;
-      this.commentCache.invalidate(cacheKey);
+      // Invalidate all cached pages for this task's comments (cursor variants included)
+      const cachePrefix = `comments:{"taskId":${JSON.stringify(commentData.taskId)}`;
+      this.commentCache.invalidate(cachePrefix);
       
       mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
         method: 'createComment',
@@ -1789,6 +1846,7 @@ export class MotionApiService {
       const apiPayload = {
         name: fieldData.name,
         type: fieldData.field,  // Motion API POST expects 'type' property in request body
+        ...(fieldData.required !== undefined && { required: fieldData.required }),
         ...(fieldData.metadata && { metadata: fieldData.metadata })
       };
 
@@ -1886,10 +1944,19 @@ export class MotionApiService {
         customFieldInstanceId: fieldId,
       };
       if (value !== undefined) {
-        requestData.value = {
-          type: fieldType || 'text',
-          value
-        };
+        if (value === null) {
+          requestData.value = fieldType !== undefined
+            ? { type: fieldType, value: null }
+            : { value: null };
+        } else {
+          if (!fieldType) {
+            throw new Error('Field type is required when setting a non-null custom field value');
+          }
+          requestData.value = {
+            type: fieldType,
+            value
+          };
+        }
       }
 
       const response: AxiosResponse<MotionCustomFieldValue> = await this.requestWithRetry(() =>
@@ -1983,10 +2050,19 @@ export class MotionApiService {
         customFieldInstanceId: fieldId,
       };
       if (value !== undefined) {
-        requestData.value = {
-          type: fieldType || 'text',
-          value
-        };
+        if (value === null) {
+          requestData.value = fieldType !== undefined
+            ? { type: fieldType, value: null }
+            : { value: null };
+        } else {
+          if (!fieldType) {
+            throw new Error('Field type is required when setting a non-null custom field value');
+          }
+          requestData.value = {
+            type: fieldType,
+            value
+          };
+        }
       }
 
       const response: AxiosResponse<MotionCustomFieldValue> = await this.requestWithRetry(() =>
@@ -2030,8 +2106,6 @@ export class MotionApiService {
       await this.requestWithRetry(() =>
         this.client.delete(`/beta/custom-field-values/task/${taskId}/custom-fields/${valueId}`)
       );
-
-      // Note: No task cache currently implemented - tasks are not cached due to frequent updates
 
       mcpLog(LOG_LEVELS.INFO, 'Custom field removed from task successfully', {
         method: 'removeCustomFieldFromTask',
@@ -2342,12 +2416,25 @@ export class MotionApiService {
           'statuses'
         );
         
-        // Extract statuses from validated response
-        const statuses = Array.isArray(validatedResponse) 
-          ? validatedResponse 
-          : ('statuses' in validatedResponse && Array.isArray(validatedResponse.statuses))
-            ? validatedResponse.statuses
-            : [];
+        // Extract statuses from validated response; fail loudly on unknown shape to avoid caching empty results.
+        let statuses: MotionStatus[];
+        if (Array.isArray(validatedResponse)) {
+          statuses = validatedResponse;
+        } else if (
+          validatedResponse &&
+          typeof validatedResponse === 'object' &&
+          'statuses' in validatedResponse &&
+          Array.isArray(validatedResponse.statuses)
+        ) {
+          statuses = validatedResponse.statuses;
+        } else {
+          mcpLog(LOG_LEVELS.WARN, 'Unexpected statuses response shape', {
+            method: 'getStatuses',
+            workspaceId,
+            responseType: validatedResponse === null ? 'null' : typeof validatedResponse
+          });
+          throw new Error('Invalid statuses response shape from Motion API');
+        }
         
         mcpLog(LOG_LEVELS.INFO, 'Statuses fetched successfully', {
           method: 'getStatuses',
@@ -2417,15 +2504,24 @@ export class MotionApiService {
               limit: fetchLimit,
               maxPages: LIMITS.MAX_PAGES
             });
-            if (wsTruncation?.wasTruncated && !aggregateTruncation) {
-              aggregateTruncation = wsTruncation;
-            }
+            aggregateTruncation = this.mergeTruncationMetadata(aggregateTruncation, wsTruncation);
 
             // Filter for uncompleted tasks
             const uncompletedTasks = workspaceTasks.filter(task => {
               // Task is uncompleted if status is missing or isResolvedStatus is false
               if (!task.status) return true; // No status = not resolved
-              if (typeof task.status === 'string') return true; // Simple string status = assume not resolved
+              if (typeof task.status === 'string') {
+                const resolvedStatusNames = new Set([
+                  'completed',
+                  'complete',
+                  'done',
+                  'closed',
+                  'resolved',
+                  'canceled',
+                  'cancelled'
+                ]);
+                return !resolvedStatusNames.has(task.status.trim().toLowerCase());
+              }
               return !task.status.isResolvedStatus; // Object status with isResolvedStatus false
             });
 

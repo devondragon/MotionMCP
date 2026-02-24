@@ -2,7 +2,6 @@ import { BaseHandler } from './base/BaseHandler';
 import { McpToolResponse } from '../types/mcp';
 import { MotionWorkspacesArgs } from '../types/mcp-tool-args';
 import {
-  formatMcpSuccess,
   formatWorkspaceList,
   formatDetailResponse
 } from '../utils';
@@ -17,8 +16,6 @@ export class WorkspaceHandler extends BaseHandler {
           return await this.handleList();
         case 'get':
           return await this.handleGet(workspaceId);
-        case 'set_default':
-          return await this.handleSetDefault(workspaceId);
         default:
           return this.handleUnknownOperation(operation);
       }
@@ -47,12 +44,4 @@ export class WorkspaceHandler extends BaseHandler {
     return formatDetailResponse(workspace, `Workspace details for "${workspace.name}"`);
   }
 
-  private async handleSetDefault(workspaceId?: string): Promise<McpToolResponse> {
-    if (!workspaceId) {
-      return this.handleError(new Error("Workspace ID is required for set_default operation"));
-    }
-
-    // For now, we'll just return a success message since Motion API doesn't have a set default endpoint
-    return formatMcpSuccess(`Default workspace would be set to: ${workspaceId} (Note: This is a placeholder - actual implementation depends on Motion API support)`);
-  }
 }

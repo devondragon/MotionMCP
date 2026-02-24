@@ -15,7 +15,6 @@ import { mcpLog } from './logger';
 interface WorkspaceResolverOptions {
   fallbackToDefault?: boolean;
   validateAccess?: boolean;
-  useCache?: boolean;
 }
 
 interface WorkspaceArgs {
@@ -41,10 +40,9 @@ export class WorkspaceResolver {
     options: WorkspaceResolverOptions = {}
   ): Promise<MotionWorkspace> {
     const { workspaceId, workspaceName } = args;
-    const { 
+    const {
       fallbackToDefault = DEFAULTS.WORKSPACE_FALLBACK_TO_DEFAULT,
       validateAccess = DEFAULTS.WORKSPACE_VALIDATE_ACCESS
-      // useCache = DEFAULTS.WORKSPACE_USE_CACHE // Will be used in future caching implementation
     } = options;
 
     mcpLog(LOG_LEVELS.DEBUG, 'Starting workspace resolution', {
@@ -68,20 +66,22 @@ export class WorkspaceResolver {
         if (validateAccess) {
           resolvedWorkspace = await this.resolveByWorkspaceId(workspaceId);
         } else {
-          // Skip validation - return workspace stub with provided ID
-          // The Motion API will validate access when the ID is used
-          mcpLog(LOG_LEVELS.DEBUG, 'Skipping workspace validation, using ID directly', {
+          // Skip strict validation; still attempt best-effort name lookup for better UX.
+          mcpLog(LOG_LEVELS.DEBUG, 'Skipping strict workspace validation, attempting best-effort lookup', {
             method: 'resolveWorkspace',
             workspaceId
           });
-          resolvedWorkspace = {
-            id: workspaceId,
-            name: 'Unknown Workspace',
-            teamId: 'unknown',
-            type: WORKSPACE_TYPES.UNKNOWN,
-            labels: [],
-            statuses: []
-          };
+          resolvedWorkspace = await this.tryResolveByWorkspaceId(workspaceId);
+          if (!resolvedWorkspace) {
+            resolvedWorkspace = {
+              id: workspaceId,
+              name: workspaceId,
+              teamId: null,
+              type: WORKSPACE_TYPES.UNKNOWN,
+              labels: [],
+              statuses: []
+            };
+          }
         }
       }
       
@@ -176,6 +176,24 @@ export class WorkspaceResolver {
   }
 
   /**
+   * Resolve workspace by ID without throwing if not found.
+   * Used for best-effort name resolution when strict validation is disabled.
+   */
+  private async tryResolveByWorkspaceId(workspaceId: string): Promise<MotionWorkspace | null> {
+    try {
+      const workspaces = await this.motionService.getWorkspaces();
+      return workspaces.find((w: MotionWorkspace) => w.id === workspaceId) || null;
+    } catch (error) {
+      mcpLog(LOG_LEVELS.WARN, 'Best-effort workspace lookup failed', {
+        method: 'tryResolveByWorkspaceId',
+        workspaceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return null;
+    }
+  }
+
+  /**
    * Resolve workspace by name - finds matching workspace
    */
   private async resolveByWorkspaceName(workspaceName: string): Promise<MotionWorkspace> {
@@ -261,7 +279,13 @@ export class WorkspaceResolver {
 
       // Use the first workspace as default
       const defaultWorkspace = workspaces[0];
-      
+      if (!defaultWorkspace) {
+        throw new WorkspaceError(
+          'No workspaces available',
+          ERROR_CODES.NO_DEFAULT_WORKSPACE
+        );
+      }
+
       mcpLog(LOG_LEVELS.INFO, 'Using default workspace', {
         method: 'resolveDefaultWorkspace',
         workspaceId: defaultWorkspace.id,

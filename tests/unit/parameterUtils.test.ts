@@ -5,7 +5,6 @@ import {
   validateRequiredParams,
   sanitizeStringParams,
   parseWorkspaceArgs,
-  parseSearchArgs,
   parseProjectArgs,
   setDefaults,
   validateParameterTypes,
@@ -308,25 +307,6 @@ describe('parseWorkspaceArgs', () => {
   it('sanitizes workspaceName', () => {
     const result = parseWorkspaceArgs({ workspaceName: '  My Workspace  ' });
     expect(result.workspaceName).toBe('My Workspace');
-  });
-});
-
-describe('parseSearchArgs', () => {
-  it('sets default search scope to "both"', () => {
-    const result = parseSearchArgs({});
-    expect(result.searchScope).toBe('both');
-  });
-
-  it('sets default limit to 40', () => {
-    const result = parseSearchArgs({});
-    expect(result.limit).toBe(40);
-  });
-
-  it('parses custom values', () => {
-    const result = parseSearchArgs({ searchScope: 'tasks', limit: 20, query: 'test' });
-    expect(result.searchScope).toBe('tasks');
-    expect(result.limit).toBe(20);
-    expect(result.query).toBe('test');
   });
 });
 

@@ -5,20 +5,6 @@
 
 import { FrequencyObject } from './motion';
 
-// Core utility types for search and context operations (used by motion_search)
-export interface SearchContentArgs {
-  query: string;
-  workspaceId?: string;
-  workspaceName?: string;
-  entityTypes?: Array<'projects' | 'tasks'>;
-}
-
-export interface GetContextArgs {
-  entityType: 'project' | 'task';
-  entityId: string;
-  includeRelated?: boolean;
-}
-
 // Consolidated tool operation types
 export type ProjectOperation = 'create' | 'list' | 'get';
 export type TaskOperation = 'create' | 'list' | 'get' | 'update' | 'delete' | 'move' | 'unassign' | 'list_all_uncompleted';
@@ -29,6 +15,7 @@ export interface MotionProjectsArgs {
   projectId?: string;
   workspaceId?: string;
   workspaceName?: string;
+  allWorkspaces?: boolean;
   // Create params
   name?: string;
   description?: string;
@@ -57,7 +44,7 @@ export interface MotionTasksArgs {
   dueDate?: string;
   duration?: string | number;
   labels?: string[];
-  autoScheduled?: object | null;
+  autoScheduled?: object | string | null;
   // Move params
   targetWorkspaceId?: string;
 }
@@ -72,7 +59,6 @@ export interface MotionUsersArgs {
 export interface MotionCommentsArgs {
   operation: 'list' | 'create';
   taskId?: string;
-  projectId?: string;
   content?: string;
   cursor?: string;
 }
@@ -82,9 +68,11 @@ export interface MotionCustomFieldsArgs {
   fieldId?: string;
   valueId?: string;
   workspaceId?: string;
+  workspaceName?: string;
   name?: string;
   field?: 'text' | 'url' | 'date' | 'person' | 'multiPerson' | 'phone' | 'select' | 'multiSelect' | 'number' | 'email' | 'checkbox' | 'relatedTo';
   options?: string[];
+  required?: boolean;
   projectId?: string;
   taskId?: string;
   value?: string | number | boolean | string[] | null;
@@ -94,6 +82,7 @@ export interface MotionRecurringTasksArgs {
   operation: 'list' | 'create' | 'delete';
   recurringTaskId?: string;
   workspaceId?: string;
+  workspaceName?: string;
   name?: string;
   projectId?: string;
   assigneeId?: string;
@@ -116,43 +105,19 @@ export interface MotionStatusesArgs {
 }
 
 // New consolidated tool argument types
-export type WorkspaceOperation = 'list' | 'get' | 'set_default';
+export type WorkspaceOperation = 'list' | 'get';
 export interface MotionWorkspacesArgs {
   operation: WorkspaceOperation;
   workspaceId?: string;
 }
 
-export type SearchOperation = 'content' | 'context' | 'smart';
+export type SearchOperation = 'content';
 export interface MotionSearchArgs {
   operation: SearchOperation;
-  // Content search params
   query?: string;
   searchScope?: 'tasks' | 'projects' | 'both';
   limit?: number;
-  // Context params
-  includeProjects?: boolean;
-  includeTasks?: boolean;
-  includeUsers?: boolean;
-  // Smart search params
-  entityType?: 'project' | 'task';
-  entityId?: string;
-  includeRelated?: boolean;
-  // Common params
   workspaceId?: string;
   workspaceName?: string;
 }
 
-// Union type of all consolidated tool arguments for type safety
-export type AllToolArgs = 
-  | SearchContentArgs
-  | GetContextArgs
-  | MotionProjectsArgs
-  | MotionTasksArgs
-  | MotionUsersArgs
-  | MotionCommentsArgs
-  | MotionCustomFieldsArgs
-  | MotionRecurringTasksArgs
-  | MotionSchedulesArgs
-  | MotionStatusesArgs
-  | MotionWorkspacesArgs
-  | MotionSearchArgs;

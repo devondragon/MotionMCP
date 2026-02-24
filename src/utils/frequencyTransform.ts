@@ -327,7 +327,7 @@ export function validateFrequencyObject(frequency: FrequencyObject): FrequencyVa
   // Type-specific validations
   switch (frequency.type) {
     case 'quarterly':
-      // Quarterly doesn't support dayOfMonth (not implemented in transform logic)
+      // Quarterly doesn't support dayOfMonth
       if (frequency.dayOfMonth) {
         return { valid: false, reason: 'dayOfMonth is not supported for quarterly patterns' };
       }
@@ -369,10 +369,3 @@ export function validateFrequencyObject(frequency: FrequencyObject): FrequencyVa
   return { valid: true };
 }
 
-/**
- * Legacy boolean validation function for backward compatibility
- * @deprecated Use validateFrequencyObject instead for detailed error information
- */
-export function isValidFrequencyObject(frequency: FrequencyObject): boolean {
-  return validateFrequencyObject(frequency).valid;
-}

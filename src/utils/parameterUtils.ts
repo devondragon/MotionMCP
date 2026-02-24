@@ -6,19 +6,13 @@
  * ensuring consistent parameter handling.
  */
 
-import { DEFAULTS, parseFilterDate } from './constants';
+import { parseFilterDate } from './constants';
 import { ValidationError } from './errorHandling';
 import { sanitizeName, sanitizeDescription } from './sanitize';
 
 interface WorkspaceArgs {
   workspaceId?: string;
   workspaceName?: string;
-}
-
-interface SearchArgs extends WorkspaceArgs {
-  query?: string;
-  searchScope?: 'both' | 'tasks' | 'projects';
-  limit?: number;
 }
 
 interface TaskArgs extends WorkspaceArgs {
@@ -47,18 +41,6 @@ export function parseWorkspaceArgs(args: Record<string, unknown> = {}): Workspac
   return {
     workspaceId: (args.workspaceId as string) || undefined,
     workspaceName: args.workspaceName ? sanitizeName(args.workspaceName as string) : undefined
-  };
-}
-
-/**
- * Parse search-related arguments from MCP request
- */
-export function parseSearchArgs(args: Record<string, unknown> = {}): SearchArgs {
-  return {
-    query: args.query ? sanitizeName(args.query as string) : '',
-    searchScope: (args.searchScope as 'both' | 'tasks' | 'projects') || DEFAULTS.SEARCH_SCOPE,
-    limit: (args.limit as number) || DEFAULTS.SEARCH_LIMIT,
-    ...parseWorkspaceArgs(args)
   };
 }
 
@@ -254,7 +236,7 @@ export function validateParameterTypes(
 
 /**
  * Sanitize string parameters (trim whitespace, handle empty strings)
- * Following NULL_UNDEFINED_POLICY: empty strings become undefined (deleted)
+ * Empty strings become undefined (deleted)
  */
 export function sanitizeStringParams<T extends Record<string, any>>(
   args: T = {} as T, 
