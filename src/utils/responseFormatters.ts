@@ -24,6 +24,12 @@ const TRUNCATION_REASON_MESSAGES: Record<string, string> = {
  */
 export function formatTruncationNotice(truncation?: TruncationInfo): string {
   if (!truncation?.wasTruncated) return '';
+
+  // When client-side filtering reduced the result set after paginated fetching
+  if (truncation.clientFiltered && truncation.fetchedCount) {
+    return `\n\nNote: Priority/due-date filtering was applied client-side after fetching ${truncation.fetchedCount} tasks (${TRUNCATION_REASON_MESSAGES[truncation.reason!] || 'due to pagination limits'}). ${truncation.returnedCount} tasks matched. There may be additional matching tasks on unfetched pages.`;
+  }
+
   const reason = truncation.reason ? TRUNCATION_REASON_MESSAGES[truncation.reason] || '' : '';
   return `\n\nNote: Results were limited to ${truncation.returnedCount} items${reason ? ` (${reason})` : ''}. There may be additional items not shown. Try using filters to narrow your results.`;
 }

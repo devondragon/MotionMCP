@@ -727,6 +727,17 @@ export class MotionApiService {
         let filteredItems = applyClientFilters(paginatedResult.items);
         let truncation = paginatedResult.truncation;
 
+        // When client-side filters reduced the result set and pagination was also truncated,
+        // update the truncation info so the notice accurately reflects what the user sees
+        if (hasClientFilters && filteredItems.length < paginatedResult.items.length && truncation?.wasTruncated) {
+          truncation = {
+            ...truncation,
+            clientFiltered: true,
+            fetchedCount: paginatedResult.items.length,
+            returnedCount: filteredItems.length,
+          };
+        }
+
         // Apply limit after client-side filtering
         if (hasClientFilters && limit && limit > 0 && filteredItems.length > limit) {
           truncation = {

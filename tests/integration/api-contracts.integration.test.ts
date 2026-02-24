@@ -267,13 +267,7 @@ describeIf('API contract tests (real Motion API)', () => {
     let betaAvailable = true;
 
     afterAll(async () => {
-      // Cleanup: remove custom field from task, delete task, delete custom field
-      // Note: removeCustomFieldFromTask expects a valueId (assignment ID), not the field definition ID.
-      // The add response ({ type, value }) doesn't expose an assignment ID, so this cleanup may fail silently.
-      if (cfTestTaskId && customFieldId) {
-        try { await service.removeCustomFieldFromTask(cfTestTaskId, customFieldId); } catch { /* ignore */ }
-        await rateLimitDelay();
-      }
+      // Cleanup: delete task (which removes any custom field assignments), then delete custom field
       if (cfTestTaskId) {
         try { await service.deleteTask(cfTestTaskId); } catch { /* ignore */ }
         await rateLimitDelay();

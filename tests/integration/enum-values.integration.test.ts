@@ -103,10 +103,7 @@ describeIf('Enum values and parameter semantics (real Motion API)', () => {
     let betaAvailable = true;
 
     afterAll(async () => {
-      if (cfTaskId && customFieldId) {
-        try { await service.removeCustomFieldFromTask(cfTaskId, customFieldId); } catch { /* ignore */ }
-        await rateLimitDelay();
-      }
+      // Cleanup: delete task (which removes any custom field assignments), then delete custom field
       if (cfTaskId) {
         try { await service.deleteTask(cfTaskId); } catch { /* ignore */ }
         await rateLimitDelay();
