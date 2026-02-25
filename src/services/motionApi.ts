@@ -28,11 +28,11 @@ import { TruncationInfo, ListResult } from '../types/mcp';
 import {
   WorkspacesListResponseSchema,
   SchedulesListResponseSchema,
-  StatusesListResponseSchema,
 } from '../schemas/motion';
 import { ApiClient, getErrorMessage } from './api/ApiClient';
 import { CacheManager } from './api/CacheManager';
-import type { IApiClient } from './api/types';
+import type { IApiClient, ResourceContext } from './api/types';
+import { getStatuses as _getStatuses } from './api/statuses';
 
 interface GetTasksOptions {
   workspaceId?: string;
@@ -64,7 +64,7 @@ export class MotionApiService {
   private customFieldCache: SimpleCache<MotionCustomField[]>;
   private recurringTaskCache: SimpleCache<MotionRecurringTask[]>;
   private scheduleCache: SimpleCache<MotionSchedule[]>;
-  private statusCache: SimpleCache<MotionStatus[]>;
+  // statusCache removed — delegated to CacheManager via _ctx
 
   constructor(apiKey?: string) {
     this._api = new ApiClient(apiKey);
@@ -80,7 +80,12 @@ export class MotionApiService {
     this.customFieldCache = this._cache.customField;
     this.recurringTaskCache = this._cache.recurringTask;
     this.scheduleCache = this._cache.schedule;
-    this.statusCache = this._cache.status;
+    // statusCache removed — accessed via _ctx.cache.status
+  }
+
+  /** ResourceContext for delegating to extracted resource modules. */
+  private get _ctx(): ResourceContext {
+    return { api: this._api, cache: this._cache };
   }
 
   private formatApiError(
@@ -2190,69 +2195,7 @@ export class MotionApiService {
    * @throws {Error} If the API request fails
    */
   async getStatuses(workspaceId?: string): Promise<MotionStatus[]> {
-    // Use workspace ID for cache key, or 'all' if not specified
-    const cacheKey = workspaceId ? `statuses:workspace:${workspaceId}` : 'statuses:all';
-    
-    return this.statusCache.withCache(cacheKey, async () => {
-      try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching statuses from Motion API', {
-          method: 'getStatuses',
-          workspaceId
-        });
-
-        const params = new URLSearchParams();
-        if (workspaceId) params.append('workspaceId', workspaceId);
-        
-        const queryString = params.toString();
-        const url = queryString ? `/statuses?${queryString}` : '/statuses';
-        
-        const response = await this.requestWithRetry(() => this.client.get(url));
-        
-        // Validate response against schema
-        const validatedResponse = this.validateResponse(
-          response.data,
-          StatusesListResponseSchema,
-          'statuses'
-        );
-        
-        // Extract statuses from validated response; fail loudly on unknown shape to avoid caching empty results.
-        let statuses: MotionStatus[];
-        if (Array.isArray(validatedResponse)) {
-          statuses = validatedResponse;
-        } else if (
-          validatedResponse &&
-          typeof validatedResponse === 'object' &&
-          'statuses' in validatedResponse &&
-          Array.isArray(validatedResponse.statuses)
-        ) {
-          statuses = validatedResponse.statuses;
-        } else {
-          mcpLog(LOG_LEVELS.WARN, 'Unexpected statuses response shape', {
-            method: 'getStatuses',
-            workspaceId,
-            responseType: validatedResponse === null ? 'null' : typeof validatedResponse
-          });
-          throw new Error('Invalid statuses response shape from Motion API');
-        }
-        
-        mcpLog(LOG_LEVELS.INFO, 'Statuses fetched successfully', {
-          method: 'getStatuses',
-          count: statuses.length,
-          workspaceId
-        });
-
-        return statuses;
-      } catch (error: unknown) {
-        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch statuses', {
-          method: 'getStatuses',
-          error: getErrorMessage(error),
-          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-          workspaceId
-        });
-        throw this.formatApiError(error, 'fetch', 'status');
-      }
-    });
+    return _getStatuses(this._ctx, workspaceId);
   }
 
   // ========================================
