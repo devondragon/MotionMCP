@@ -76,7 +76,8 @@ export const CACHE_TTL = {
   COMMENTS: 60,       // 1 minute
   CUSTOM_FIELDS: 600,  // 10 minutes
   RECURRING_TASKS: 300, // 5 minutes (same as projects)
-  SCHEDULES: 300      // 5 minutes (schedule data changes frequently)
+  SCHEDULES: 300,      // 5 minutes (schedule data changes frequently)
+  STATUSES: 600        // 10 minutes (same as workspaces)
 } as const;
 
 // Content limits and validation

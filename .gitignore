@@ -12,3 +12,4 @@ yarn-error.log*
 coverage/
 dist/
 *.log
+.worktrees/
