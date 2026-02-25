@@ -91,7 +91,13 @@ export class UserFacingError extends Error {
     userMessage: string,
     technicalMessage: string,
     originalError?: Error,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
+    /**
+     * Optional HTTP status code. When provided, overrides any status code that
+     * would otherwise be extracted from originalError. Use only when the caller
+     * has already extracted and validated the status (e.g. createUserFacingError).
+     */
+    statusCode?: number
   ) {
     super(userMessage);
     this.name = 'UserFacingError';
@@ -100,8 +106,10 @@ export class UserFacingError extends Error {
     this.originalError = originalError;
     this.context = context ?? {};
 
-    // Extract status code from axios errors
-    if (originalError && isAxiosError(originalError)) {
+    // Use explicit statusCode if provided, otherwise extract from axios errors
+    if (statusCode !== undefined) {
+      this.statusCode = statusCode;
+    } else if (originalError && isAxiosError(originalError)) {
       this.statusCode = originalError.response?.status;
     }
     this.code = httpStatusToErrorCode(this.statusCode);
@@ -309,7 +317,8 @@ export function createUserFacingError(
       resourceType: context.resourceType,
       resourceId: context.resourceId,
       resourceName: context.resourceName
-    }
+    },
+    statusCode
   );
 
   // Log the error

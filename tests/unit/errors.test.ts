@@ -92,6 +92,24 @@ describe('UserFacingError', () => {
     expect(err.statusCode).toBeUndefined();
   });
 
+  it('uses explicit statusCode when provided', () => {
+    const err = new UserFacingError('msg', 'tech', undefined, {}, 404);
+    expect(err.statusCode).toBe(404);
+    expect(err.code).toBe(ERROR_CODES.RESOURCE_NOT_FOUND);
+  });
+
+  it('explicit statusCode overrides Axios-extracted value', () => {
+    const err = new UserFacingError('msg', 'tech', fakeAxiosError(500), {}, 429);
+    expect(err.statusCode).toBe(429);
+    expect(err.code).toBe(ERROR_CODES.RATE_LIMIT_EXCEEDED);
+  });
+
+  it('falls back to Axios extraction when statusCode not provided', () => {
+    const err = new UserFacingError('msg', 'tech', fakeAxiosError(401));
+    expect(err.statusCode).toBe(401);
+    expect(err.code).toBe(ERROR_CODES.AUTH_FAILED);
+  });
+
   describe('httpStatusToErrorCode mapping (via Axios originalError)', () => {
     it('maps 401 to AUTH_FAILED', () => {
       const err = new UserFacingError('msg', 'tech', fakeAxiosError(401));
@@ -368,5 +386,11 @@ describe('createUserFacingError', () => {
     const err = createUserFacingError(axiosErr, ctx);
 
     expect(err.userMessage).toContain('(ID: task-789)');
+  });
+
+  it('propagates statusCode from Axios error', () => {
+    const err = createUserFacingError(fakeAxiosError(429), createErrorContext('fetch', 'task'));
+    expect(err.statusCode).toBe(429);
+    expect(err.code).toBe(ERROR_CODES.RATE_LIMIT_EXCEEDED);
   });
 });
