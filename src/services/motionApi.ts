@@ -15,24 +15,23 @@ import {
   CreateRecurringTaskData,
   MotionSchedule,
   MotionStatus,
-  ListResponse,
   MotionPaginatedResponse
 } from '../types/motion';
 import { LOG_LEVELS, createMinimalPayload, LIMITS, ValidPriority } from '../utils/constants';
-import { transformFrequencyToApiString, validateFrequencyObject } from '../utils/frequencyTransform';
-import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
+import { mcpLog } from '../utils/logger';
 import { fetchAllPages as fetchAllPagesNew, calculateAdaptiveFetchLimit } from '../utils/paginationNew';
 import { unwrapApiResponse } from '../utils/responseWrapper';
 import { TruncationInfo, ListResult } from '../types/mcp';
-import {
-  WorkspacesListResponseSchema,
-  SchedulesListResponseSchema,
-} from '../schemas/motion';
 import { ApiClient, getErrorMessage } from './api/ApiClient';
 import { CacheManager } from './api/CacheManager';
 import type { IApiClient, ResourceContext } from './api/types';
 import { getStatuses as _getStatuses } from './api/statuses';
+import { getSchedules as _getSchedules, getAvailableScheduleNames as _getAvailableScheduleNames } from './api/schedules';
+import { getComments as _getComments, createComment as _createComment } from './api/comments';
+import { getWorkspaces as _getWorkspaces } from './api/workspaces';
+import { getUsers as _getUsers, getCurrentUser as _getCurrentUser } from './api/users';
+import { getRecurringTasks as _getRecurringTasks, createRecurringTask as _createRecurringTask, deleteRecurringTask as _deleteRecurringTask } from './api/recurringTasks';
 
 interface GetTasksOptions {
   workspaceId?: string;
@@ -56,31 +55,20 @@ export class MotionApiService {
   private _api: IApiClient;
   private _cache: CacheManager;
   private client: InstanceType<typeof import('axios').default.Axios>;
-  private workspaceCache: SimpleCache<MotionWorkspace[]>;
-  private userCache: SimpleCache<MotionUser[]>;
+  // Remaining cache aliases — removed as modules are extracted
   private projectCache: SimpleCache<MotionProject[]>;
   private singleProjectCache: SimpleCache<MotionProject>;
-  private commentCache: SimpleCache<MotionPaginatedResponse<MotionComment>>;
   private customFieldCache: SimpleCache<MotionCustomField[]>;
-  private recurringTaskCache: SimpleCache<MotionRecurringTask[]>;
-  private scheduleCache: SimpleCache<MotionSchedule[]>;
-  // statusCache removed — delegated to CacheManager via _ctx
 
   constructor(apiKey?: string) {
     this._api = new ApiClient(apiKey);
     this._cache = new CacheManager();
     this.client = this._api.client;
 
-    // Aliases for backward compatibility during incremental migration
-    this.workspaceCache = this._cache.workspace;
-    this.userCache = this._cache.user;
+    // Aliases for caches still used directly by un-extracted methods
     this.projectCache = this._cache.project;
     this.singleProjectCache = this._cache.singleProject;
-    this.commentCache = this._cache.comment;
     this.customFieldCache = this._cache.customField;
-    this.recurringTaskCache = this._cache.recurringTask;
-    this.scheduleCache = this._cache.schedule;
-    // statusCache removed — accessed via _ctx.cache.status
   }
 
   /** ResourceContext for delegating to extracted resource modules. */
@@ -109,13 +97,7 @@ export class MotionApiService {
     return this._api.mergeTruncationMetadata(aggregate, source);
   }
 
-  private validateResponse<T>(
-    data: unknown,
-    schema: import('zod').ZodSchema<T>,
-    context: string
-  ): T {
-    return this._api.validateResponse(data, schema, context);
-  }
+  // validateResponse removed — accessed via _ctx.api.validateResponse in extracted modules
 
   // ========================================
   // PROJECT API METHODS
@@ -795,61 +777,7 @@ export class MotionApiService {
   // ========================================
 
   async getWorkspaces(ids?: string[]): Promise<MotionWorkspace[]> {
-    // Skip caching when filtering by IDs — filtered results are unlikely to be reused
-    if (ids && ids.length > 0) {
-      return this.fetchWorkspaces(ids);
-    }
-    return this.workspaceCache.withCache('workspaces', async () => {
-      return this.fetchWorkspaces();
-    });
-  }
-
-  private async fetchWorkspaces(ids?: string[]): Promise<MotionWorkspace[]> {
-    try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Fetching workspaces from Motion API', {
-        method: 'getWorkspaces',
-        filterIds: ids
-      });
-
-      const params = new URLSearchParams();
-      if (ids && ids.length > 0) {
-        for (const id of ids) {
-          params.append('ids', id);
-        }
-      }
-      const queryString = params.toString();
-      const url = queryString ? `/workspaces?${queryString}` : '/workspaces';
-
-      const response: AxiosResponse = await this.requestWithRetry(() => this.client.get(url));
-
-      // Validate the response structure
-      const validatedResponse = this.validateResponse(
-        response.data,
-        WorkspacesListResponseSchema,
-        'getWorkspaces'
-      );
-
-      // Extract workspaces array (handle both wrapped and unwrapped responses)
-      const workspaces = Array.isArray(validatedResponse)
-        ? validatedResponse
-        : validatedResponse.workspaces;
-
-      mcpLog(LOG_LEVELS.INFO, 'Workspaces fetched successfully', {
-        method: 'getWorkspaces',
-        count: workspaces.length,
-        workspaceNames: workspaces.map((w: MotionWorkspace) => w.name)
-      });
-
-      return workspaces;
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch workspaces', {
-        method: 'getWorkspaces',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
-      });
-      throw this.formatApiError(error, 'fetch', 'workspace');
-    }
+    return _getWorkspaces(this._ctx, ids);
   }
 
   // ========================================
@@ -857,98 +785,11 @@ export class MotionApiService {
   // ========================================
 
   async getUsers(workspaceId?: string, teamId?: string): Promise<MotionUser[]> {
-    const parts = [workspaceId && `ws:${workspaceId}`, teamId && `team:${teamId}`].filter(Boolean);
-    const cacheKey = parts.length > 0 ? `users:${parts.join(':')}` : 'users:all';
-
-    return this.userCache.withCache(cacheKey, async () => {
-      try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching users from Motion API', {
-          method: 'getUsers',
-          workspaceId,
-          teamId
-        });
-
-        const params = new URLSearchParams();
-        if (workspaceId) {
-          params.append('workspaceId', workspaceId);
-        }
-        if (teamId) {
-          params.append('teamId', teamId);
-        }
-
-        const queryString = params.toString();
-        const url = queryString ? `/users?${queryString}` : '/users';
-        
-        const response: AxiosResponse<ListResponse<MotionUser>> = await this.requestWithRetry(() => this.client.get(url));
-
-        // The Motion API might wrap the users in a 'users' array
-        const usersData = response.data?.users || response.data || [];
-        const users = Array.isArray(usersData) ? usersData : [];
-
-        if (!Array.isArray(response.data?.users) && !Array.isArray(response.data)) {
-          mcpLog(LOG_LEVELS.WARN, 'Unexpected users response shape', {
-            method: 'getUsers',
-            workspaceId,
-            responseType: response.data === null ? 'null' : typeof response.data
-          });
-        }
-
-        mcpLog(LOG_LEVELS.INFO, 'Users fetched successfully', {
-          method: 'getUsers',
-          count: users.length,
-          workspaceId
-        });
-
-        return users;
-      } catch (error: unknown) {
-        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch users', {
-          method: 'getUsers',
-          error: getErrorMessage(error),
-          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
-        });
-        throw this.formatApiError(error, 'fetch', 'user');
-      }
-    });
+    return _getUsers(this._ctx, workspaceId, teamId);
   }
 
   async getCurrentUser(): Promise<MotionUser> {
-    const cacheKey = 'currentUser';
-    
-    // Use userCache but with a special single-user wrapper
-    const cachedUsers = await this.userCache.withCache(cacheKey, async () => {
-      try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching current user from Motion API', {
-          method: 'getCurrentUser'
-        });
-
-        const response: AxiosResponse<MotionUser> = await this.requestWithRetry(() => this.client.get('/users/me'));
-        
-        const user = response.data;
-        
-        mcpLog(LOG_LEVELS.INFO, 'Current user fetched successfully', {
-          method: 'getCurrentUser',
-          userId: user.id,
-          email: user.email
-        });
-
-        return [user]; // Wrap in array for cache compatibility
-      } catch (error: unknown) {
-        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch current user', {
-          method: 'getCurrentUser',
-          error: getErrorMessage(error),
-          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
-        });
-        throw this.formatApiError(error, 'fetch', 'user');
-      }
-    });
-    
-    const user = cachedUsers[0];
-    if (!user) {
-      throw this.formatApiError(new Error('No user returned from API'), 'fetch', 'user');
-    }
-    return user;
+    return _getCurrentUser(this._ctx);
   }
 
   // ========================================
@@ -1489,99 +1330,12 @@ export class MotionApiService {
   // COMMENT API METHODS
   // ========================================
 
-  /**
-   * Get comments for a task with proper pagination support
-   * @param taskId Task ID to get comments for
-   * @param cursor Optional cursor for pagination
-   * @returns Paginated response with comments and metadata
-   */
   async getComments(taskId: string, cursor?: string): Promise<MotionPaginatedResponse<MotionComment>> {
-    const cacheParams = { taskId, cursor: cursor || null };
-    const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
-    
-    return this.commentCache.withCache(cacheKey, async () => {
-      try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching comments from Motion API', {
-          method: 'getComments',
-          taskId,
-          cursor
-        });
-
-        const params = new URLSearchParams({ taskId });
-        if (cursor) params.append('cursor', cursor);
-        
-        const response = await this.requestWithRetry(() => 
-          this.client.get(`/comments?${params.toString()}`)
-        );
-
-        // Use new response wrapper for consistent handling
-        const unwrapped = unwrapApiResponse<MotionComment>(response.data, 'comments');
-        
-        mcpLog(LOG_LEVELS.INFO, 'Comments fetched successfully', {
-          method: 'getComments',
-          count: unwrapped.data.length,
-          hasMore: !!unwrapped.meta?.nextCursor,
-          taskId
-        });
-
-        // Return in our standard paginated format
-        return {
-          data: unwrapped.data,
-          meta: {
-            nextCursor: unwrapped.meta?.nextCursor,
-            pageSize: unwrapped.meta?.pageSize || unwrapped.data.length
-          }
-        };
-      } catch (error: unknown) {
-        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch comments', {
-          method: 'getComments',
-          error: getErrorMessage(error),
-          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-          taskId,
-          cursor
-        });
-        throw this.formatApiError(error, 'fetch', 'comment');
-      }
-    });
+    return _getComments(this._ctx, taskId, cursor);
   }
 
   async createComment(commentData: CreateCommentData): Promise<MotionComment> {
-    try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Creating comment in Motion API', {
-        method: 'createComment',
-        taskId: commentData.taskId,
-        contentLength: commentData.content?.length || 0
-      });
-
-      // Create minimal payload by removing empty/null values to avoid validation errors
-      const minimalPayload = createMinimalPayload(commentData);
-
-      const response: AxiosResponse<MotionComment> = await this.requestWithRetry(() =>
-        this.client.post('/comments', minimalPayload)
-      );
-      
-      // Invalidate all cached pages for this task's comments (cursor variants included)
-      const cachePrefix = `comments:{"taskId":${JSON.stringify(commentData.taskId)}`;
-      this.commentCache.invalidate(cachePrefix);
-      
-      mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
-        method: 'createComment',
-        commentId: response.data?.id,
-        taskId: commentData.taskId
-      });
-
-      return response.data;
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to create comment', {
-        method: 'createComment',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        taskId: commentData?.taskId
-      });
-      throw this.formatApiError(error, 'create', 'comment');
-    }
+    return _createComment(this._ctx, commentData);
   }
 
   // ========================================
@@ -1935,253 +1689,28 @@ export class MotionApiService {
   // RECURRING TASK API METHODS
   // ========================================
 
-  /**
-   * Fetch recurring tasks from Motion API with automatic pagination
-   * @param workspaceId - Optional workspace ID to filter recurring tasks
-   * @param options - Optional configuration for maxPages and limit
-   * @returns Array of recurring tasks from all pages
-   */
   async getRecurringTasks(workspaceId?: string, options?: { maxPages?: number; limit?: number }): Promise<ListResult<MotionRecurringTask>> {
-    const { maxPages = 10, limit } = options || {};
-    const cacheKey = workspaceId ? `recurring-tasks:workspace:${workspaceId}` : 'recurring-tasks:all';
-
-    // Check cache - return items only (no stale truncation info)
-    const cachedItems = this.recurringTaskCache.get(cacheKey);
-    if (cachedItems !== null) {
-      return { items: cachedItems };
-    }
-
-    try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Fetching recurring tasks from Motion API with pagination', {
-        method: 'getRecurringTasks',
-        workspaceId,
-        maxPages,
-        limit
-      });
-
-      // Create a fetch function for pagination utility
-      const fetchPage = async (cursor?: string) => {
-        const params = new URLSearchParams();
-        if (workspaceId) params.append('workspaceId', workspaceId);
-        if (cursor) params.append('cursor', cursor);
-
-        const queryString = params.toString();
-        const url = queryString ? `/recurring-tasks?${queryString}` : '/recurring-tasks';
-
-        return this.requestWithRetry(() => this.client.get(url));
-      };
-
-      // Use pagination utility to fetch all pages
-      const paginatedResult = await fetchAllPagesNew<MotionRecurringTask>(fetchPage, 'recurring-tasks', {
-        maxPages,
-        logProgress: true,
-        ...(limit ? { maxItems: limit } : {})
-      });
-
-      mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully with pagination', {
-        method: 'getRecurringTasks',
-        totalCount: paginatedResult.totalFetched,
-        pagesProcessed: Math.ceil(paginatedResult.totalFetched / 50), // Assuming ~50 items per page
-        hasMore: paginatedResult.hasMore,
-        workspaceId
-      });
-
-      // Cache only items, not truncation metadata
-      this.recurringTaskCache.set(cacheKey, paginatedResult.items);
-      return { items: paginatedResult.items, truncation: paginatedResult.truncation };
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch recurring tasks', {
-        method: 'getRecurringTasks',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        workspaceId
-      });
-      throw this.formatApiError(error, 'fetch', 'recurring task');
-    }
+    return _getRecurringTasks(this._ctx, workspaceId, options);
   }
 
-  /**
-   * Create a new recurring task
-   * @param taskData - Data for creating the recurring task
-   * @returns The created recurring task
-   */
   async createRecurringTask(taskData: CreateRecurringTaskData): Promise<MotionRecurringTask> {
-    try {
-      // Validate frequency object before transformation
-      const freqValidation = validateFrequencyObject(taskData.frequency);
-      if (!freqValidation.valid) {
-        throw new Error(`Invalid frequency object: ${freqValidation.reason || 'Unknown reason'}`);
-      }
-
-      // Transform frequency object to API string format
-      const frequencyString = transformFrequencyToApiString(taskData.frequency);
-
-      mcpLog(LOG_LEVELS.DEBUG, 'Creating recurring task in Motion API', {
-        method: 'createRecurringTask',
-        name: taskData.name,
-        assigneeId: taskData.assigneeId,
-        frequency: frequencyString,
-        originalFrequency: taskData.frequency,
-        workspaceId: taskData.workspaceId
-      });
-
-      // Build API payload: extract endDate from frequency object to top-level,
-      // replace frequency object with transformed string
-      const { frequency: _freqObj, ...restTaskData } = taskData;
-      const apiPayload = {
-        ...restTaskData,
-        frequency: frequencyString,
-        ...(taskData.frequency.endDate && { endDate: taskData.frequency.endDate })
-      };
-
-      // Create minimal payload by removing empty/null values to avoid validation errors
-      const minimalPayload = createMinimalPayload(apiPayload);
-      const response: AxiosResponse<MotionRecurringTask> = await this.requestWithRetry(() =>
-        this.client.post('/recurring-tasks', minimalPayload)
-      );
-      
-      // Invalidate cache after successful creation
-      this.recurringTaskCache.invalidate('recurring-tasks:');
-      
-      mcpLog(LOG_LEVELS.INFO, 'Recurring task created successfully', {
-        method: 'createRecurringTask',
-        taskId: response.data?.id,
-        name: taskData.name
-      });
-
-      return response.data;
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to create recurring task', {
-        method: 'createRecurringTask',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        taskName: taskData?.name
-      });
-      throw this.formatApiError(error, 'create', 'recurring task', undefined, taskData.name);
-    }
+    return _createRecurringTask(this._ctx, taskData);
   }
 
-  /**
-   * Delete a recurring task
-   * @param recurringTaskId - ID of the recurring task to delete
-   * @returns Success indicator
-   */
   async deleteRecurringTask(recurringTaskId: string): Promise<{ success: boolean }> {
-    try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Deleting recurring task from Motion API', {
-        method: 'deleteRecurringTask',
-        recurringTaskId
-      });
-
-      await this.requestWithRetry(() => 
-        this.client.delete(`/recurring-tasks/${recurringTaskId}`)
-      );
-      
-      // Invalidate cache after successful deletion
-      this.recurringTaskCache.invalidate('recurring-tasks:');
-      
-      mcpLog(LOG_LEVELS.INFO, 'Recurring task deleted successfully', {
-        method: 'deleteRecurringTask',
-        recurringTaskId
-      });
-
-      return { success: true };
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to delete recurring task', {
-        method: 'deleteRecurringTask',
-        error: getErrorMessage(error),
-        apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-        apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined,
-        recurringTaskId
-      });
-      throw this.formatApiError(error, 'delete', 'recurring task', recurringTaskId);
-    }
+    return _deleteRecurringTask(this._ctx, recurringTaskId);
   }
 
   // ========================================
   // SCHEDULE API METHODS
   // ========================================
 
-  /**
-   * Get available schedule names for auto-scheduling
-   * @param workspaceId - Optional workspace ID to filter schedules (currently unused by Motion API)
-   * @returns Array of schedule names
-   */
   async getAvailableScheduleNames(workspaceId?: string): Promise<string[]> {
-    try {
-      mcpLog(LOG_LEVELS.DEBUG, 'Fetching available schedule names', {
-        method: 'getAvailableScheduleNames',
-        workspaceId
-      });
-
-      // Fetch all schedules without filters to get available schedule templates
-      const schedules = await this.getSchedules();
-      const scheduleNames = schedules.map(schedule => schedule.name).filter(Boolean);
-
-      mcpLog(LOG_LEVELS.INFO, 'Available schedule names fetched successfully', {
-        method: 'getAvailableScheduleNames',
-        count: scheduleNames.length,
-        scheduleNames
-      });
-
-      return scheduleNames;
-    } catch (error: unknown) {
-      mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch available schedule names', {
-        method: 'getAvailableScheduleNames',
-        error: getErrorMessage(error),
-        workspaceId
-      });
-      throw this.formatApiError(error, 'fetch', 'schedule');
-    }
+    return _getAvailableScheduleNames(this._ctx, workspaceId);
   }
 
-  /**
-   * Fetch schedules from Motion API.
-   * The Motion API GET /schedules accepts no query parameters.
-   * @returns Array of schedules
-   */
   async getSchedules(): Promise<MotionSchedule[]> {
-    const cacheKey = 'schedules:all';
-
-    return this.scheduleCache.withCache(cacheKey, async () => {
-      try {
-        mcpLog(LOG_LEVELS.DEBUG, 'Fetching schedules from Motion API', {
-          method: 'getSchedules'
-        });
-
-        const response: AxiosResponse<ListResponse<MotionSchedule>> = await this.requestWithRetry(() => this.client.get('/schedules'));
-
-        // Validate response against schema
-        const validatedResponse = this.validateResponse(
-          response.data,
-          SchedulesListResponseSchema,
-          'getSchedules'
-        );
-
-        // Handle both wrapped and unwrapped responses
-        const schedules = Array.isArray(validatedResponse)
-          ? validatedResponse
-          : validatedResponse.schedules || [];
-        const schedulesArray = Array.isArray(schedules) ? schedules : [];
-
-        mcpLog(LOG_LEVELS.INFO, 'Schedules fetched successfully', {
-          method: 'getSchedules',
-          count: schedulesArray.length
-        });
-
-        return schedulesArray;
-      } catch (error: unknown) {
-        mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch schedules', {
-          method: 'getSchedules',
-          error: getErrorMessage(error),
-          apiStatus: isAxiosError(error) ? error.response?.status : undefined,
-          apiMessage: isAxiosError(error) ? error.response?.data?.message : undefined
-        });
-        throw this.formatApiError(error, 'fetch', 'schedule');
-      }
-    });
+    return _getSchedules(this._ctx);
   }
 
   // ========================================
