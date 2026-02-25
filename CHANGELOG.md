@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.0] - 2026-02-25
+
+### 🏗️ Refactoring
+
+- **Split `motionApi.ts` into resource modules**: Decomposed the monolithic 1,850-line `MotionApiService` into 10 focused resource modules under `src/services/api/`. The facade class (`motionApi.ts`) is now ~254 lines of pure delegation with no business logic. Each module exports standalone async functions that accept a `ResourceContext` (`{ api, cache }`), making the codebase easier to navigate, test, and extend. (#52, #85)
+  - New modules: `tasks`, `projects`, `workspaces`, `users`, `comments`, `customFields`, `recurringTasks`, `schedules`, `search`, `statuses`
+  - Extracted `ApiClient` (HTTP client with retry/backoff) and `CacheManager` (per-resource TTL cache) as shared infrastructure
+  - Shared types in `src/services/api/types.ts` (`ResourceContext`, `IApiClient`, `ICacheManager`)
+  - Barrel export at `src/services/api/index.ts`
+  - Added `facade-contract.spec.ts` — 314-line test suite verifying the facade delegates correctly to all resource modules
+
+### 🔧 Technical Improvements
+
+- **Consolidated error modules**: Merged separate error files into a single `errors.ts` module. (#81)
+- **Dead code removal**: Removed unused exports, stubs, and consolidated scattered constants. (#78)
+- **`UserFacingError` statusCode parameter**: Added an explicit `statusCode` constructor parameter for cleaner error construction. (#83)
+- **`ToolRegistry.register()` made private**: Encapsulated tool registration as an internal implementation detail. (#79, #84)
+
 ## [2.6.0] - 2026-02-24
 
 ### 🚀 New Features
