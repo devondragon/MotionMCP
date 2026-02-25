@@ -34,7 +34,7 @@ export class ToolRegistry {
    * Registers a tool definition in the registry.
    * @param tool - The tool definition to register
    */
-  register(tool: McpToolDefinition): void {
+  private register(tool: McpToolDefinition): void {
     this.tools.set(tool.name, tool);
   }
 
