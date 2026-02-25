@@ -387,4 +387,10 @@ describe('createUserFacingError', () => {
 
     expect(err.userMessage).toContain('(ID: task-789)');
   });
+
+  it('propagates statusCode from Axios error', () => {
+    const err = createUserFacingError(fakeAxiosError(429), createErrorContext('fetch', 'task'));
+    expect(err.statusCode).toBe(429);
+    expect(err.code).toBe(ERROR_CODES.RATE_LIMIT_EXCEEDED);
+  });
 });

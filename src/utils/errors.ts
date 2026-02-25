@@ -92,6 +92,11 @@ export class UserFacingError extends Error {
     technicalMessage: string,
     originalError?: Error,
     context?: Record<string, unknown>,
+    /**
+     * Optional HTTP status code. When provided, overrides any status code that
+     * would otherwise be extracted from originalError. Use only when the caller
+     * has already extracted and validated the status (e.g. createUserFacingError).
+     */
     statusCode?: number
   ) {
     super(userMessage);
