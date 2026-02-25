@@ -18,7 +18,7 @@ import {
   ListResponse,
   MotionPaginatedResponse
 } from '../types/motion';
-import { LOG_LEVELS, createMinimalPayload, CACHE_TTL, LIMITS, ValidPriority } from '../utils/constants';
+import { LOG_LEVELS, createMinimalPayload, LIMITS, ValidPriority } from '../utils/constants';
 import { transformFrequencyToApiString, validateFrequencyObject } from '../utils/frequencyTransform';
 import { mcpLog } from '../utils/logger';
 import { SimpleCache } from '../utils/cache';
@@ -31,6 +31,7 @@ import {
   StatusesListResponseSchema,
 } from '../schemas/motion';
 import { ApiClient, getErrorMessage } from './api/ApiClient';
+import { CacheManager } from './api/CacheManager';
 import type { IApiClient } from './api/types';
 
 interface GetTasksOptions {
@@ -53,6 +54,7 @@ interface ResolveUserIdentifierOptions {
 
 export class MotionApiService {
   private _api: IApiClient;
+  private _cache: CacheManager;
   private client: InstanceType<typeof import('axios').default.Axios>;
   private workspaceCache: SimpleCache<MotionWorkspace[]>;
   private userCache: SimpleCache<MotionUser[]>;
@@ -66,18 +68,19 @@ export class MotionApiService {
 
   constructor(apiKey?: string) {
     this._api = new ApiClient(apiKey);
+    this._cache = new CacheManager();
     this.client = this._api.client;
 
-    // Initialize cache instances with TTL from constants (converted to ms)
-    this.workspaceCache = new SimpleCache(CACHE_TTL.WORKSPACES);
-    this.userCache = new SimpleCache(CACHE_TTL.USERS);
-    this.projectCache = new SimpleCache(CACHE_TTL.PROJECTS);
-    this.singleProjectCache = new SimpleCache(CACHE_TTL.PROJECTS);
-    this.commentCache = new SimpleCache(CACHE_TTL.COMMENTS);
-    this.customFieldCache = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS);
-    this.recurringTaskCache = new SimpleCache(CACHE_TTL.RECURRING_TASKS);
-    this.scheduleCache = new SimpleCache(CACHE_TTL.SCHEDULES);
-    this.statusCache = new SimpleCache(CACHE_TTL.WORKSPACES); // 10 minutes, like workspaces
+    // Aliases for backward compatibility during incremental migration
+    this.workspaceCache = this._cache.workspace;
+    this.userCache = this._cache.user;
+    this.projectCache = this._cache.project;
+    this.singleProjectCache = this._cache.singleProject;
+    this.commentCache = this._cache.comment;
+    this.customFieldCache = this._cache.customField;
+    this.recurringTaskCache = this._cache.recurringTask;
+    this.scheduleCache = this._cache.schedule;
+    this.statusCache = this._cache.status;
   }
 
   private formatApiError(
