@@ -59,6 +59,7 @@
     "watch": "tsc --watch",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "test:types": "tsc --noEmit -p tsconfig.tests.json",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:watch": "vitest --config vitest.integration.config.ts",
     "worker:dev": "wrangler dev",

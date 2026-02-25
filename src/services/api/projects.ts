@@ -5,7 +5,8 @@
 
 import { AxiosResponse, isAxiosError } from 'axios';
 import { MotionProject } from '../../types/motion';
-import { LOG_LEVELS, createMinimalPayload } from '../../utils/constants';
+import { LOG_LEVELS, createMinimalPayload, LIMITS } from '../../utils/constants';
+import { UserFacingError } from '../../utils/errors';
 import { mcpLog } from '../../utils/logger';
 import { fetchAllPages as fetchAllPagesNew } from '../../utils/paginationNew';
 import { unwrapApiResponse } from '../../utils/responseWrapper';
@@ -15,7 +16,7 @@ import { getErrorMessage } from './ApiClient';
 import { getWorkspaces } from './workspaces';
 
 export async function getProjects(ctx: ResourceContext, workspaceId: string, options?: { maxPages?: number; limit?: number }): Promise<ListResult<MotionProject>> {
-  const { maxPages = 5, limit } = options || {};
+  const { maxPages = LIMITS.MAX_PAGES, limit } = options || {};
 
   // Validate limit parameter if provided
   if (limit !== undefined && (limit < 0 || !Number.isInteger(limit))) {
@@ -91,7 +92,7 @@ export async function getProjects(ctx: ResourceContext, workspaceId: string, opt
     });
 
     // Do not cache fallback results. If pagination failed, this may be only the first page.
-    return { items: projects };
+    return { items: projects, truncation: undefined };
   } catch (error: unknown) {
     mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects', {
       method: 'getProjects',
@@ -189,7 +190,13 @@ export async function createProject(ctx: ResourceContext, projectData: Partial<M
     });
 
     if (!projectData.workspaceId) {
-      throw new Error('Workspace ID is required to create a project');
+      throw new UserFacingError(
+        'Workspace ID is required to create a project',
+        'Workspace ID is required to create a project',
+        undefined,
+        undefined,
+        400
+      );
     }
 
     // Create minimal payload by removing empty/null values to avoid validation errors

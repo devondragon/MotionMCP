@@ -39,6 +39,6 @@ export class CacheManager implements ICacheManager {
     this.customField = new SimpleCache(CACHE_TTL.CUSTOM_FIELDS);
     this.recurringTask = new SimpleCache(CACHE_TTL.RECURRING_TASKS);
     this.schedule = new SimpleCache(CACHE_TTL.SCHEDULES);
-    this.status = new SimpleCache(CACHE_TTL.WORKSPACES); // 10 minutes, like workspaces
+    this.status = new SimpleCache(CACHE_TTL.STATUSES);
   }
 }

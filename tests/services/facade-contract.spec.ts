@@ -26,6 +26,7 @@ import type {
   MotionPaginatedResponse,
 } from '../../src/types/motion';
 import type { ListResult } from '../../src/types/mcp';
+import type { ValidPriority } from '../../src/utils/constants';
 
 // ---------------------------------------------------------------------------
 // Type-level assertions: each assignment enforces the exact method signature.
@@ -61,7 +62,7 @@ type _getTasks = AssertMethod<
     status?: string | string[];
     includeAllStatuses?: boolean;
     assigneeId?: string;
-    priority?: string;
+    priority?: ValidPriority;
     dueDate?: string;
     labels?: string[];
     limit?: number;
@@ -255,8 +256,18 @@ describe('MotionApiService facade contract', () => {
   });
 
   it('should throw without API key', async () => {
-    const mod = await import('../../src/services/motionApi');
-    expect(() => new mod.MotionApiService()).toThrow('MOTION_API_KEY');
+    const origKey = process.env.MOTION_API_KEY;
+    delete process.env.MOTION_API_KEY;
+    try {
+      // MotionApiService checks env at construction time, and the module is
+      // already imported above, so we can just construct a new instance.
+      const mod = await import('../../src/services/motionApi');
+      expect(() => new mod.MotionApiService()).toThrow('MOTION_API_KEY');
+    } finally {
+      if (origKey !== undefined) {
+        process.env.MOTION_API_KEY = origKey;
+      }
+    }
   });
 
   it('should have all 37 public methods', async () => {

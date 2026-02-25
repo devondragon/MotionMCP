@@ -11,8 +11,7 @@ import { ResourceContext } from './types';
 import { getErrorMessage } from './ApiClient';
 
 export async function getComments(ctx: ResourceContext, taskId: string, cursor?: string): Promise<MotionPaginatedResponse<MotionComment>> {
-  const cacheParams = { taskId, cursor: cursor || null };
-  const cacheKey = `comments:${JSON.stringify(cacheParams)}`;
+  const cacheKey = `comments:${taskId}:${cursor ?? 'none'}`;
 
   return ctx.cache.comment.withCache(cacheKey, async () => {
     try {
@@ -77,8 +76,7 @@ export async function createComment(ctx: ResourceContext, commentData: CreateCom
     );
 
     // Invalidate all cached pages for this task's comments (cursor variants included)
-    const cachePrefix = `comments:{"taskId":${JSON.stringify(commentData.taskId)}`;
-    ctx.cache.comment.invalidate(cachePrefix);
+    ctx.cache.comment.invalidate(`comments:${commentData.taskId}:`);
 
     mcpLog(LOG_LEVELS.INFO, 'Comment created successfully', {
       method: 'createComment',

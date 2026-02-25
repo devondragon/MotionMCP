@@ -4,7 +4,7 @@
 
 import { isAxiosError, AxiosResponse } from 'axios';
 import { MotionRecurringTask, CreateRecurringTaskData } from '../../types/motion';
-import { LOG_LEVELS, createMinimalPayload } from '../../utils/constants';
+import { LOG_LEVELS, createMinimalPayload, LIMITS } from '../../utils/constants';
 import { mcpLog } from '../../utils/logger';
 import { fetchAllPages as fetchAllPagesNew } from '../../utils/paginationNew';
 import { ListResult } from '../../types/mcp';
@@ -17,7 +17,7 @@ export async function getRecurringTasks(
   workspaceId?: string,
   options?: { maxPages?: number; limit?: number }
 ): Promise<ListResult<MotionRecurringTask>> {
-  const { maxPages = 10, limit } = options || {};
+  const { maxPages = LIMITS.MAX_PAGES, limit } = options || {};
   const cacheKey = workspaceId ? `recurring-tasks:workspace:${workspaceId}` : 'recurring-tasks:all';
 
   // Check cache - return items only (no stale truncation info)

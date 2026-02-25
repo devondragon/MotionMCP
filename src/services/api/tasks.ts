@@ -6,6 +6,7 @@
 import { AxiosResponse, isAxiosError } from 'axios';
 import { MotionTask, MotionTaskCreateData, MotionTaskUpdateData } from '../../types/motion';
 import { LOG_LEVELS, createMinimalPayload, LIMITS, ValidPriority } from '../../utils/constants';
+import { UserFacingError } from '../../utils/errors';
 import { mcpLog } from '../../utils/logger';
 import { fetchAllPages as fetchAllPagesNew, calculateAdaptiveFetchLimit } from '../../utils/paginationNew';
 import { unwrapApiResponse } from '../../utils/responseWrapper';
@@ -40,7 +41,7 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
     dueDate,
     labels,
     limit,
-    maxPages = 5
+    maxPages = LIMITS.MAX_PAGES
   } = options;
 
   // Validate limit parameter if provided
@@ -73,6 +74,7 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
         filtered = filtered.filter(t => {
           if (!t.dueDate) return false;
           const taskDate = t.dueDate.substring(0, 10);
+          // Upper-bound filter: returns tasks due ON OR BEFORE the given date (inclusive)
           return taskDate <= dueDate;
         });
       }
@@ -203,7 +205,7 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
       limitApplied: limit
     });
 
-    return { items: tasks };
+    return { items: tasks, truncation: undefined };
   } catch (error: unknown) {
     mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch tasks', {
       method: 'getTasks',
@@ -253,7 +255,13 @@ export async function createTask(ctx: ResourceContext, taskData: MotionTaskCreat
     });
 
     if (!taskData.workspaceId) {
-      throw new Error('Workspace ID is required to create a task');
+      throw new UserFacingError(
+        'Workspace ID is required to create a task',
+        'Workspace ID is required to create a task',
+        undefined,
+        undefined,
+        400
+      );
     }
 
     // Create minimal payload by removing empty/null values to avoid validation errors
