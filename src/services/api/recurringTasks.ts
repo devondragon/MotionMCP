@@ -56,7 +56,7 @@ export async function getRecurringTasks(
     mcpLog(LOG_LEVELS.INFO, 'Recurring tasks fetched successfully with pagination', {
       method: 'getRecurringTasks',
       totalCount: paginatedResult.totalFetched,
-      pagesProcessed: Math.ceil(paginatedResult.totalFetched / 50), // Assuming ~50 items per page
+      pagesProcessed: Math.ceil(paginatedResult.totalFetched / LIMITS.DEFAULT_PAGE_SIZE),
       hasMore: paginatedResult.hasMore,
       workspaceId
     });

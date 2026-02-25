@@ -74,7 +74,8 @@ export async function getProjects(ctx: ResourceContext, workspaceId: string, opt
       ctx.cache.project.set(cacheKey, projects);
       return { items: projects, truncation: paginatedResult.truncation };
     } catch (paginationError) {
-      mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
+      // Fallback to simple fetch if pagination fails — results may be incomplete
+      mcpLog(LOG_LEVELS.WARN, 'Pagination failed, falling back to single-page fetch', {
         method: 'getProjects',
         error: paginationError instanceof Error ? paginationError.message : String(paginationError)
       });
@@ -92,7 +93,7 @@ export async function getProjects(ctx: ResourceContext, workspaceId: string, opt
     });
 
     // Do not cache fallback results. If pagination failed, this may be only the first page.
-    return { items: projects, truncation: undefined };
+    return { items: projects, truncation: { wasTruncated: true, returnedCount: projects.length, reason: 'error' } };
   } catch (error: unknown) {
     mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects', {
       method: 'getProjects',

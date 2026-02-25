@@ -180,8 +180,8 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
       });
       return { items: filteredItems, truncation };
     } catch (paginationError) {
-      // Fallback to simple fetch if pagination fails
-      mcpLog(LOG_LEVELS.DEBUG, 'Pagination failed, falling back to simple fetch', {
+      // Fallback to simple fetch if pagination fails — results may be incomplete
+      mcpLog(LOG_LEVELS.WARN, 'Pagination failed, falling back to single-page fetch', {
         method: 'getTasks',
         error: paginationError instanceof Error ? paginationError.message : String(paginationError)
       });
@@ -205,7 +205,7 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
       limitApplied: limit
     });
 
-    return { items: tasks, truncation: undefined };
+    return { items: tasks, truncation: { wasTruncated: true, returnedCount: tasks.length, reason: 'error' } };
   } catch (error: unknown) {
     mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch tasks', {
       method: 'getTasks',

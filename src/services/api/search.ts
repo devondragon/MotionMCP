@@ -141,7 +141,7 @@ export async function searchTasks(ctx: ResourceContext, query: string, workspace
       query,
       error: getErrorMessage(error)
     });
-    throw error;
+    throw ctx.api.formatApiError(error, 'search', 'task');
   }
 }
 
@@ -265,7 +265,7 @@ export async function searchProjects(ctx: ResourceContext, query: string, worksp
       query,
       error: getErrorMessage(error)
     });
-    throw error;
+    throw ctx.api.formatApiError(error, 'search', 'project');
   }
 }
 
