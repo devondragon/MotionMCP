@@ -265,6 +265,43 @@ describe('RecurringTaskHandler', () => {
       const text = (res.content?.[0] as any)?.text || '';
       expect(text).toContain('Frequency type');
     });
+
+    it('parses JSON-stringified frequency object', async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new RecurringTaskHandler(ctx);
+      const args = {
+        operation: 'create',
+        name: 'Stringified Freq Task',
+        workspaceId: 'ws1',
+        assigneeId: 'user1',
+        frequency: '{"type":"weekly"}' as any,
+      };
+
+      const res = await handler.handle(args);
+
+      expect(res.isError).toBeFalsy();
+      expect(motionService.createRecurringTask).toHaveBeenCalledWith(
+        expect.objectContaining({ frequency: { type: 'weekly' } })
+      );
+    });
+
+    it('returns error for non-object stringified frequency', async () => {
+      const { ctx } = makeContext();
+      const handler = new RecurringTaskHandler(ctx);
+      const args = {
+        operation: 'create',
+        name: 'Bad Freq Task',
+        workspaceId: 'ws1',
+        assigneeId: 'user1',
+        frequency: 'not-an-object' as any,
+      };
+
+      const res = await handler.handle(args);
+
+      expect(res.isError).toBe(true);
+      const text = (res.content?.[0] as any)?.text || '';
+      expect(text).toContain('frequency must be an object');
+    });
   });
 
   describe('delete operation', () => {

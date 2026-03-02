@@ -273,6 +273,48 @@ export function sanitizeStringParams<T extends Record<string, any>>(
   return sanitized;
 }
 
+/**
+ * Defensively parse a value that should be an object but may have been
+ * JSON-stringified by an LLM transport layer.
+ */
+export function parseObjectParam(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === 'string' && value.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(value.trim());
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Not valid JSON
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Defensively parse a value that should be an array but may have been
+ * JSON-stringified by an LLM transport layer.
+ */
+export function parseArrayParam(value: unknown): unknown[] | undefined {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(value.trim());
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Not valid JSON
+    }
+  }
+  return undefined;
+}
+
 interface ValidationOptions {
   requireWorkspace?: boolean;
 }

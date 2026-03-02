@@ -1,8 +1,8 @@
 import { BaseHandler } from './base/BaseHandler';
 import { McpToolResponse } from '../types/mcp';
 import { MotionRecurringTasksArgs } from '../types/mcp-tool-args';
-import { CreateRecurringTaskData } from '../types/motion';
-import { formatRecurringTaskList, formatRecurringTaskDetail, formatMcpSuccess } from '../utils';
+import { CreateRecurringTaskData, FrequencyObject } from '../types/motion';
+import { formatRecurringTaskList, formatRecurringTaskDetail, formatMcpSuccess, parseObjectParam } from '../utils';
 
 export class RecurringTaskHandler extends BaseHandler {
   async handle(args: MotionRecurringTasksArgs): Promise<McpToolResponse> {
@@ -41,8 +41,14 @@ export class RecurringTaskHandler extends BaseHandler {
       return this.handleError(new Error('Name, workspace ID/workspace name, assignee ID, and frequency are required for create operation'));
     }
 
+    // Defensive: LLMs may stringify the frequency object
+    const frequency = parseObjectParam(args.frequency) as FrequencyObject | undefined;
+    if (!frequency) {
+      return this.handleError(new Error('frequency must be an object with a "type" property'));
+    }
+
     // Validate frequency
-    if (!args.frequency.type || !['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', 'custom'].includes(args.frequency.type)) {
+    if (!frequency.type || !['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', 'custom'].includes(frequency.type)) {
       return this.handleError(new Error('Frequency type must be one of: daily, weekly, biweekly, monthly, quarterly, yearly, custom'));
     }
 
@@ -55,7 +61,7 @@ export class RecurringTaskHandler extends BaseHandler {
       name: args.name,
       workspaceId: workspace.id,
       assigneeId: args.assigneeId,
-      frequency: args.frequency,
+      frequency,
       ...(args.description && { description: args.description }),
       ...(args.projectId && { projectId: args.projectId }),
       ...(args.deadlineType && { deadlineType: args.deadlineType }),

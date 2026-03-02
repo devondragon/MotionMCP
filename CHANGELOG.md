@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.0] - 2026-03-02
+
+### 🐛 Bug Fixes
+
+- **Hardened object/array parameters against LLM stringification**: Some MCP transports serialize structured parameters as JSON strings (e.g., `'{"type":"weekly"}'` instead of `{"type":"weekly"}`). Added defensive parsing with `parseObjectParam()` and `parseArrayParam()` utilities that transparently handle both native and stringified inputs. Applied to: (#88, #89)
+  - `autoScheduled` parameter in task create/update (fixed in PR #89)
+  - `frequency` object in recurring task creation
+  - `status` array in task list filtering
+  - `value` array for multiSelect custom fields
+
+### 📖 Documentation
+
+- **Fixed stale README tool descriptions**: Corrected `motion_search` operations (only `content` exists; removed references to deleted `context` and `smart` operations) and `motion_workspaces` operations (removed non-existent `set_default`).
+
+### 📦 Dependencies
+
+- **hono**: 4.12.1 → 4.12.2 (#86)
+- **rollup**: 4.57.1 → 4.59.0 (#87)
+
 ## [2.7.0] - 2026-02-25
 
 ### 🏗️ Refactoring

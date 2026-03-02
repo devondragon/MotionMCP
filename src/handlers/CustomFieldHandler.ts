@@ -2,7 +2,7 @@ import { BaseHandler } from './base/BaseHandler';
 import { McpToolResponse } from '../types/mcp';
 import { MotionCustomFieldsArgs } from '../types/mcp-tool-args';
 import { CreateCustomFieldData } from '../types/motion';
-import { formatCustomFieldList, formatCustomFieldDetail, formatCustomFieldSuccess, LIMITS } from '../utils';
+import { formatCustomFieldList, formatCustomFieldDetail, formatCustomFieldSuccess, LIMITS, parseArrayParam } from '../utils';
 
 export class CustomFieldHandler extends BaseHandler {
   async handle(args: MotionCustomFieldsArgs): Promise<McpToolResponse> {
@@ -99,7 +99,16 @@ export class CustomFieldHandler extends BaseHandler {
       return this.handleError(new Error('Field type (field) is required when providing a value. Use "text", "number", "multiSelect", etc.'));
     }
 
-    const result = await this.motionService.addCustomFieldToProject(args.projectId, args.fieldId, args.value, args.field);
+    // Defensive: LLMs may stringify array values for multiSelect fields
+    let value = args.value;
+    if (typeof value === 'string' && args.field === 'multiSelect') {
+      const parsed = parseArrayParam(value);
+      if (parsed && parsed.every(v => typeof v === 'string')) {
+        value = parsed as string[];
+      }
+    }
+
+    const result = await this.motionService.addCustomFieldToProject(args.projectId, args.fieldId, value, args.field);
     return formatCustomFieldSuccess('added', 'project', args.projectId, result);
   }
 
@@ -120,7 +129,16 @@ export class CustomFieldHandler extends BaseHandler {
       return this.handleError(new Error('Field type (field) is required when providing a value. Use "text", "number", "multiSelect", etc.'));
     }
 
-    const result = await this.motionService.addCustomFieldToTask(args.taskId, args.fieldId, args.value, args.field);
+    // Defensive: LLMs may stringify array values for multiSelect fields
+    let taskValue = args.value;
+    if (typeof taskValue === 'string' && args.field === 'multiSelect') {
+      const parsed = parseArrayParam(taskValue);
+      if (parsed && parsed.every(v => typeof v === 'string')) {
+        taskValue = parsed as string[];
+      }
+    }
+
+    const result = await this.motionService.addCustomFieldToTask(args.taskId, args.fieldId, taskValue, args.field);
     return formatCustomFieldSuccess('added', 'task', args.taskId, result);
   }
 

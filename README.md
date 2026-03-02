@@ -149,9 +149,9 @@ Manage Motion projects. Workspace and project names are fuzzy-matched, and the s
 ```
 
 ### motion_workspaces
-**Operations:** `list`, `get`, `set_default`
+**Operations:** `list`, `get`
 
-List and inspect workspaces, or set a default workspace for subsequent calls.
+List and inspect workspaces.
 
 ### motion_users
 **Operations:** `list`, `current`
@@ -159,9 +159,9 @@ List and inspect workspaces, or set a default workspace for subsequent calls.
 List users in a workspace or get the current authenticated user.
 
 ### motion_search
-**Operations:** `content`, `context`, `smart`
+**Operations:** `content`
 
-Cross-search tasks and projects by query with intelligent scope and priority boosting. The `context` operation returns a lightweight summary of your workspace (tasks, projects, schedules) — useful for giving an LLM situational awareness. The `smart` operation combines search with prioritized scheduling to surface what's most relevant.
+Search tasks and projects by query across a workspace.
 
 ```json
 {"operation": "content", "query": "API integration", "workspaceName": "Development"}
