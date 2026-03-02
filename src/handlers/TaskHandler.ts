@@ -6,6 +6,7 @@ import {
   formatMcpSuccess,
   parseTaskArgs,
   parseAutoScheduledParam,
+  parseArrayParam,
   formatTaskList,
   formatTaskDetail,
   normalizeDueDateForApi
@@ -255,6 +256,14 @@ export class TaskHandler extends BaseHandler {
       } else {
         const identifier = params.projectId ? `ID "${params.projectId}"` : `name "${params.projectName}"`;
         return this.handleError(new Error(`Project with ${identifier} not found in any workspace`));
+      }
+    }
+
+    // Defensive: LLMs may stringify the status array
+    if (typeof params.status === 'string' && params.status.trim().startsWith('[')) {
+      const parsed = parseArrayParam(params.status);
+      if (parsed && parsed.every(s => typeof s === 'string')) {
+        params = { ...params, status: parsed as string[] };
       }
     }
 
