@@ -75,7 +75,7 @@ export function parseAutoScheduledParam(value: unknown): Record<string, unknown>
     return value as Record<string, unknown>;
   }
 
-  // If it's a non-empty string, treat as schedule name
+  // If it's a non-empty string, check if it's a JSON object first, then treat as schedule name
   if (typeof value === 'string' && value.trim()) {
     const trimmed = value.trim();
     // If it's 'false', disable auto-scheduling
@@ -85,6 +85,17 @@ export function parseAutoScheduledParam(value: unknown): Record<string, unknown>
     // If it's 'true' or empty string, enable with no schedule (will trigger validation error)
     if (trimmed === 'true' || trimmed === '') {
       return {}; // Empty object enables auto-scheduling but will require schedule validation
+    }
+    // Check if the string is a JSON-serialized object (LLMs sometimes stringify objects)
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === 'object' && parsed !== null) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        // Not valid JSON — fall through to treat as schedule name
+      }
     }
     // Otherwise, treat as schedule name
     return { schedule: trimmed };

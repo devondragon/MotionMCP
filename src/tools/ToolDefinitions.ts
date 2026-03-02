@@ -158,7 +158,7 @@ export const tasksToolDefinition: McpToolDefinition = {
           { type: "null" },
           { type: "string", description: "Schedule name (shorthand for {schedule: 'name'})" }
         ],
-        description: "Auto-scheduling configuration. Requires a schedule name. Use motion_schedules to see available schedules. Examples: 'Work Hours' or {schedule: 'Work Hours', deadlineType: 'SOFT'}"
+        description: "Auto-scheduling configuration. Can be either:\n- A schedule name string: \"Work Hours\" (simple, no start date)\n- An object for full control: {\"schedule\": \"Work Hours\", \"startDate\": \"2025-03-05\", \"deadlineType\": \"SOFT\"}\nWhen the user specifies a start date, you MUST use the object form.\nUse motion_schedules to see available schedule names."
       },
       targetWorkspaceId: {
         type: "string",

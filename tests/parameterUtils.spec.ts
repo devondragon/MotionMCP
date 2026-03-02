@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseWorkspaceArgs,
   parseTaskArgs,
+  parseAutoScheduledParam,
   validateRequiredParams,
   validateParameterTypes,
   normalizeDueDateForApi
@@ -41,5 +42,32 @@ describe('parameterUtils', () => {
   it('normalizeDueDateForApi expands relative dates', () => {
     const result = normalizeDueDateForApi('today');
     expect(result).toMatch(/T23:59:59\.000Z$/);
+  });
+
+  describe('parseAutoScheduledParam JSON-stringified objects', () => {
+    it('parses JSON-stringified object with schedule', () => {
+      const result = parseAutoScheduledParam('{"schedule":"Work Hours"}');
+      expect(result).toEqual({ schedule: 'Work Hours' });
+    });
+
+    it('parses JSON-stringified object with schedule and startDate', () => {
+      const result = parseAutoScheduledParam('{"schedule":"Work Hours","startDate":"2025-03-05"}');
+      expect(result).toEqual({ schedule: 'Work Hours', startDate: '2025-03-05' });
+    });
+
+    it('parses JSON-stringified object with schedule and deadlineType', () => {
+      const result = parseAutoScheduledParam('{"schedule":"Work Hours","deadlineType":"SOFT"}');
+      expect(result).toEqual({ schedule: 'Work Hours', deadlineType: 'SOFT' });
+    });
+
+    it('treats invalid JSON starting with { as schedule name', () => {
+      const result = parseAutoScheduledParam('{not valid json}');
+      expect(result).toEqual({ schedule: '{not valid json}' });
+    });
+
+    it('treats JSON array string as schedule name', () => {
+      const result = parseAutoScheduledParam('["Work Hours"]');
+      expect(result).toEqual({ schedule: '["Work Hours"]' });
+    });
   });
 });
