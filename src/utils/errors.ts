@@ -263,6 +263,11 @@ function buildUserMessage(
     if (statusCode === 401 || statusCode === 403) {
       return `${STATUS_CODE_MESSAGES[statusCode]} Unable to ${action} ${resource}${resourceInfo}.`;
     }
+    // For 404s, prefer the API message when available (e.g. "Unknown user schedule: X")
+    // since it's more actionable than the generic "resource not found"
+    if (statusCode === 404 && apiMessage) {
+      return `Unable to ${action} ${resource}${resourceInfo}. ${apiMessage}`;
+    }
     return `Unable to ${action} ${resource}${resourceInfo}. ${STATUS_CODE_MESSAGES[statusCode]}`;
   }
 
