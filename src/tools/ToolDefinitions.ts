@@ -105,7 +105,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       priority: {
         type: "string",
-        description: "Filter by priority level (for list, filtered client-side): ASAP, HIGH, MEDIUM, LOW",
+        description: "Task priority: ASAP, HIGH, MEDIUM, LOW. Set on create/update; filters results on list (filtered client-side)",
         enum: ["ASAP", "HIGH", "MEDIUM", "LOW"]
       },
       dueDate: {
@@ -117,7 +117,7 @@ export const tasksToolDefinition: McpToolDefinition = {
         items: {
           type: "string"
         },
-        description: "Filter by labels (for list). Array of label names"
+        description: "Array of label names. Applied to the task on create/update; filters results on list"
       },
       name: {
         type: "string",
