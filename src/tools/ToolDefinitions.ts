@@ -110,7 +110,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       dueDate: {
         type: "string",
-        description: "Due date (for create/update) or filter (for list, filtered client-side — returns tasks due on or before this date). Date-only values are stored as end-of-day UTC. Format: YYYY-MM-DD or relative like 'today', 'tomorrow'"
+        description: "Due date (for create/update) or filter (for list, filtered client-side — returns tasks due on or before this date). Format: YYYY-MM-DD, a full ISO 8601 timestamp with offset, or relative like 'today', 'tomorrow'. A date-only value is sent as 23:59:59Z — end of day in UTC, NOT in the account's timezone. In any zone ahead of UTC that instant already falls on the following local calendar day (e.g. '2026-08-10' lands at 05:29 on 11 Aug in Asia/Kolkata). Pass an explicit ISO timestamp with an offset when the local day boundary matters. Relative keywords resolve against the account's schedule timezone when all schedules agree on one, falling back to UTC otherwise."
       },
       labels: {
         type: "array",

@@ -11,6 +11,7 @@ import {
   formatTaskDetail,
   normalizeDueDateForApi
 } from '../utils';
+import { resolveDisplayTimeZone } from '../utils/dateFormat';
 import { isValidPriority, parseFilterDate, ValidPriority } from '../utils/constants';
 
 /** Parameters for creating a new task */
@@ -200,13 +201,17 @@ export class TaskHandler extends BaseHandler {
       targetWorkspaceId
     );
 
+    // Zone-aware relative-date resolution ('today' means today in the account's
+    // schedule zone, not UTC). Cached lookup; failure degrades to UTC resolution.
+    const dueDateZone = taskData.dueDate ? await this.resolveTimeZone() : undefined;
+
     const task = await this.motionService.createTask({
       name: taskData.name,
       description: taskData.description,
       projectId: resolvedProjectId,
       status: taskData.status,
       priority: taskData.priority,
-      dueDate: normalizeDueDateForApi(taskData.dueDate),
+      dueDate: normalizeDueDateForApi(taskData.dueDate, dueDateZone),
       duration: convertedDuration,
       labels: convertedLabels,
       assigneeId: taskData.assigneeId,
@@ -291,7 +296,7 @@ export class TaskHandler extends BaseHandler {
     // Validate and parse due date if provided
     let validatedDueDate: string | undefined;
     if (params.dueDate) {
-      const parsedDate = parseFilterDate(params.dueDate);
+      const parsedDate = parseFilterDate(params.dueDate, await this.resolveTimeZone());
       if (!parsedDate) {
         return this.handleError(new Error(
           `Invalid date format "${params.dueDate}". Use YYYY-MM-DD format or relative dates like 'today', 'tomorrow'`
@@ -337,8 +342,23 @@ export class TaskHandler extends BaseHandler {
       priority: params.priority,
       dueDate: params.dueDate,
       limit: params.limit,
-      truncation
+      truncation,
+      timeZone: await this.resolveTimeZone()
     });
+  }
+
+  /**
+   * Resolve the IANA zone used to render local times beside ISO instants.
+   * Backed by the schedules cache, so this costs one API call per cache window.
+   * Any failure degrades to undefined — callers then emit ISO instants alone,
+   * which remain unambiguous. Display formatting must never fail a read.
+   */
+  private async resolveTimeZone(): Promise<string | undefined> {
+    try {
+      return resolveDisplayTimeZone(await this.motionService.getSchedules());
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -352,7 +372,7 @@ export class TaskHandler extends BaseHandler {
     }
 
     const taskDetails = await this.motionService.getTask(params.taskId);
-    return formatTaskDetail(taskDetails);
+    return formatTaskDetail(taskDetails, await this.resolveTimeZone());
   }
 
   /**
@@ -387,7 +407,7 @@ export class TaskHandler extends BaseHandler {
       updateData.priority = params.priority;
     }
     if (params.dueDate !== undefined) {
-      updateData.dueDate = normalizeDueDateForApi(params.dueDate);
+      updateData.dueDate = normalizeDueDateForApi(params.dueDate, await this.resolveTimeZone());
     }
     if (params.duration !== undefined) {
       updateData.duration = this.parseDurationValue(params.duration);
@@ -487,7 +507,8 @@ export class TaskHandler extends BaseHandler {
       assigneeName: display || resolvedId,
       limit: params.limit,
       allWorkspaces: true,
-      truncation
+      truncation,
+      timeZone: await this.resolveTimeZone()
     });
   }
 

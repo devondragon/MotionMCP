@@ -139,8 +139,12 @@ export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
  * Normalize date-only due dates so Motion stores them on the intended calendar day.
  * Converts relative inputs (today/tomorrow/yesterday) or YYYY-MM-DD values
  * to the end of that day in UTC. Leaves timestamps with explicit offsets intact.
+ *
+ * `timeZone` (IANA) controls which calendar day a relative keyword resolves to;
+ * the stored instant remains end-of-day UTC either way (deliberate — see the
+ * dueDate tool description). Without a zone, relative keywords resolve in UTC.
  */
-export function normalizeDueDateForApi(dueDate?: string | null): string | undefined {
+export function normalizeDueDateForApi(dueDate?: string | null, timeZone?: string): string | undefined {
   if (!dueDate) {
     return undefined;
   }
@@ -150,7 +154,7 @@ export function normalizeDueDateForApi(dueDate?: string | null): string | undefi
     return undefined;
   }
 
-  const normalizedDate = parseFilterDate(trimmed);
+  const normalizedDate = parseFilterDate(trimmed, timeZone);
   if (normalizedDate) {
     return `${normalizedDate}T23:59:59.000Z`;
   }

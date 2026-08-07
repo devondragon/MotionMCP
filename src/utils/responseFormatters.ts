@@ -11,6 +11,7 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionCustomFieldValue, MotionRecurringTask, MotionSchedule, MotionScheduleDetails, MotionStatus } from '../types/motion';
 import { TruncationInfo } from '../types/mcp';
 import { LIMITS } from './constants';
+import { formatTimestamp, formatDateOnly } from './dateFormat';
 
 const TRUNCATION_REASON_MESSAGES: Record<string, string> = {
   page_size_limit: 'due to page size limits',
@@ -109,6 +110,11 @@ interface TaskListContext {
   limit?: number;
   allWorkspaces?: boolean;
   truncation?: TruncationInfo;
+  /**
+   * IANA zone ID used to render local times alongside the ISO instant.
+   * Omitted when the account's schedules disagree — see resolveDisplayTimeZone.
+   */
+  timeZone?: string;
 }
 
 /**
@@ -118,16 +124,15 @@ export function formatTaskList(
   tasks: MotionTask[],
   context: TaskListContext = {}
 ): CallToolResult {
-  const { workspaceName, projectName, status, assigneeName, priority, dueDate, limit, allWorkspaces, truncation } = context;
-  
+  const { workspaceName, projectName, status, assigneeName, priority, dueDate, limit, allWorkspaces, truncation, timeZone } = context;
+
   const taskFormatter = (task: MotionTask) => {
     let line = `- ${task.name}`;
     if (task.id) line += ` (ID: ${task.id})`;
     if (task.status) line += ` [${typeof task.status === 'string' ? task.status : task.status.name}]`;
     if (task.priority) line += ` {${task.priority}}`;
     if (task.dueDate) {
-      const dueDate = new Date(task.dueDate).toLocaleDateString();
-      line += ` (Due: ${dueDate})`;
+      line += ` (Due: ${formatDateOnly(task.dueDate, timeZone)})`;
     }
     return line;
   };
@@ -143,11 +148,11 @@ export function formatTaskList(
   if (assigneeName) title += ` for assignee "${assigneeName}"`;
   if (priority) title += ` with priority "${priority}"`;
   if (dueDate) {
-    const parsedDueDate = new Date(dueDate);
-    const dueDateText = Number.isNaN(parsedDueDate.getTime())
-      ? dueDate
-      : parsedDueDate.toLocaleDateString();
-    title += ` due by ${dueDateText}`;
+    // The filter value is user input (a date-only string, a relative word, or an
+    // ISO timestamp) — echo it verbatim. Parsing a date-only string as an instant
+    // lands at midnight UTC, which renders as the *previous* calendar day in any
+    // zone behind UTC. Only real instants from the API go through formatDateOnly.
+    title += ` due by ${dueDate}`;
   }
   if (limit) title += ` (limit: ${limit})`;
 
@@ -210,7 +215,7 @@ export function formatDetailResponse<T extends Record<string, any>>(
 /**
  * Format single task detail response with comprehensive information
  */
-export function formatTaskDetail(task: MotionTask): CallToolResult {
+export function formatTaskDetail(task: MotionTask, timeZone?: string): CallToolResult {
   const details = [
     `Task: ${task.name}`,
     `ID: ${task.id}`,
@@ -218,10 +223,10 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
     `Status: ${typeof task.status === 'string' ? task.status : task.status?.name || 'Unknown'}`,
     `Priority: ${task.priority || 'Not set'}`,
     `Completed: ${task.completed ? 'Yes' : 'No'}`,
-    task.dueDate ? `Due Date: ${new Date(task.dueDate).toLocaleString()}` : 'Due Date: Not set',
-    task.createdTime ? `Created: ${new Date(task.createdTime).toLocaleString()}` : null,
-    task.updatedTime ? `Last Updated: ${new Date(task.updatedTime).toLocaleString()}` : null,
-    task.completedTime ? `Completed: ${new Date(task.completedTime).toLocaleString()}` : null,
+    task.dueDate ? `Due Date: ${formatTimestamp(task.dueDate, timeZone)}` : 'Due Date: Not set',
+    task.createdTime ? `Created: ${formatTimestamp(task.createdTime, timeZone)}` : null,
+    task.updatedTime ? `Last Updated: ${formatTimestamp(task.updatedTime, timeZone)}` : null,
+    task.completedTime ? `Completed: ${formatTimestamp(task.completedTime, timeZone)}` : null,
     `Workspace: ${task.workspace?.name || 'Unknown'} (${task.workspace?.id || 'N/A'})`,
     task.project ? `Project: ${task.project.name} (${task.project.id})` : 'Project: No project assigned',
     task.assignees && task.assignees.length > 0
@@ -233,8 +238,8 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
       : null,
     task.duration ? `Duration: ${typeof task.duration === 'number' ? `${task.duration} minutes` : task.duration}` : null,
     task.deadlineType ? `Deadline Type: ${task.deadlineType}` : null,
-    task.scheduledStart ? `Scheduled Start: ${new Date(task.scheduledStart).toLocaleString()}` : null,
-    task.scheduledEnd ? `Scheduled End: ${new Date(task.scheduledEnd).toLocaleString()}` : null,
+    task.scheduledStart ? `Scheduled Start: ${formatTimestamp(task.scheduledStart, timeZone)}` : null,
+    task.scheduledEnd ? `Scheduled End: ${formatTimestamp(task.scheduledEnd, timeZone)}` : null,
     task.parentRecurringTaskId ? `Recurring Task ID: ${task.parentRecurringTaskId}` : null,
     task.chunks && task.chunks.length > 0
       ? `Scheduled Chunks: ${task.chunks.length} time block(s)`

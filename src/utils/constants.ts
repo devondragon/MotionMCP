@@ -144,25 +144,56 @@ export function isValidPriority(priority: string): priority is ValidPriority {
   return VALID_PRIORITIES.includes(priority as ValidPriority);
 }
 
-// Helper to parse and validate date formats
-export function parseFilterDate(dateInput: string): string | null {
+/**
+ * Current calendar date (YYYY-MM-DD) in the given IANA zone.
+ * Falls back to UTC when no zone is given or the runtime rejects it —
+ * identical to the pre-zone-aware behavior, so failure cannot regress anything.
+ */
+function currentDateInZone(timeZone?: string): string {
+  if (timeZone) {
+    try {
+      // en-CA formats as YYYY-MM-DD
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date());
+    } catch {
+      // fall through to UTC
+    }
+  }
+  return new Date().toISOString().split('T')[0]!;
+}
+
+/** Shift a YYYY-MM-DD calendar date by whole days. Pure calendar arithmetic — DST-immune. */
+function shiftCalendarDate(date: string, days: number): string {
+  const shifted = new Date(`${date}T00:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted.toISOString().split('T')[0]!;
+}
+
+/**
+ * Helper to parse and validate date formats.
+ *
+ * Relative keywords (today/tomorrow/yesterday) resolve against the given IANA
+ * zone when supplied — without one they resolve against UTC, which in a zone
+ * ahead of UTC yields *yesterday's* local date between local midnight and the
+ * UTC day boundary (e.g. 00:00–05:29 in Asia/Kolkata).
+ */
+export function parseFilterDate(dateInput: string, timeZone?: string): string | null {
   if (!dateInput) return null;
 
   // Handle relative dates
-  const today = new Date();
   const normalizedInput = dateInput.toLowerCase().trim();
 
   switch (normalizedInput) {
     case 'today':
-      return today.toISOString().split('T')[0]!;
+      return currentDateInZone(timeZone);
     case 'tomorrow':
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
-      return tomorrow.toISOString().split('T')[0]!;
+      return shiftCalendarDate(currentDateInZone(timeZone), 1);
     case 'yesterday':
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      return yesterday.toISOString().split('T')[0]!;
+      return shiftCalendarDate(currentDateInZone(timeZone), -1);
   }
 
   // Validate YYYY-MM-DD format
