@@ -129,6 +129,11 @@ export function formatTaskList(
       const dueDate = new Date(task.dueDate).toLocaleDateString();
       line += ` (Due: ${dueDate})`;
     }
+    // Scheduling fields let a single list sweep compute both overdue and at-risk,
+    // avoiding per-task `get` calls against Motion's 12 req/min individual limit.
+    if (task.startOn) line += ` (Start On: ${new Date(task.startOn).toLocaleDateString()})`;
+    if (task.scheduledEnd) line += ` (Scheduled End: ${new Date(task.scheduledEnd).toLocaleString()})`;
+    if (task.schedulingIssue) line += ` [SCHEDULING ISSUE]`;
     return line;
   };
   
@@ -155,7 +160,12 @@ export function formatTaskList(
   let responseText = `${title}:\n${list}`;
   responseText += formatTruncationNotice(truncation);
 
-  return formatMcpSuccess(responseText);
+  const structuredContent = {
+    count: tasks.length,
+    tasks: tasks.map(taskToStructuredContent)
+  };
+
+  return formatMcpSuccess(responseText, structuredContent);
 }
 
 /**
@@ -208,6 +218,50 @@ export function formatDetailResponse<T extends Record<string, any>>(
 }
 
 /**
+ * Normalize a task's labels to a plain string array (labels may arrive as
+ * strings or as `{ name }` objects).
+ */
+function normalizeLabels(labels: MotionTask['labels']): string[] {
+  if (!Array.isArray(labels)) return [];
+  return labels.map(l => (typeof l === 'string' ? l : l.name));
+}
+
+/**
+ * Build the machine-readable projection of a task for `structuredContent`.
+ *
+ * Timestamps are passed through as the raw ISO 8601 strings Motion returns —
+ * NOT localized — so consumers get unambiguous, timezone-safe values to compute
+ * overdue/at-risk state from. `schedulingIssue` is the key signal for tasks
+ * Motion could not fit (which have no `scheduledEnd` at all).
+ */
+export function taskToStructuredContent(task: MotionTask): Record<string, unknown> {
+  return {
+    id: task.id,
+    name: task.name,
+    status: typeof task.status === 'string' ? task.status : task.status?.name ?? null,
+    completed: task.completed ?? false,
+    priority: task.priority ?? null,
+    dueDate: task.dueDate ?? null,
+    deadlineType: task.deadlineType ?? null,
+    duration: task.duration ?? null,
+    scheduledStart: task.scheduledStart ?? null,
+    scheduledEnd: task.scheduledEnd ?? null,
+    schedulingIssue: task.schedulingIssue ?? false,
+    startOn: task.startOn ?? null,
+    labels: normalizeLabels(task.labels),
+    chunks: Array.isArray(task.chunks)
+      ? task.chunks.map(chunk => ({
+          scheduledStart: chunk.scheduledStart,
+          scheduledEnd: chunk.scheduledEnd,
+          duration: chunk.duration,
+          isFixed: chunk.isFixed,
+          completedTime: chunk.completedTime ?? null
+        }))
+      : []
+  };
+}
+
+/**
  * Format single task detail response with comprehensive information
  */
 export function formatTaskDetail(task: MotionTask): CallToolResult {
@@ -233,11 +287,17 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
       : null,
     task.duration ? `Duration: ${typeof task.duration === 'number' ? `${task.duration} minutes` : task.duration}` : null,
     task.deadlineType ? `Deadline Type: ${task.deadlineType}` : null,
+    task.startOn ? `Start On: ${new Date(task.startOn).toLocaleString()}` : null,
     task.scheduledStart ? `Scheduled Start: ${new Date(task.scheduledStart).toLocaleString()}` : null,
     task.scheduledEnd ? `Scheduled End: ${new Date(task.scheduledEnd).toLocaleString()}` : null,
+    // The single most important signal for at-risk detection: unschedulable tasks
+    // have no scheduledEnd, so this flag is the only indication Motion couldn't fit them.
+    task.schedulingIssue ? `Scheduling Issue: Yes (Motion could not fit this task in the schedule)` : null,
     task.parentRecurringTaskId ? `Recurring Task ID: ${task.parentRecurringTaskId}` : null,
     task.chunks && task.chunks.length > 0
-      ? `Scheduled Chunks: ${task.chunks.length} time block(s)`
+      ? `Scheduled Chunks: ${task.chunks.length} time block(s)\n${task.chunks.map((chunk, i) =>
+          `  - Chunk ${i + 1}: ${new Date(chunk.scheduledStart).toLocaleString()} → ${new Date(chunk.scheduledEnd).toLocaleString()}${chunk.isFixed ? ' (fixed)' : ''}`
+        ).join('\n')}`
       : null,
     task.customFieldValues && Object.keys(task.customFieldValues).length > 0
       ? `Custom Fields:\n${Object.entries(task.customFieldValues).map(([valueId, cfv]) =>
@@ -246,7 +306,7 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
       : null
   ].filter(Boolean).join('\n');
 
-  return formatMcpSuccess(details);
+  return formatMcpSuccess(details, taskToStructuredContent(task));
 }
 
 interface SearchOptions {
