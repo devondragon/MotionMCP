@@ -96,6 +96,35 @@ describe('responseFormatters', () => {
       expect(sc.schedulingIssue).toBe(false);
     });
 
+    it('keeps the channels separate: readable text in content, fields in structuredContent', () => {
+      const res = formatTaskDetail(makeTask({ name: 'Readable Task', schedulingIssue: true }));
+      const text = (res.content?.[0] as any)?.text || '';
+      const sc = res.structuredContent as Record<string, any>;
+
+      // content is a plain-text block, not JSON
+      expect(text).toContain('Task: Readable Task');
+      expect(text).toContain('Scheduling Issue: Yes');
+      // structuredContent holds the fields — and does NOT duplicate the prose
+      expect(sc.summary).toBeUndefined();
+      expect(sc.schedulingIssue).toBe(true);
+      expect(sc.id).toBe('task_1');
+    });
+
+    it('renders startOn as a plain date, not a timezone-shifted timestamp', () => {
+      const res = formatTaskDetail(makeTask({ startOn: '2026-08-31' }));
+      const text = (res.content?.[0] as any)?.text || '';
+      const startOnLine = text.split('\n').find((l: string) => l.startsWith('Start On:'));
+
+      // Built from date parts, so the calendar day survives in zones behind UTC
+      // (naive `new Date("2026-08-31")` would render as Aug 30, 8:00 PM in US Eastern).
+      const expected = new Date(2026, 7, 31).toLocaleDateString();
+      expect(startOnLine).toBe(`Start On: ${expected}`);
+      // No time-of-day component
+      expect(startOnLine).not.toMatch(/\d:\d\d/);
+      // structuredContent still carries the raw ISO value
+      expect((res.structuredContent as any).startOn).toBe('2026-08-31');
+    });
+
     it('surfaces schedulingIssue: true for a task Motion could not fit (no scheduledEnd)', () => {
       const res = formatTaskDetail(makeTask({
         dueDate: '2026-08-15T17:00:00.000Z',
@@ -133,6 +162,22 @@ describe('responseFormatters', () => {
       expect(Array.isArray(sc.tasks)).toBe(true);
       expect(sc.tasks[0].id).toBe('t1');
       expect(sc.tasks[1].schedulingIssue).toBe(true);
+    });
+
+    it('stays lean — no prose duplicated into structuredContent', () => {
+      const res = formatTaskList([makeTask({ id: 't1' }), makeTask({ id: 't2' })]);
+      const sc = res.structuredContent as Record<string, any>;
+
+      expect(sc.summary).toBeUndefined();
+      expect(sc.tasks[0].summary).toBeUndefined();
+    });
+
+    it('renders startOn as a plain date in list lines too', () => {
+      const res = formatTaskList([makeTask({ id: 't1', startOn: '2026-08-31' })]);
+      const text = (res.content?.[0] as any)?.text || '';
+
+      const expected = new Date(2026, 7, 31).toLocaleDateString();
+      expect(text).toContain(`(Start On: ${expected})`);
     });
   });
 });

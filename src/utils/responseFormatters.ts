@@ -131,7 +131,7 @@ export function formatTaskList(
     }
     // Scheduling fields let a single list sweep compute both overdue and at-risk,
     // avoiding per-task `get` calls against Motion's 12 req/min individual limit.
-    if (task.startOn) line += ` (Start On: ${new Date(task.startOn).toLocaleDateString()})`;
+    if (task.startOn) line += ` (Start On: ${formatDateOnly(task.startOn)})`;
     if (task.scheduledEnd) line += ` (Scheduled End: ${new Date(task.scheduledEnd).toLocaleString()})`;
     if (task.schedulingIssue) line += ` [SCHEDULING ISSUE]`;
     return line;
@@ -227,6 +227,24 @@ function normalizeLabels(labels: MotionTask['labels']): string[] {
 }
 
 /**
+ * Render a date-only field (e.g. `startOn`, which Motion returns as "2026-08-31").
+ *
+ * `new Date("2026-08-31")` parses as UTC midnight, so formatting it in a zone
+ * behind UTC lands on the PREVIOUS day ("8/30/2026, 8:00:00 PM" in US Eastern).
+ * Building the date from its parts keeps it in local time, so the calendar date
+ * is preserved and no misleading time-of-day is shown.
+ */
+function formatDateOnly(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match) {
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString();
+  }
+  // Not date-only (a full timestamp) — render just the date portion of it.
+  return new Date(value).toLocaleDateString();
+}
+
+/**
  * Build the machine-readable projection of a task for `structuredContent`.
  *
  * Timestamps are passed through as the raw ISO 8601 strings Motion returns —
@@ -287,7 +305,7 @@ export function formatTaskDetail(task: MotionTask): CallToolResult {
       : null,
     task.duration ? `Duration: ${typeof task.duration === 'number' ? `${task.duration} minutes` : task.duration}` : null,
     task.deadlineType ? `Deadline Type: ${task.deadlineType}` : null,
-    task.startOn ? `Start On: ${new Date(task.startOn).toLocaleString()}` : null,
+    task.startOn ? `Start On: ${formatDateOnly(task.startOn)}` : null,
     task.scheduledStart ? `Scheduled Start: ${new Date(task.scheduledStart).toLocaleString()}` : null,
     task.scheduledEnd ? `Scheduled End: ${new Date(task.scheduledEnd).toLocaleString()}` : null,
     // The single most important signal for at-risk detection: unschedulable tasks
