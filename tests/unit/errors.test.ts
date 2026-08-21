@@ -328,8 +328,19 @@ describe('createErrorContext', () => {
 });
 
 describe('createUserFacingError', () => {
-  it('creates error with user-friendly message for Axios 404', () => {
-    const axiosErr = fakeAxiosError(404);
+  it('creates error with user-friendly message for Axios 404 with API message', () => {
+    const axiosErr = fakeAxiosError(404, 'Unknown user schedule: Work Hours Plus');
+    const ctx = createErrorContext('fetch', 'task', 'abc123');
+    const err = createUserFacingError(axiosErr, ctx);
+
+    expect(err).toBeInstanceOf(UserFacingError);
+    expect(err.userMessage).toContain('Unable to load task');
+    expect(err.userMessage).toContain('Unknown user schedule: Work Hours Plus');
+    expect(err.code).toBe(ERROR_CODES.RESOURCE_NOT_FOUND);
+  });
+
+  it('creates error with generic message for Axios 404 without API message', () => {
+    const axiosErr = fakeAxiosError(404, '');
     const ctx = createErrorContext('fetch', 'task', 'abc123');
     const err = createUserFacingError(axiosErr, ctx);
 
