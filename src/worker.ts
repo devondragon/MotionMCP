@@ -34,7 +34,10 @@ export class MotionMCPAgent extends McpAgent<Env> {
       registry
     );
     const enabledTools = configurator.getEnabledTools();
-    validator.initializeValidators(enabledTools);
+    // No AJV validator init here: ajv.compile() uses runtime code generation,
+    // which Cloudflare Workers disallows (EvalError). Input validation in the
+    // Worker is handled by the Zod schemas passed to server.tool() below;
+    // validateInput() is only called from the stdio entry point.
 
     for (const tool of enabledTools) {
       const zodShape = jsonSchemaToZodShape(tool.inputSchema as Parameters<typeof jsonSchemaToZodShape>[0]);
@@ -67,6 +70,22 @@ export default {
     // Validate secret path: /mcp/{secret}/...
     // Clients configure URL as: https://your-worker.workers.dev/mcp/YOUR_SECRET
     const pathParts = url.pathname.split("/").filter(Boolean);
+
+    // SSE message endpoint: the SSE stream's `endpoint` event advertises the
+    // rewritten path (/mcp/message?sessionId=...), which has no secret segment.
+    // The sessionId is unguessable and only issued on a stream opened with the
+    // secret, so it authenticates these POSTs.
+    if (
+      pathParts[0] === "mcp" &&
+      pathParts[1] === "message" &&
+      request.method === "POST" &&
+      url.searchParams.has("sessionId")
+    ) {
+      return (
+        MotionMCPAgent.mount("/mcp") as { fetch: (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response> }
+      ).fetch(request, env, ctx);
+    }
+
     if (pathParts[0] !== "mcp" || pathParts[1] !== env.MOTION_MCP_SECRET) {
       return new Response("Not found", { status: 404 });
     }
@@ -77,8 +96,16 @@ export default {
     const cleanUrl = new URL(cleanPath, url.origin);
     const cleanRequest = new Request(cleanUrl, request);
 
+    // Streamable HTTP (POST/DELETE /mcp, or GET with an mcp-session-id header)
+    // is served by serve(); a bare GET on /mcp is a legacy SSE stream via mount().
+    const isStreamableHttp =
+      cleanPath === "/mcp" &&
+      (request.method !== "GET" || request.headers.has("mcp-session-id"));
+
     return (
-      MotionMCPAgent.mount("/mcp") as { fetch: (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response> }
+      (isStreamableHttp
+        ? MotionMCPAgent.serve("/mcp")
+        : MotionMCPAgent.mount("/mcp")) as { fetch: (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response> }
     ).fetch(cleanRequest, env, ctx);
   },
 };

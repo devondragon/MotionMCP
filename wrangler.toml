@@ -10,7 +10,7 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["MotionMCPAgent"]
+new_sqlite_classes = ["MotionMCPAgent"]
 
 [vars]
 MOTION_MCP_TOOLS = "essential"
