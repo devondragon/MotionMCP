@@ -194,10 +194,12 @@ export function formatMcpError(error: Error | unknown): CallToolResult {
 }
 
 /**
- * Format a success response for MCP protocol
+ * Format a success response for MCP protocol.
+ * When structuredContent is provided it is attached to the result so that
+ * machine consumers can index raw fields without parsing the prose text.
  */
-export function formatMcpSuccess(text: string): CallToolResult {
-  return {
+export function formatMcpSuccess(text: string, structuredContent?: Record<string, unknown>): CallToolResult {
+  const result: CallToolResult = {
     content: [
       {
         type: MCP_RESPONSE_TYPES.TEXT,
@@ -205,6 +207,10 @@ export function formatMcpSuccess(text: string): CallToolResult {
       }
     ]
   };
+  if (structuredContent !== undefined) {
+    result.structuredContent = structuredContent;
+  }
+  return result;
 }
 
 // ─── User-Facing Error Factories ────────────────────────────────────────────
