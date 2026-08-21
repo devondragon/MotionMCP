@@ -31,8 +31,9 @@ export function sanitizeTextContent(input: string | undefined | null): string {
   let sanitized = trimmed
     // Remove script tags and their content entirely
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    // Remove any remaining HTML tags but keep inner text
-    .replace(/<[^>]*>/g, '')
+    // Remove real HTML tags (open/close) but keep inner text.
+    // Tag-anchored so ordinary text like "x < 5 and y > 3" or "<2026>" is preserved.
+    .replace(/<\/?[a-z][a-z0-9]*\b[^>]*>/gi, '')
     // Normalize unicode non-breaking spaces
     .replace(/\u00a0/g, ' ');
 

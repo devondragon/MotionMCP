@@ -92,7 +92,8 @@ export const LIMITS = {
   MAX_PAGE_SIZE: 200,           // Maximum allowed page size
   MAX_PAGES: 10,                // Maximum number of pages to fetch
   ABSOLUTE_MAX_PAGES: 50,       // Absolute maximum pages to prevent infinite loops
-  MAX_SEARCH_RESULTS: 100       // Maximum search results to return
+  MAX_SEARCH_RESULTS: 100,      // Maximum search results to return
+  MAX_SEARCH_FETCH: 300         // Maximum items to fetch per source when overfetching for client-side search filtering
 } as const;
 
 // Logging levels for MCP compliance

@@ -111,6 +111,80 @@ export function formatTimestamp(value?: string | null, timeZone?: string): strin
 }
 
 /**
+ * Offset (ms) the given IANA zone is ahead of UTC at the given instant.
+ * Positive east of UTC, negative west. Returns null if the zone is unusable.
+ */
+function zoneOffsetMs(timeZone: string, date: Date): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23'
+    })
+      .formatToParts(date)
+      .reduce<Record<string, string>>((acc, part) => {
+        acc[part.type] = part.value;
+        return acc;
+      }, {});
+
+    if (!parts.year || !parts.month || !parts.day || !parts.hour || !parts.minute || !parts.second) {
+      return null;
+    }
+
+    const asIfUtc = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second)
+    );
+    return asIfUtc - date.getTime();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Given a calendar date (YYYY-MM-DD) and an IANA zone, return the ISO 8601 UTC
+ * instant that corresponds to 23:59:59.000 local wall-clock time on that date in
+ * that zone. Stored this way, the due date renders back as the same calendar day
+ * in the account's display zone instead of slipping forward one day (as a plain
+ * 23:59:59Z instant does in any zone ahead of UTC).
+ *
+ * Returns null if the date string is malformed or the zone cannot be honoured,
+ * so the caller can fall back to UTC end-of-day.
+ */
+export function endOfDayInZone(dateOnly: string, timeZone: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  // Treat the target wall-clock (23:59:59 local) as if it were UTC, then correct
+  // by the zone's offset. Re-evaluate the offset at the corrected instant once so
+  // a DST boundary near the guess resolves to the right side.
+  const asIfUtc = Date.UTC(year, month - 1, day, 23, 59, 59, 0);
+  const offset = zoneOffsetMs(timeZone, new Date(asIfUtc));
+  if (offset === null) return null;
+
+  let utcMs = asIfUtc - offset;
+  const refinedOffset = zoneOffsetMs(timeZone, new Date(utcMs));
+  if (refinedOffset !== null && refinedOffset !== offset) {
+    utcMs = asIfUtc - refinedOffset;
+  }
+
+  return new Date(utcMs).toISOString();
+}
+
+/**
  * Format a calendar date for compact list output. The zone matters: an instant
  * of 2026-08-10T23:59:59Z is 11 August in Asia/Kolkata, and reporting it as
  * "8/10/2026" is an off-by-one-day error, not a cosmetic one.

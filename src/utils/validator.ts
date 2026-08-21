@@ -33,20 +33,30 @@ export class InputValidator {
   }
 
   /**
-   * Validate input arguments against tool schema
+   * Validate input arguments against tool schema.
+   *
+   * AJV is configured with `coerceTypes: true`, which mutates the object it
+   * validates (e.g. "30" -> 30). To avoid mutating the caller's args object,
+   * validation runs against a structuredClone. On success, the coerced clone
+   * is returned as `data` so callers can pass the coerced values downstream
+   * without the original object being touched.
    */
-  validateInput(toolName: string, args: unknown): { valid: boolean; errors?: string } {
+  validateInput(
+    toolName: string,
+    args: unknown
+  ): { valid: boolean; errors?: string; data?: unknown } {
     const validator = this.validators.get(toolName);
-    
+
     if (!validator) {
-      return { 
-        valid: false, 
-        errors: `No validator found for tool: ${toolName}` 
+      return {
+        valid: false,
+        errors: `No validator found for tool: ${toolName}`
       };
     }
 
-    const valid = validator(args);
-    
+    const coerced = structuredClone(args);
+    const valid = validator(coerced);
+
     if (!valid) {
       return {
         valid: false,
@@ -54,7 +64,7 @@ export class InputValidator {
       };
     }
 
-    return { valid: true };
+    return { valid: true, data: coerced };
   }
 
   /**

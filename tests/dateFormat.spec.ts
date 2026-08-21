@@ -3,6 +3,7 @@ import {
   formatTimestamp,
   formatDateOnly,
   resolveDisplayTimeZone,
+  endOfDayInZone,
   LEGACY_LOCALE_SHAPE
 } from '../src/utils/dateFormat';
 import { formatTaskDetail, formatTaskList } from '../src/utils/responseFormatters';
@@ -205,14 +206,37 @@ describe('zone-aware relative dates (parseFilterDate / normalizeDueDateForApi)',
     expect(parseFilterDate('2026-08-10', IST)).toBe('2026-08-10');
   });
 
-  it("normalizeDueDateForApi picks the zone's calendar day but still stores end-of-day UTC (D7)", () => {
+  it("normalizeDueDateForApi stores end-of-day in the supplied zone (F10)", () => {
     vi.useFakeTimers();
     vi.setSystemTime(IST_EARLY_MORNING);
 
-    // The calendar day comes from the zone; the stored instant stays 23:59:59Z.
-    expect(normalizeDueDateForApi('today', IST)).toBe('2026-08-07T23:59:59.000Z');
+    // The calendar day comes from the zone AND the stored instant is 23:59:59
+    // local in that zone: 2026-08-07 23:59:59 IST == 2026-08-07T18:29:59Z.
+    expect(normalizeDueDateForApi('today', IST)).toBe('2026-08-07T18:29:59.000Z');
+    // Without a zone, it falls back to end-of-day UTC (legacy behavior).
     expect(normalizeDueDateForApi('today')).toBe('2026-08-06T23:59:59.000Z');
     // Full ISO input passes through byte-identical regardless of zone.
     expect(normalizeDueDateForApi('2026-08-05T18:29:00.000Z', IST)).toBe('2026-08-05T18:29:00.000Z');
+  });
+
+  it('stored due date renders back as the same calendar day in the account zone (F10)', () => {
+    // A plain UTC end-of-day slips forward a day; a zone-anchored one does not.
+    const stored = normalizeDueDateForApi('2026-08-10', IST);
+    expect(stored).toBe('2026-08-10T18:29:59.000Z');
+    expect(formatDateOnly(stored, IST)).toBe('2026-08-10 Asia/Kolkata');
+  });
+});
+
+describe('endOfDayInZone', () => {
+  it('anchors 23:59:59 to the wall clock of the given zone', () => {
+    // IST is UTC+5:30 → 23:59:59 local is 18:29:59Z the same date.
+    expect(endOfDayInZone('2026-08-10', 'Asia/Kolkata')).toBe('2026-08-10T18:29:59.000Z');
+    // New York in August is UTC-4 → 23:59:59 local is 03:59:59Z the next date.
+    expect(endOfDayInZone('2026-08-10', 'America/New_York')).toBe('2026-08-11T03:59:59.000Z');
+  });
+
+  it('returns null for a malformed date or an unusable zone', () => {
+    expect(endOfDayInZone('not-a-date', 'Asia/Kolkata')).toBeNull();
+    expect(endOfDayInZone('2026-08-10', 'Not/AZone')).toBeNull();
   });
 });

@@ -49,7 +49,8 @@ export const projectsToolDefinition: McpToolDefinition = {
         description: "List projects from all workspaces (for list operation only). When true and no workspace is specified, returns projects from all workspaces."
       }
     },
-    required: ["operation"]
+    required: ["operation"],
+    additionalProperties: false
   }
 };
 
@@ -97,11 +98,11 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       assigneeId: {
         type: "string",
-        description: "Filter by assignee (for list/list_all_uncompleted), set assignee (for create/update), or reassign (for move)"
+        description: "Assignee user ID, or the 'me' shortcut for the current user. Filters on list/list_all_uncompleted; sets the assignee on create/update; reassigns on move. The 'me' shortcut is resolved to a concrete ID for all of these."
       },
       assignee: {
         type: "string",
-        description: "Filter by assignee name, email, or 'me' shortcut (for list and list_all_uncompleted). Resolved to an ID automatically"
+        description: "Assignee name, email, or the 'me' shortcut. Resolved to an ID automatically for list, list_all_uncompleted, create, update, and move. A name that cannot be resolved returns an error."
       },
       priority: {
         type: "string",
@@ -110,7 +111,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       dueDate: {
         type: "string",
-        description: "Due date (for create/update) or filter (for list, filtered client-side — returns tasks due on or before this date). Format: YYYY-MM-DD, a full ISO 8601 timestamp with offset, or relative like 'today', 'tomorrow'. A date-only value is sent as 23:59:59Z — end of day in UTC, NOT in the account's timezone. In any zone ahead of UTC that instant already falls on the following local calendar day (e.g. '2026-08-10' lands at 05:29 on 11 Aug in Asia/Kolkata). Pass an explicit ISO timestamp with an offset when the local day boundary matters. Relative keywords resolve against the account's schedule timezone when all schedules agree on one, falling back to UTC otherwise."
+        description: "Due date (for create/update) or filter (for list, filtered client-side — returns tasks due on or before this date). Format: YYYY-MM-DD, a full ISO 8601 timestamp with offset, or relative like 'today', 'tomorrow'. A date-only value is stored as end of day (23:59:59) in the account's schedule timezone when all schedules agree on one, so it renders back as the same calendar day; it falls back to end-of-day UTC when no single zone is resolvable. Pass an explicit ISO timestamp with an offset to control the exact instant. Relative keywords resolve against the same account timezone, falling back to UTC otherwise."
       },
       labels: {
         type: "array",
@@ -169,7 +170,8 @@ export const tasksToolDefinition: McpToolDefinition = {
         description: "Maximum number of tasks to return (for list and list_all_uncompleted)"
       }
     },
-    required: ["operation"]
+    required: ["operation"],
+    additionalProperties: false
   }
 };
 
@@ -189,7 +191,8 @@ export const workspacesToolDefinition: McpToolDefinition = {
         description: "Workspace ID (required for get operation)"
       }
     },
-    required: ["operation"]
+    required: ["operation"],
+    additionalProperties: false
   }
 };
 
@@ -226,7 +229,8 @@ export const searchToolDefinition: McpToolDefinition = {
         description: "Maximum number of results"
       }
     },
-    required: ["operation"]
+    required: ["operation"],
+    additionalProperties: false
   }
 };
 
@@ -254,7 +258,8 @@ export const usersToolDefinition: McpToolDefinition = {
         description: "Team ID to filter users by (optional for list operation)"
       }
     },
-    required: ["operation"]
+    required: ["operation"],
+    additionalProperties: false
   }
 };
 
@@ -282,7 +287,8 @@ export const commentsToolDefinition: McpToolDefinition = {
         description: "Pagination cursor for list operation (optional)"
       }
     },
-    required: ["operation", "taskId"]
+    required: ["operation", "taskId"],
+    additionalProperties: false
   }
 };
 
@@ -325,7 +331,8 @@ export const customFieldsToolDefinition: McpToolDefinition = {
       options: {
         type: "array",
         items: { type: "string" },
-        description: "Option labels. Required for: create when field is select or multiSelect."
+        minItems: 1,
+        description: "Option labels. Required for: create when field is select or multiSelect (at least one)."
       },
       required: {
         type: "boolean",
@@ -350,7 +357,8 @@ export const customFieldsToolDefinition: McpToolDefinition = {
         description: "Field value to set. Optional for add_to_project/add_to_task. When provided and non-null, the field param (type) is also required."
       }
     },
-    required: ["operation"]
+    required: ["operation"],
+    additionalProperties: false
   }
 };
 
@@ -443,10 +451,10 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
       },
       duration: {
         oneOf: [
-          { type: "number" },
+          { type: "number", minimum: 0 },
           { type: "string", enum: ["REMINDER"] }
         ],
-        description: "Task duration in minutes or REMINDER"
+        description: "Task duration in minutes (non-negative integer) or REMINDER"
       },
       startingOn: {
         type: "string",
@@ -466,7 +474,8 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
         description: "Task priority (default: MEDIUM)"
       }
     },
-    required: ["operation"]
+    required: ["operation"],
+    additionalProperties: false
   }
 };
 
@@ -492,9 +501,18 @@ export const statusesToolDefinition: McpToolDefinition = {
   inputSchema: {
     type: "object",
     properties: {
+      operation: {
+        type: "string",
+        enum: ["list"],
+        description: "Operation to perform"
+      },
       workspaceId: {
         type: "string",
         description: "Workspace ID to get statuses for (optional, returns all statuses if not specified)"
+      },
+      workspaceName: {
+        type: "string",
+        description: "Workspace name (alternative to workspaceId, resolved to an ID automatically)"
       }
     },
     additionalProperties: false

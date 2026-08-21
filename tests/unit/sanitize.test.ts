@@ -91,6 +91,33 @@ describe('sanitizeTextContent', () => {
     });
   });
 
+  describe('angle brackets in ordinary text (tag-anchored stripping)', () => {
+    it('preserves comparison operators around numbers', () => {
+      expect(sanitizeTextContent('if x < 5 and y > 3 then done'))
+        .toBe('if x < 5 and y > 3 then done');
+    });
+
+    it('preserves angle-bracketed numbers', () => {
+      expect(sanitizeTextContent('Q3 <2026> planning')).toBe('Q3 <2026> planning');
+    });
+
+    it('preserves a lone less-than followed by whitespace', () => {
+      expect(sanitizeTextContent('a < b')).toBe('a < b');
+    });
+
+    it('still strips real HTML open and close tags', () => {
+      expect(sanitizeTextContent('<b>bold</b>')).toBe('bold');
+    });
+
+    it('still strips img tags with event handlers', () => {
+      expect(sanitizeTextContent('<img src=x onerror=y>')).toBe('');
+    });
+
+    it('still strips script blocks entirely', () => {
+      expect(sanitizeTextContent('<script>alert(1)</script>')).toBe('');
+    });
+  });
+
   describe('unicode normalization', () => {
     it('normalizes non-breaking spaces to regular spaces', () => {
       expect(sanitizeTextContent('hello\u00a0world')).toBe('hello world');

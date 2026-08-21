@@ -213,9 +213,24 @@ export class WorkspaceResolver {
       // Case-insensitive match as fallback
       if (!workspace) {
         const lowerName = workspaceName.toLowerCase();
-        workspace = workspaces.find((w: MotionWorkspace) => 
+        const caseInsensitiveMatches = workspaces.filter((w: MotionWorkspace) =>
           w.name.toLowerCase() === lowerName
         );
+
+        // When multiple workspaces differ only by case, the first match is
+        // ambiguous. Still return a match, but surface the ambiguity.
+        if (caseInsensitiveMatches.length > 1) {
+          mcpLog(LOG_LEVELS.WARN, 'Ambiguous case-insensitive workspace match', {
+            method: 'resolveByWorkspaceName',
+            workspaceName,
+            candidates: caseInsensitiveMatches.map((w: MotionWorkspace) => ({
+              id: w.id,
+              name: w.name
+            }))
+          });
+        }
+
+        workspace = caseInsensitiveMatches[0];
       }
       
       if (!workspace) {

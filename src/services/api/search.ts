@@ -37,7 +37,7 @@ export async function searchTasks(ctx: ResourceContext, query: string, workspace
     // First, search in the specified workspace
     const { items: primaryTasks, truncation: primaryTruncation } = await getTasks(ctx, {
       workspaceId,
-      limit: calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit),
+      limit: calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit, 3, LIMITS.MAX_SEARCH_FETCH),
       maxPages: LIMITS.MAX_PAGES
     });
     aggregateTruncation = ctx.api.mergeTruncationMetadata(aggregateTruncation, primaryTruncation);
@@ -67,7 +67,7 @@ export async function searchTasks(ctx: ResourceContext, query: string, workspace
 
           try {
             // Calculate fetch limit before API call (defense-in-depth)
-            const fetchLimit = calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit);
+            const fetchLimit = calculateAdaptiveFetchLimit(allMatchingTasks.length, effectiveLimit, 3, LIMITS.MAX_SEARCH_FETCH);
             if (fetchLimit <= 0) break;
 
             mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for tasks', {
@@ -163,7 +163,7 @@ export async function searchProjects(ctx: ResourceContext, query: string, worksp
     // First, search in the specified workspace
     const { items: primaryProjects, truncation: primaryTruncation } = await getProjects(ctx, workspaceId, {
       maxPages: LIMITS.MAX_PAGES,
-      limit: calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit)
+      limit: calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit, 3, LIMITS.MAX_SEARCH_FETCH)
     });
     aggregateTruncation = ctx.api.mergeTruncationMetadata(aggregateTruncation, primaryTruncation);
     const primaryMatches = primaryProjects.filter(project =>
@@ -192,7 +192,7 @@ export async function searchProjects(ctx: ResourceContext, query: string, worksp
 
           try {
             // Calculate fetch limit before API call (defense-in-depth)
-            const fetchLimit = calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit);
+            const fetchLimit = calculateAdaptiveFetchLimit(allMatchingProjects.length, effectiveLimit, 3, LIMITS.MAX_SEARCH_FETCH);
             if (fetchLimit <= 0) break;
 
             mcpLog(LOG_LEVELS.DEBUG, 'Searching additional workspace for projects', {

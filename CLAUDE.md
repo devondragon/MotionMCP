@@ -91,7 +91,7 @@ Centralized Motion API client (`https://api.usemotion.com/v1`). Features:
 
 | Tool | Operations |
 |------|-----------|
-| motion_tasks | create, list, get, update, delete, move, unassign |
+| motion_tasks | create, list, list_all_uncompleted, get, update, delete, move, unassign |
 | motion_projects | create, list, get |
 | motion_workspaces | list, get |
 | motion_users | list, current |

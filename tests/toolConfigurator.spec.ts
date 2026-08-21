@@ -76,4 +76,11 @@ describe('ToolConfigurator', () => {
 
     expect(() => new ToolConfigurator('custom:nonexistent_tool', registry)).toThrow();
   });
+
+  it('de-duplicates repeated tool names in a custom config', () => {
+    const cfg = new ToolConfigurator('custom:motion_tasks,motion_tasks', registry);
+    const tools = cfg.getEnabledTools();
+    expect(tools).toHaveLength(1);
+    expect(tools[0].name).toBe(TOOL_NAMES.TASKS);
+  });
 });

@@ -9,6 +9,7 @@
 import { parseFilterDate } from './constants';
 import { ValidationError } from './errors';
 import { sanitizeName, sanitizeDescription } from './sanitize';
+import { endOfDayInZone } from './dateFormat';
 
 interface WorkspaceArgs {
   workspaceId?: string;
@@ -26,6 +27,7 @@ interface TaskArgs extends WorkspaceArgs {
   duration?: string | number;
   labels?: string[];
   assigneeId?: string;
+  assignee?: string;
   autoScheduled?: Record<string, unknown> | null;
 }
 
@@ -130,6 +132,7 @@ export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
     duration: args.duration !== undefined ? args.duration as (string | number) : undefined,
     labels: Array.isArray(args.labels) ? args.labels as string[] : undefined,
     assigneeId: (args.assigneeId as string) || undefined,
+    assignee: (args.assignee as string) || undefined,
     autoScheduled: parseAutoScheduledParam(args.autoScheduled),
     ...parseWorkspaceArgs(args)
   };
@@ -137,12 +140,14 @@ export function parseTaskArgs(args: Record<string, unknown> = {}): TaskArgs {
 
 /**
  * Normalize date-only due dates so Motion stores them on the intended calendar day.
- * Converts relative inputs (today/tomorrow/yesterday) or YYYY-MM-DD values
- * to the end of that day in UTC. Leaves timestamps with explicit offsets intact.
+ * Converts relative inputs (today/tomorrow/yesterday) or YYYY-MM-DD values to the
+ * end of that day. Leaves timestamps with explicit offsets intact.
  *
- * `timeZone` (IANA) controls which calendar day a relative keyword resolves to;
- * the stored instant remains end-of-day UTC either way (deliberate — see the
- * dueDate tool description). Without a zone, relative keywords resolve in UTC.
+ * `timeZone` (IANA) controls both which calendar day a relative keyword resolves
+ * to AND the wall clock the stored end-of-day is anchored in: with a zone, the
+ * value is 23:59:59 local time in that zone, so it renders back as the same
+ * calendar day in the account's display zone rather than slipping one day ahead.
+ * Without a zone (or if the zone is unusable), it falls back to end-of-day UTC.
  */
 export function normalizeDueDateForApi(dueDate?: string | null, timeZone?: string): string | undefined {
   if (!dueDate) {
@@ -156,6 +161,12 @@ export function normalizeDueDateForApi(dueDate?: string | null, timeZone?: strin
 
   const normalizedDate = parseFilterDate(trimmed, timeZone);
   if (normalizedDate) {
+    if (timeZone) {
+      const zonedEndOfDay = endOfDayInZone(normalizedDate, timeZone);
+      if (zonedEndOfDay) {
+        return zonedEndOfDay;
+      }
+    }
     return `${normalizedDate}T23:59:59.000Z`;
   }
 
@@ -172,6 +183,47 @@ export function normalizeDueDateForApi(dueDate?: string | null, timeZone?: strin
 
   // Otherwise, just return the original string (unparseable or unexpected format)
   return trimmed;
+}
+
+/**
+ * Parse and validate a task duration value.
+ *
+ * Accepts a non-negative integer number of minutes (as a number or a numeric
+ * string), or one of the allowed sentinel strings. Callers choose which
+ * sentinels are valid: tasks allow 'NONE' and 'REMINDER', recurring tasks allow
+ * only 'REMINDER'. Throws with a caller-appropriate message on anything else.
+ *
+ * @param duration - The raw duration value from the request
+ * @param allowedSentinels - Sentinel strings permitted for this caller (default NONE/REMINDER)
+ * @returns A non-negative integer, or one of the allowed sentinel strings
+ * @throws {Error} If the value is neither a non-negative integer nor an allowed sentinel
+ */
+export function parseDurationValue(
+  duration: string | number,
+  allowedSentinels: readonly string[] = ['NONE', 'REMINDER']
+): number | string {
+  const sentinelHint = allowedSentinels.length
+    ? `, or ${allowedSentinels.map(s => `"${s}"`).join('/')}`
+    : '';
+  const errorMessage = `Duration must be a non-negative integer number of minutes${sentinelHint}.`;
+
+  if (typeof duration === 'number') {
+    if (!Number.isInteger(duration) || duration < 0) {
+      throw new Error(errorMessage);
+    }
+    return duration;
+  }
+
+  const trimmed = duration.trim();
+  if (allowedSentinels.includes(trimmed)) {
+    return trimmed;
+  }
+
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error(errorMessage);
+  }
+
+  return parseInt(trimmed, 10);
 }
 
 /**

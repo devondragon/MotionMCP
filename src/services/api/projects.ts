@@ -70,8 +70,11 @@ export async function getProjects(ctx: ResourceContext, workspaceId: string, opt
         workspaceId
       });
 
-      // Cache only items, not truncation metadata
-      ctx.cache.project.set(cacheKey, projects);
+      // Cache only complete (non-truncated) results, and only items (not truncation metadata).
+      // Caching a truncated list would later return it as if complete, since truncation info is not cached.
+      if (!paginatedResult.truncation?.wasTruncated) {
+        ctx.cache.project.set(cacheKey, projects);
+      }
       return { items: projects, truncation: paginatedResult.truncation };
     } catch (paginationError) {
       // Fallback to simple fetch if pagination fails — results may be incomplete
@@ -85,6 +88,14 @@ export async function getProjects(ctx: ResourceContext, workspaceId: string, opt
     const response = await fetchPage();
     const unwrapped = unwrapApiResponse<MotionProject>(response.data, 'projects');
     let projects = unwrapped.data;
+    const hasMoreData = Boolean(unwrapped.meta?.nextCursor);
+
+    // Apply limit if specified
+    let slicedToLimit = false;
+    if (limit && limit > 0 && projects.length > limit) {
+      projects = projects.slice(0, limit);
+      slicedToLimit = true;
+    }
 
     mcpLog(LOG_LEVELS.INFO, 'Projects fetched successfully (single page)', {
       method: 'getProjects',
@@ -93,7 +104,15 @@ export async function getProjects(ctx: ResourceContext, workspaceId: string, opt
     });
 
     // Do not cache fallback results. If pagination failed, this may be only the first page.
-    return { items: projects, truncation: { wasTruncated: true, returnedCount: projects.length, reason: 'error' } };
+    // Report truncation only when it reflects reality: the fallback page had more data
+    // (a nextCursor) or the result was sliced down to the requested limit.
+    let truncation: TruncationInfo | undefined;
+    if (slicedToLimit) {
+      truncation = { wasTruncated: true, returnedCount: projects.length, reason: 'max_items', limit };
+    } else if (hasMoreData) {
+      truncation = { wasTruncated: true, returnedCount: projects.length, reason: 'error' };
+    }
+    return { items: projects, truncation };
   } catch (error: unknown) {
     mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch projects', {
       method: 'getProjects',

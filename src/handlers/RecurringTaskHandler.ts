@@ -2,7 +2,7 @@ import { BaseHandler } from './base/BaseHandler';
 import { McpToolResponse } from '../types/mcp';
 import { MotionRecurringTasksArgs } from '../types/mcp-tool-args';
 import { CreateRecurringTaskData, FrequencyObject } from '../types/motion';
-import { formatRecurringTaskList, formatRecurringTaskDetail, formatMcpSuccess, parseObjectParam } from '../utils';
+import { formatRecurringTaskList, formatRecurringTaskDetail, formatMcpSuccess, parseObjectParam, parseDurationValue } from '../utils';
 
 export class RecurringTaskHandler extends BaseHandler {
   async handle(args: MotionRecurringTasksArgs): Promise<McpToolResponse> {
@@ -52,6 +52,13 @@ export class RecurringTaskHandler extends BaseHandler {
       return this.handleError(new Error('Frequency type must be one of: daily, weekly, biweekly, monthly, quarterly, yearly, custom'));
     }
 
+    // Validate duration: non-negative integer minutes or the 'REMINDER' sentinel.
+    // The recurring schema omits 'NONE', so it is not accepted here.
+    let validatedDuration: number | 'REMINDER' | undefined;
+    if (args.duration !== undefined && args.duration !== null) {
+      validatedDuration = parseDurationValue(args.duration, ['REMINDER']) as number | 'REMINDER';
+    }
+
     const workspace = await this.workspaceResolver.resolveWorkspace({
       workspaceId: args.workspaceId,
       workspaceName: args.workspaceName
@@ -65,7 +72,7 @@ export class RecurringTaskHandler extends BaseHandler {
       ...(args.description && { description: args.description }),
       ...(args.projectId && { projectId: args.projectId }),
       ...(args.deadlineType && { deadlineType: args.deadlineType }),
-      ...(args.duration !== undefined && args.duration !== null && { duration: args.duration }),
+      ...(validatedDuration !== undefined && { duration: validatedDuration }),
       ...(args.startingOn && { startingOn: args.startingOn }),
       ...(args.idealTime && { idealTime: args.idealTime }),
       ...(args.schedule && { schedule: args.schedule }),

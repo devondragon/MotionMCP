@@ -166,6 +166,25 @@ describe('CustomFieldHandler', () => {
       const text = (res.content?.[0] as any)?.text || '';
       expect(text).toContain('required for select/multiSelect');
     });
+
+    it('returns error when select field created with an empty options array', async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new CustomFieldHandler(ctx);
+      const args: MotionCustomFieldsArgs = {
+        operation: 'create',
+        workspaceId: 'ws1',
+        name: 'Category',
+        field: 'select',
+        options: [],
+      };
+
+      const res = await handler.handle(args);
+
+      expect(res.isError).toBe(true);
+      expect(motionService.createCustomField).not.toHaveBeenCalled();
+      const text = (res.content?.[0] as any)?.text || '';
+      expect(text).toContain('required for select/multiSelect');
+    });
   });
 
   describe('delete operation', () => {

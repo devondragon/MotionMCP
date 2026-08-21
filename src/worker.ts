@@ -55,8 +55,27 @@ export class MotionMCPAgent extends McpAgent<Env> {
   }
 }
 
+/**
+ * Constant-time secret comparison.
+ *
+ * Hashes both values with SHA-256 and compares the digests with
+ * crypto.subtle.timingSafeEqual. timingSafeEqual requires equal-length
+ * buffers; the fixed-length (32-byte) SHA-256 digests always satisfy that,
+ * so inputs of differing length are handled without leaking length via an
+ * early return. Hashing also avoids a direct timing signal on the raw
+ * secret bytes.
+ */
+async function secretsMatch(provided: string, expected: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const [providedDigest, expectedDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(provided)),
+    crypto.subtle.digest("SHA-256", encoder.encode(expected)),
+  ]);
+  return crypto.subtle.timingSafeEqual(providedDigest, expectedDigest);
+}
+
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
 
     // Health check endpoint
@@ -67,14 +86,20 @@ export default {
       );
     }
 
-    // Validate secret path: /mcp/{secret}/...
-    // Clients configure URL as: https://your-worker.workers.dev/mcp/YOUR_SECRET
+    // Fail closed if no secret is configured. Without this, an unset
+    // MOTION_MCP_SECRET makes the comparison below `undefined === undefined`
+    // (or an empty-string match), which would authorize every request.
+    if (!env.MOTION_MCP_SECRET) {
+      return new Response("Server misconfigured", { status: 500 });
+    }
+
     const pathParts = url.pathname.split("/").filter(Boolean);
 
     // SSE message endpoint: the SSE stream's `endpoint` event advertises the
     // rewritten path (/mcp/message?sessionId=...), which has no secret segment.
     // The sessionId is unguessable and only issued on a stream opened with the
-    // secret, so it authenticates these POSTs.
+    // secret, so it authenticates these POSTs. This branch remains
+    // sessionId-authenticated for legacy SSE compatibility.
     if (
       pathParts[0] === "mcp" &&
       pathParts[1] === "message" &&
@@ -86,13 +111,31 @@ export default {
       ).fetch(request, env, ctx);
     }
 
-    if (pathParts[0] !== "mcp" || pathParts[1] !== env.MOTION_MCP_SECRET) {
+    // Two authentication modes, both checked in constant time:
+    //   1. Authorization: Bearer <secret> header (preferred; keeps the secret
+    //      out of the URL for header-capable clients). The path is already
+    //      clean in this mode (e.g. /mcp or /mcp/sse), so no rewrite is needed.
+    //   2. URL path secret: /mcp/<secret>/... (backward compatible). Clients
+    //      configure URL as https://your-worker.workers.dev/mcp/YOUR_SECRET.
+    // If a Bearer header is present it is used; otherwise the path segment is.
+    const authHeader = request.headers.get("Authorization");
+    const bearerSecret =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.slice("Bearer ".length).trim()
+        : null;
+    const usedBearer = bearerSecret !== null;
+    const providedSecret = usedBearer ? bearerSecret : (pathParts[1] ?? "");
+
+    if (pathParts[0] !== "mcp" || !(await secretsMatch(providedSecret, env.MOTION_MCP_SECRET))) {
       return new Response("Not found", { status: 404 });
     }
 
-    // Rewrite path to strip the secret before passing to McpAgent
+    // Determine the path passed to McpAgent. With Bearer auth the path carries
+    // no secret segment to strip; with path-secret auth, strip the secret.
     // e.g., /mcp/SECRET -> /mcp, /mcp/SECRET/sse -> /mcp/sse
-    const cleanPath = "/mcp" + (pathParts.length > 2 ? "/" + pathParts.slice(2).join("/") : "");
+    const cleanPath = usedBearer
+      ? "/" + pathParts.join("/")
+      : "/mcp" + (pathParts.length > 2 ? "/" + pathParts.slice(2).join("/") : "");
     const cleanUrl = new URL(cleanPath, url.origin);
     const cleanRequest = new Request(cleanUrl, request);
 

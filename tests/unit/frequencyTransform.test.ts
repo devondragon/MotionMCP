@@ -156,7 +156,22 @@ describe('transformFrequencyToApiString', () => {
       })).toBe('monthly_any_week_day_second_week');
     });
 
-    it('returns monthly_any_day_last_week', () => {
+    it('returns monthly_any_day_first_week when weekOfMonth given without daysOfWeek', () => {
+      expect(transformFrequencyToApiString({
+        type: 'monthly',
+        weekOfMonth: 'last'
+      })).toBe('monthly_any_day_last_week');
+    });
+
+    it('throws for arbitrary multi-day set with weekOfMonth instead of silently discarding days', () => {
+      expect(() => transformFrequencyToApiString({
+        type: 'monthly',
+        daysOfWeek: [1, 3],
+        weekOfMonth: 'first'
+      })).toThrow('Unsupported multi-day recurrence pattern');
+    });
+
+    it('maps all-seven-days set with weekOfMonth to the any-day pattern (lossless)', () => {
       expect(transformFrequencyToApiString({
         type: 'monthly',
         daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
@@ -249,6 +264,14 @@ describe('transformFrequencyToApiString', () => {
         type: 'quarterly',
         daysOfWeek: [1, 3, 5] // Not weekdays, not single day
       })).toThrow('Unsupported multi-day selection for quarterly patterns');
+    });
+
+    it('throws for arbitrary multi-day set with weekOfMonth instead of silently discarding days', () => {
+      expect(() => transformFrequencyToApiString({
+        type: 'quarterly',
+        daysOfWeek: [1, 3],
+        weekOfMonth: 'first'
+      })).toThrow('Unsupported multi-day recurrence pattern');
     });
   });
 
@@ -502,6 +525,28 @@ describe('validateFrequencyObject', () => {
       const result = validateFrequencyObject({ type: 'monthly', monthOfQuarter: 1 });
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('monthOfQuarter is not supported for monthly patterns');
+    });
+
+    it('rejects arbitrary multi-day set with weekOfMonth for monthly', () => {
+      const result = validateFrequencyObject({ type: 'monthly', daysOfWeek: [1, 3], weekOfMonth: 'first' });
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain('Unsupported multi-day recurrence pattern');
+    });
+
+    it('rejects arbitrary multi-day set with weekOfMonth for quarterly', () => {
+      const result = validateFrequencyObject({ type: 'quarterly', daysOfWeek: [1, 3], weekOfMonth: 'first' });
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain('Unsupported multi-day recurrence pattern');
+    });
+
+    it('accepts weekdays (Mon-Fri) with weekOfMonth for monthly', () => {
+      const result = validateFrequencyObject({ type: 'monthly', daysOfWeek: [1, 2, 3, 4, 5], weekOfMonth: 'first' });
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts a single day with weekOfMonth for quarterly', () => {
+      const result = validateFrequencyObject({ type: 'quarterly', daysOfWeek: [1], weekOfMonth: 'first' });
+      expect(result.valid).toBe(true);
     });
   });
 });
