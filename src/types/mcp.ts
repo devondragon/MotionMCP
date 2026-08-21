@@ -41,7 +41,7 @@ export interface TruncationInfo {
   returnedCount: number;
   reason?: 'page_size_limit' | 'max_items' | 'max_pages' | 'error';
   limit?: number;
-  /** True when client-side filters (priority/dueDate) reduced the result set after pagination */
+  /** True when client-side filters (name/priority/dueDate) reduced the result set after pagination */
   clientFiltered?: boolean;
   /** Number of items fetched before client-side filtering was applied */
   fetchedCount?: number;

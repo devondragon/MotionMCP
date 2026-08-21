@@ -121,7 +121,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       name: {
         type: "string",
-        description: "Task name (required for create, optional for list as case-insensitive substring search)"
+        description: "Task name (required for create, optional for list as case-insensitive substring search, filtered client-side)"
       },
       description: {
         type: "string",

@@ -63,9 +63,16 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
       maxPages
     });
 
-    // Client-side filters for params not supported by the API
+    // Client-side filters — applied after fetch because the Motion API either
+    // doesn't support these as query params (priority, dueDate) or because
+    // sending them server-side can hang for certain parameter combinations (name
+    // combined with projectId + includeAllStatuses causes the API to never respond).
     const applyClientFilters = (tasks: MotionTask[]): MotionTask[] => {
       let filtered = tasks;
+      if (name) {
+        const lowerName = name.toLowerCase();
+        filtered = filtered.filter(t => t.name?.toLowerCase().includes(lowerName));
+      }
       if (priority) {
         filtered = filtered.filter(t => t.priority === priority);
       }
@@ -110,10 +117,7 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
       if (assigneeId) {
         params.append('assigneeId', assigneeId);
       }
-      // Note: priority and dueDate are NOT valid API query params — filtered client-side after fetch
-      if (name) {
-        params.append('name', name);
-      }
+      // Note: name, priority, and dueDate are filtered client-side after fetch
       if (labels && labels.length > 0) {
         // API accepts 'label' (singular) as a string parameter
         for (const label of labels) {
@@ -136,7 +140,7 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
       // When client-side filters are active, don't cap pagination with maxItems
       // because valid matches may exist beyond the first batch. Fetch all pages
       // and apply the limit after filtering instead.
-      const hasClientFilters = Boolean(priority || dueDate);
+      const hasClientFilters = Boolean(name || priority || dueDate);
       const paginatedResult = await fetchAllPagesNew<MotionTask>(fetchPage, 'tasks', {
         maxPages,
         logProgress: false,  // Less verbose for tasks

@@ -28,7 +28,7 @@ export function formatTruncationNotice(truncation?: TruncationInfo): string {
 
   // When client-side filtering reduced the result set after paginated fetching
   if (truncation.clientFiltered && truncation.fetchedCount) {
-    return `\n\nNote: Priority/due-date filtering was applied client-side after fetching ${truncation.fetchedCount} tasks (${TRUNCATION_REASON_MESSAGES[truncation.reason!] || 'due to pagination limits'}). ${truncation.returnedCount} tasks matched. There may be additional matching tasks on unfetched pages.`;
+    return `\n\nNote: Name/priority/due-date filtering was applied client-side after fetching ${truncation.fetchedCount} tasks (${TRUNCATION_REASON_MESSAGES[truncation.reason!] || 'due to pagination limits'}). ${truncation.returnedCount} tasks matched. There may be additional matching tasks on unfetched pages.`;
   }
 
   const reason = truncation.reason ? TRUNCATION_REASON_MESSAGES[truncation.reason] || '' : '';
