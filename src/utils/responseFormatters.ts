@@ -134,9 +134,18 @@ export function formatTaskList(
     if (task.dueDate) {
       line += ` (Due: ${formatDateOnly(task.dueDate, timeZone)})`;
     }
+    if (task.startOn) {
+      line += ` (Start: ${formatDateOnly(task.startOn, timeZone)})`;
+    }
+    if (task.scheduledEnd) {
+      line += ` (Scheduled End: ${formatDateOnly(task.scheduledEnd, timeZone)})`;
+    }
+    if (task.schedulingIssue) {
+      line += ` [SCHEDULING ISSUE]`;
+    }
     return line;
   };
-  
+
   let title = `Found ${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`;
   if (allWorkspaces) {
     title += ` across all workspaces`;
@@ -160,7 +169,11 @@ export function formatTaskList(
   let responseText = `${title}:\n${list}`;
   responseText += formatTruncationNotice(truncation);
 
-  return formatMcpSuccess(responseText);
+  const structured: Record<string, unknown> = {
+    tasks: tasks.map(taskToStructuredContent),
+  };
+
+  return formatMcpSuccess(responseText, structured);
 }
 
 /**
@@ -213,6 +226,41 @@ export function formatDetailResponse<T extends Record<string, any>>(
 }
 
 /**
+ * Project a task into a flat object carrying raw ISO 8601 timestamps so that
+ * machine consumers (dashboards, at-risk math) can index fields directly
+ * without parsing the prose text.
+ */
+export function taskToStructuredContent(task: MotionTask): Record<string, unknown> {
+  return {
+    id: task.id,
+    name: task.name,
+    status: typeof task.status === 'string' ? task.status : task.status?.name ?? null,
+    priority: task.priority ?? null,
+    completed: task.completed,
+    dueDate: task.dueDate ?? null,
+    startOn: task.startOn ?? null,
+    scheduledStart: task.scheduledStart ?? null,
+    scheduledEnd: task.scheduledEnd ?? null,
+    schedulingIssue: task.schedulingIssue ?? null,
+    createdTime: task.createdTime ?? null,
+    updatedTime: task.updatedTime ?? null,
+    completedTime: task.completedTime ?? null,
+    workspaceId: task.workspace?.id ?? null,
+    projectId: task.project?.id ?? null,
+    chunks: task.chunks
+      ? task.chunks.map(c => ({
+          id: c.id ?? null,
+          duration: c.duration ?? null,
+          scheduledStart: c.scheduledStart ?? null,
+          scheduledEnd: c.scheduledEnd ?? null,
+          completedTime: c.completedTime ?? null,
+          isFixed: c.isFixed ?? null,
+        }))
+      : [],
+  };
+}
+
+/**
  * Format single task detail response with comprehensive information
  */
 export function formatTaskDetail(task: MotionTask, timeZone?: string): CallToolResult {
@@ -224,6 +272,8 @@ export function formatTaskDetail(task: MotionTask, timeZone?: string): CallToolR
     `Priority: ${task.priority || 'Not set'}`,
     `Completed: ${task.completed ? 'Yes' : 'No'}`,
     task.dueDate ? `Due Date: ${formatTimestamp(task.dueDate, timeZone)}` : 'Due Date: Not set',
+    task.startOn ? `Start On: ${formatDateOnly(task.startOn, timeZone)}` : null,
+    task.schedulingIssue ? `Scheduling Issue: Yes` : null,
     task.createdTime ? `Created: ${formatTimestamp(task.createdTime, timeZone)}` : null,
     task.updatedTime ? `Last Updated: ${formatTimestamp(task.updatedTime, timeZone)}` : null,
     task.completedTime ? `Completed: ${formatTimestamp(task.completedTime, timeZone)}` : null,
@@ -242,7 +292,9 @@ export function formatTaskDetail(task: MotionTask, timeZone?: string): CallToolR
     task.scheduledEnd ? `Scheduled End: ${formatTimestamp(task.scheduledEnd, timeZone)}` : null,
     task.parentRecurringTaskId ? `Recurring Task ID: ${task.parentRecurringTaskId}` : null,
     task.chunks && task.chunks.length > 0
-      ? `Scheduled Chunks: ${task.chunks.length} time block(s)`
+      ? `Scheduled Chunks (${task.chunks.length}):\n${task.chunks.map((c, i) =>
+          `  ${i + 1}. ${formatTimestamp(c.scheduledStart, timeZone)} - ${formatTimestamp(c.scheduledEnd, timeZone)} (${c.duration} min${c.isFixed ? ', fixed' : ''})`
+        ).join('\n')}`
       : null,
     task.customFieldValues && Object.keys(task.customFieldValues).length > 0
       ? `Custom Fields:\n${Object.entries(task.customFieldValues).map(([valueId, cfv]) =>
@@ -251,7 +303,7 @@ export function formatTaskDetail(task: MotionTask, timeZone?: string): CallToolR
       : null
   ].filter(Boolean).join('\n');
 
-  return formatMcpSuccess(details);
+  return formatMcpSuccess(details, taskToStructuredContent(task));
 }
 
 interface SearchOptions {
