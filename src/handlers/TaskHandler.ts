@@ -12,7 +12,8 @@ import {
   normalizeDueDateForApi
 } from '../utils';
 import { resolveDisplayTimeZone } from '../utils/dateFormat';
-import { isValidPriority, parseFilterDate, ValidPriority } from '../utils/constants';
+import { isValidPriority, parseFilterDate, ValidPriority, LOG_LEVELS } from '../utils/constants';
+import { mcpLog } from '../utils/logger';
 
 /** Parameters for creating a new task */
 interface CreateTaskParams {
@@ -356,7 +357,10 @@ export class TaskHandler extends BaseHandler {
   private async resolveTimeZone(): Promise<string | undefined> {
     try {
       return resolveDisplayTimeZone(await this.motionService.getSchedules());
-    } catch {
+    } catch (error) {
+      mcpLog(LOG_LEVELS.WARN, 'Timezone resolution failed, timestamps will omit local time', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       return undefined;
     }
   }
