@@ -66,8 +66,10 @@ export class MotionMCPAgent extends McpAgent<Env> {
  * so inputs of differing length are handled without leaking length via an
  * early return. Hashing also avoids a direct timing signal on the raw
  * secret bytes.
+ *
+ * Exported so the Worker auth tests can exercise it directly under workerd.
  */
-async function secretsMatch(provided: string, expected: string): Promise<boolean> {
+export async function secretsMatch(provided: string, expected: string): Promise<boolean> {
   const encoder = new TextEncoder();
   const [providedDigest, expectedDigest] = await Promise.all([
     crypto.subtle.digest("SHA-256", encoder.encode(provided)),
@@ -159,7 +161,15 @@ export default {
     const cleanPath = usedBearer
       ? "/" + pathParts.join("/")
       : "/mcp" + (pathParts.length > 2 ? "/" + pathParts.slice(2).join("/") : "");
+    // Carry the caller's query string across the rewrite. Only the path holds
+    // the secret in path-secret mode, so building the rewritten URL from the
+    // path alone silently dropped every query param the agent needs (notably
+    // sessionId on a message POST that did not match the branch above).
+    // SSE_SECRET_PARAM is this Worker's own signalling param: drop whatever a
+    // client sent under that name so only the value set below reaches the agent.
     const cleanUrl = new URL(cleanPath, url.origin);
+    cleanUrl.search = url.search;
+    cleanUrl.searchParams.delete(SSE_SECRET_PARAM);
 
     // Streamable HTTP (POST/DELETE /mcp, or GET with an mcp-session-id header)
     // is served by serve(); a bare GET on /mcp is a legacy SSE stream via mount().
