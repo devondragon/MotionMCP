@@ -33,7 +33,7 @@ All notable changes to this project will be documented in this file.
 
 - `motion_statuses` accepts `operation` and `workspaceName` (with name resolution), matching the other tools. (#132)
 - All 10 tool schemas set `additionalProperties: false`, so unknown properties are rejected rather than ignored. Note this makes the previously undocumented `entityTypes` property on `motion_search` an error; use `searchScope`. (#132)
-- `motion_tasks` `update` with `assigneeId: ""` is now a no-op rather than forwarding an empty string. Use the `unassign` operation to clear an assignee. (#132)
+- **Empty assignee identifiers are rejected**: `assigneeId` and `assignee` on `motion_tasks`, and `assigneeId` on `motion_recurring_tasks`, now carry `minLength: 1`. An empty string previously reached the handler and was silently dropped, so `update` appeared to succeed while changing nothing. Callers now get a validation error; use the `unassign` operation to clear a task's assignee. (#132)
 
 ### 🧪 Testing
 

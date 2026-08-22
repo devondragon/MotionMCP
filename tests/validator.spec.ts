@@ -31,4 +31,50 @@ describe('InputValidator', () => {
     expect(nope.valid).toBe(false);
     expect(String(nope.errors)).toContain('No validator found for tool');
   });
+
+  it('rejects empty assignee identifiers instead of silently ignoring them', () => {
+    const validator = new InputValidator();
+    validator.initializeValidators(allToolDefinitions);
+
+    // An empty assigneeId used to reach the handler and be dropped by
+    // resolveAssignee, so `update` silently did nothing. Reject it at the
+    // schema boundary so the caller gets an error and is pointed at unassign.
+    const emptyId = validator.validateInput('motion_tasks', {
+      operation: 'update',
+      taskId: 'task-1',
+      assigneeId: ''
+    });
+    expect(emptyId.valid).toBe(false);
+    expect(String(emptyId.errors)).toContain('assigneeId');
+
+    const emptyName = validator.validateInput('motion_tasks', {
+      operation: 'update',
+      taskId: 'task-1',
+      assignee: ''
+    });
+    expect(emptyName.valid).toBe(false);
+    expect(String(emptyName.errors)).toContain('assignee');
+
+    const emptyRecurring = validator.validateInput('motion_recurring_tasks', {
+      operation: 'create',
+      assigneeId: ''
+    });
+    expect(emptyRecurring.valid).toBe(false);
+    expect(String(emptyRecurring.errors)).toContain('assigneeId');
+
+    // Non-empty values still pass, and omitting the field is still fine.
+    expect(
+      validator.validateInput('motion_tasks', {
+        operation: 'update',
+        taskId: 'task-1',
+        assigneeId: 'me'
+      }).valid
+    ).toBe(true);
+    expect(
+      validator.validateInput('motion_tasks', {
+        operation: 'update',
+        taskId: 'task-1'
+      }).valid
+    ).toBe(true);
+  });
 });

@@ -98,11 +98,13 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       assigneeId: {
         type: "string",
-        description: "Assignee user ID, or the 'me' shortcut for the current user. Filters on list/list_all_uncompleted; sets the assignee on create/update; reassigns on move. The 'me' shortcut is resolved to a concrete ID for all of these."
+        minLength: 1,
+        description: "Assignee user ID, or the 'me' shortcut for the current user. Filters on list/list_all_uncompleted; sets the assignee on create/update; reassigns on move. The 'me' shortcut is resolved to a concrete ID for all of these. Must be non-empty; use the unassign operation to clear a task's assignee."
       },
       assignee: {
         type: "string",
-        description: "Assignee name, email, or the 'me' shortcut. Resolved to an ID automatically for list, list_all_uncompleted, create, update, and move. A name that cannot be resolved returns an error."
+        minLength: 1,
+        description: "Assignee name, email, or the 'me' shortcut. Resolved to an ID automatically for list, list_all_uncompleted, create, update, and move. A name that cannot be resolved returns an error. Must be non-empty; use the unassign operation to clear a task's assignee."
       },
       priority: {
         type: "string",
@@ -399,7 +401,8 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
       },
       assigneeId: {
         type: "string",
-        description: "User ID to assign the recurring task to. Required for: create."
+        minLength: 1,
+        description: "User ID, or the 'me' shortcut for the current user. Required for: create."
       },
       frequency: {
         type: "object",
