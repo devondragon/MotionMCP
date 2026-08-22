@@ -16,9 +16,10 @@ npm run mcp:dev            # Start MCP server (ts-node, no build needed)
 npm run type-check         # Type checking without emitting files
 
 # Testing (vitest)
-npm test                   # Run all unit tests
+npm test                   # Run all unit tests (node + worker projects)
 npm test -- handlers.task  # Run a single test file by name fragment
 npm test -- --reporter=verbose  # Run with verbose output
+npm run test:worker        # Worker auth tests only (runs in workerd)
 npm run test:integration   # Integration tests (requires MOTION_API_KEY in .env)
 
 # Worker (Cloudflare)
@@ -35,11 +36,17 @@ timeout 3s npm run mcp
 
 ## Testing
 
-Uses **vitest**. Unit tests in `tests/**/*.spec.ts`, integration tests in `tests/integration/**/*.integration.test.ts`.
+Uses **vitest**. `vitest.config.mts` defines two projects that both run under `npm test`:
 
-- Unit tests: 10s timeout, mocked services, `tests/setup.ts` silences console.error
+- **node** — unit tests in `tests/**/*.spec.ts`, 10s timeout, mocked services, `tests/setup.ts` silences console.error
+- **worker** — `tests/worker/**/*.spec.ts`, run inside workerd via `@cloudflare/vitest-pool-workers`
+
+Integration tests live in `tests/integration/**/*.integration.test.ts` and use their own config.
+
 - Integration tests: 60s timeout, sequential execution (rate limits), requires `MOTION_API_KEY` env var
 - Handler tests mock `MotionApiService` and `WorkspaceResolver`; service returns use `ListResult<T>` shape (`{ items, truncation }`)
+- Worker tests cover `src/worker.ts` authentication. They must run in workerd, not Node: `crypto.subtle.timingSafeEqual` is a Workers extension Node does not implement, and the path rewrites depend on Workers `Request`/`URL` semantics. Bindings come from `wrangler.toml` with fake `MOTION_API_KEY`/`MOTION_MCP_SECRET` values injected in the config, and `MotionMCPAgent.serve()/mount()` are stubbed so authorized requests are observable without a live MCP session.
+- The config is `.mts` because `@cloudflare/vitest-pool-workers` is ESM-only and the package is CommonJS.
 
 ## Architecture
 
