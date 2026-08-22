@@ -31,7 +31,7 @@ export default defineConfig({
         ],
         test: {
           name: 'worker',
-          include: ['tests/worker/**/*.spec.ts'],
+          include: ['tests/worker/**/*.{test,spec}.ts'],
           testTimeout: 10000
         }
       }

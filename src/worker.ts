@@ -183,7 +183,15 @@ export default {
     // the branch above then authenticates. Bearer clients send the header on the
     // POST instead, so no param is added for them (keeping the secret out of the
     // URL, which is the point of Bearer mode).
-    if (!isStreamableHttp && !usedBearer) {
+    //
+    // Restricted to GET, the only method that opens a stream. Other requests
+    // reaching mount() (e.g. a message POST addressed as /mcp/<secret>/message,
+    // which does not match the branch above) have nothing to advertise, and the
+    // secret on their URL would be a pointless exposure: an exception inside the
+    // Durable Object surfaces the request URL in Workers trace events, so it
+    // would reach `wrangler tail` and any Logpush sink. The dedicated message
+    // branch strips the param for the same reason.
+    if (!isStreamableHttp && !usedBearer && request.method === "GET") {
       cleanUrl.searchParams.set(SSE_SECRET_PARAM, env.MOTION_MCP_SECRET);
     }
 

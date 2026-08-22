@@ -295,6 +295,21 @@ describe("worker auth", () => {
       expect(url.searchParams.get("sessionId")).toBe("session-1");
     });
 
+    it("puts the secret on the URL only for SSE stream opens, never a message POST", async () => {
+      // Nothing is advertised on a POST, so the secret on its URL would be a
+      // pointless exposure via Workers trace events. The dedicated /mcp/message
+      // branch strips the param; this fall-through path must agree with it.
+      await fetchWorker(
+        new Request(`https://example.com/mcp/${SECRET}/message?sessionId=session-1`, {
+          method: "POST",
+          body: "{}",
+        })
+      );
+
+      expect(agentUrl().searchParams.has("mcpSecret")).toBe(false);
+      expect(onlyAgentCall().url).not.toContain(SECRET);
+    });
+
     it("drops a client-supplied mcpSecret param, which only this Worker may set", async () => {
       await fetchWorker(
         new Request("https://example.com/mcp/sse?mcpSecret=client-injected", {
