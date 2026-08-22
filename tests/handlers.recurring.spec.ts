@@ -62,6 +62,7 @@ function makeContext() {
       labels: [],
     }),
     deleteRecurringTask: vi.fn().mockResolvedValue(undefined),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'me-id', name: 'Me', email: 'me@example.com' }),
   } as any;
 
   const workspaceResolver = {
@@ -125,6 +126,26 @@ describe('RecurringTaskHandler', () => {
         workspaceId: 'ws1',
         assigneeId: 'user1',
         frequency: { type: 'weekly' },
+      }));
+      expect(res.isError).toBeFalsy();
+    });
+
+    it("resolves the assigneeId 'me' shortcut to the current user, consistent with motion_tasks", async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new RecurringTaskHandler(ctx);
+      const args: MotionRecurringTasksArgs = {
+        operation: 'create',
+        name: 'New Recurring Task',
+        workspaceId: 'ws1',
+        assigneeId: 'me',
+        frequency: { type: 'weekly' },
+      };
+
+      const res = await handler.handle(args);
+
+      expect(motionService.getCurrentUser).toHaveBeenCalled();
+      expect(motionService.createRecurringTask).toHaveBeenCalledWith(expect.objectContaining({
+        assigneeId: 'me-id',
       }));
       expect(res.isError).toBeFalsy();
     });

@@ -64,10 +64,18 @@ export class RecurringTaskHandler extends BaseHandler {
       workspaceName: args.workspaceName
     });
 
+    // Resolve the 'me' shortcut to a concrete user ID, consistent with motion_tasks.
+    // (Unlike motion_tasks, this tool has no assignee-name field yet — only the
+    // 'me' shortcut and direct IDs are supported here.)
+    const resolvedAssigneeId =
+      args.assigneeId!.trim().toLowerCase() === 'me'
+        ? (await this.motionService.getCurrentUser()).id
+        : args.assigneeId!;
+
     const taskData: CreateRecurringTaskData = {
       name: args.name,
       workspaceId: workspace.id,
-      assigneeId: args.assigneeId,
+      assigneeId: resolvedAssigneeId,
       frequency,
       ...(args.description && { description: args.description }),
       ...(args.projectId && { projectId: args.projectId }),
