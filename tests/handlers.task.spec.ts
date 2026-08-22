@@ -212,4 +212,60 @@ describe('TaskHandler', () => {
 
     expect(ctx.motionService.moveTask).toHaveBeenCalledWith('t1', 'w2', 'me-id');
   });
+
+  it("scopes assignee-name resolution on update to the task's actual workspace instead of a cross-workspace scan", async () => {
+    const ctx = makeContext();
+    ctx.motionService.getTask = vi.fn().mockResolvedValue({ id: 't1', name: 'A', workspaceId: 'w1' });
+    // Two different "Jane"s in two workspaces; only the task's own workspace (w1) should resolve.
+    ctx.motionService.resolveUserIdentifier = vi.fn().mockImplementation((_ident: unknown, workspaceId: string) =>
+      Promise.resolve(
+        workspaceId === 'w1' ? { id: 'u-jane-w1', name: 'Jane', email: 'jane@w1.example.com' } : null
+      )
+    );
+    const handler = new TaskHandler(ctx);
+
+    await handler.handle({
+      operation: 'update',
+      taskId: 't1',
+      assignee: 'Jane'
+      // no workspaceId supplied — must be scoped via the task's own workspace, not a cross-workspace scan
+    } as any);
+
+    expect(ctx.motionService.getTask).toHaveBeenCalledWith('t1');
+    expect(ctx.motionService.resolveUserIdentifier).toHaveBeenCalledWith(
+      { userName: 'Jane' },
+      'w1',
+      { strictWorkspace: true }
+    );
+    expect(ctx.motionService.getWorkspaces).not.toHaveBeenCalled();
+    expect(ctx.motionService.updateTask).toHaveBeenCalledWith('t1', expect.objectContaining({
+      assigneeId: 'u-jane-w1'
+    }));
+  });
+
+  it('scopes assignee-name resolution on move to the destination workspace, not a cross-workspace scan', async () => {
+    const ctx = makeContext();
+    // Two different "Jane"s in two workspaces; only the destination workspace (w2) should resolve.
+    ctx.motionService.resolveUserIdentifier = vi.fn().mockImplementation((_ident: unknown, workspaceId: string) =>
+      Promise.resolve(
+        workspaceId === 'w2' ? { id: 'u-jane-w2', name: 'Jane', email: 'jane@w2.example.com' } : null
+      )
+    );
+    const handler = new TaskHandler(ctx);
+
+    await handler.handle({
+      operation: 'move',
+      taskId: 't1',
+      targetWorkspaceId: 'w2',
+      assignee: 'Jane'
+    } as any);
+
+    expect(ctx.motionService.resolveUserIdentifier).toHaveBeenCalledWith(
+      { userName: 'Jane' },
+      'w2',
+      { strictWorkspace: true }
+    );
+    expect(ctx.motionService.getWorkspaces).not.toHaveBeenCalled();
+    expect(ctx.motionService.moveTask).toHaveBeenCalledWith('t1', 'w2', 'u-jane-w2');
+  });
 });

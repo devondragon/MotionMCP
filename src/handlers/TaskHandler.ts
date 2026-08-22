@@ -431,13 +431,27 @@ export class TaskHandler extends BaseHandler {
     }
     // API accepts labels as plain string array per docs
     if (params.labels !== undefined) updateData.labels = params.labels;
+
+    // Resolve the task's workspaceId once (fetching only if needed) so assignee
+    // resolution and auto-scheduling validation both scope to the task's actual
+    // workspace instead of falling into a cross-workspace name lookup.
+    const needsWorkspaceId =
+      params.assigneeId !== undefined ||
+      params.assignee !== undefined ||
+      params.autoScheduled !== undefined;
+    let resolvedWorkspaceId = params.workspaceId;
+    if (!resolvedWorkspaceId && needsWorkspaceId) {
+      const task = await this.motionService.getTask(params.taskId!);
+      resolvedWorkspaceId = task.workspaceId;
+    }
+
     if (params.assigneeId !== undefined || params.assignee !== undefined) {
-      // Resolve the 'me' shortcut and assignee names (cross-workspace lookup when
-      // no workspaceId is provided). A supplied name that cannot be found throws.
+      // Resolve the 'me' shortcut and assignee names, scoped to the task's
+      // workspace. A supplied name that cannot be found throws.
       const { resolvedId } = await this.resolveAssignee(
         params.assigneeId,
         params.assignee,
-        params.workspaceId
+        resolvedWorkspaceId
       );
       if (resolvedId !== undefined) {
         updateData.assigneeId = resolvedId;
@@ -449,15 +463,9 @@ export class TaskHandler extends BaseHandler {
 
       // Validate auto-scheduling (same as create): catches "true" → {} silent no-op
       if (updateData.autoScheduled !== null && updateData.autoScheduled !== undefined) {
-        // Use provided workspaceId to avoid an extra GET; fall back to fetching if not supplied
-        let workspaceId = params.workspaceId;
-        if (!workspaceId) {
-          const task = await this.motionService.getTask(params.taskId!);
-          workspaceId = task.workspaceId;
-        }
         updateData.autoScheduled = await this.validateAndNormalizeAutoScheduling(
           updateData.autoScheduled,
-          workspaceId
+          resolvedWorkspaceId!
         );
       }
     }
@@ -494,11 +502,13 @@ export class TaskHandler extends BaseHandler {
       return this.handleError(new Error("Target workspace ID is required for move operation"));
     }
 
-    // Resolve the 'me' shortcut and assignee names (cross-workspace lookup) so a
-    // reassignment during the move uses a concrete user ID. Unresolvable names throw.
+    // Resolve the 'me' shortcut and assignee names, scoped to the destination
+    // workspace, so a reassignment during the move uses a concrete user ID from
+    // the workspace the task is moving into. Unresolvable names throw.
     const { resolvedId: resolvedAssigneeId } = await this.resolveAssignee(
       params.assigneeId,
-      params.assignee
+      params.assignee,
+      params.targetWorkspaceId
     );
 
     const movedTask = await this.motionService.moveTask(params.taskId, params.targetWorkspaceId, resolvedAssigneeId);
