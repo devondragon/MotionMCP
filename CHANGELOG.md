@@ -35,6 +35,11 @@ All notable changes to this project will be documented in this file.
 - All 10 tool schemas set `additionalProperties: false`, so unknown properties are rejected rather than ignored. Note this makes the previously undocumented `entityTypes` property on `motion_search` an error; use `searchScope`. (#132)
 - **Empty assignee identifiers are rejected**: `assigneeId` and `assignee` on `motion_tasks`, and `assigneeId` on `motion_recurring_tasks`, now carry `minLength: 1`. An empty string previously reached the handler and was silently dropped, so `update` appeared to succeed while changing nothing. Callers now get a validation error; use the `unassign` operation to clear a task's assignee. (#132)
 
+### 📦 Dependencies
+
+- **@hono/node-server**: 1.19.13 → 2.1.1, resolving Dependabot alert #149 (GHSA-frvp-7c67-39w9, path traversal in `serve-static` on Windows). Lockfile-only; the package is a transitive dependency of `@modelcontextprotocol/sdk` and is never imported by either entry point. (#134)
+- **Minimum Node.js is now 20** (was 18). Node 18 reached end of life in April 2025, and `@hono/node-server` 2.x declares `engines.node: ">=20"`, so installs on Node 18 emitted `EBADENGINE` warnings. Development targets Node 24, pinned in `mise.toml`.
+
 ### 🧪 Testing
 
 - Added regression coverage for assignee resolution and workspace scoping, sanitize tag anchoring, frequency transforms, duration parsing, validator cloning/coercion, custom tool de-duplication, and status/search/custom-field/recurring handler paths. 539 tests across 30 files.
