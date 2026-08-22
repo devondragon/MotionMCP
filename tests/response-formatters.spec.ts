@@ -92,6 +92,9 @@ describe('taskToStructuredContent', () => {
     expect(sc.schedulingIssue).toBeNull();
     expect(sc.completedTime).toBeNull();
     expect(sc.chunks).toEqual([]);
+    expect(sc.deadlineType).toBeNull();
+    expect(sc.duration).toBeNull();
+    expect(sc.labels).toEqual([]);
   });
 
   it('projects chunks with ?? null for stable serialization', () => {
@@ -108,6 +111,27 @@ describe('taskToStructuredContent', () => {
     expect(chunks[0].completedTime).toBeNull();
     expect(chunks[1].completedTime).toBe('2026-08-13T14:45:00.000Z');
     expect(chunks[1].isFixed).toBe(true);
+  });
+
+  it('projects deadlineType and duration', () => {
+    const task = makeTask({ deadlineType: 'HARD', duration: 90 });
+    const sc = taskToStructuredContent(task);
+    expect(sc.deadlineType).toBe('HARD');
+    expect(sc.duration).toBe(90);
+  });
+
+  it('preserves duration when the task could not be scheduled (schedulingIssue with empty chunks)', () => {
+    const task = makeTask({ schedulingIssue: true, chunks: [], duration: 45 });
+    const sc = taskToStructuredContent(task);
+    expect(sc.schedulingIssue).toBe(true);
+    expect(sc.chunks).toEqual([]);
+    expect(sc.duration).toBe(45);
+  });
+
+  it('normalizes labels from both string and {name} object forms', () => {
+    const task = makeTask({ labels: ['urgent', { name: 'backend' }] });
+    const sc = taskToStructuredContent(task);
+    expect(sc.labels).toEqual(['urgent', 'backend']);
   });
 });
 

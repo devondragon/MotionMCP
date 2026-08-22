@@ -247,6 +247,11 @@ export function taskToStructuredContent(task: MotionTask): Record<string, unknow
     completedTime: task.completedTime ?? null,
     workspaceId: task.workspace?.id ?? null,
     projectId: task.project?.id ?? null,
+    deadlineType: task.deadlineType ?? null,
+    duration: task.duration ?? null,
+    labels: Array.isArray(task.labels)
+      ? task.labels.map(l => (typeof l === 'string' ? l : l.name))
+      : [],
     chunks: task.chunks
       ? task.chunks.map(c => ({
           id: c.id ?? null,
