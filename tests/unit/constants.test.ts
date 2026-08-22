@@ -68,11 +68,12 @@ describe('parseFilterDate', () => {
       expect(parseFilterDate('2024')).toBeNull();
     });
 
-    it('handles date overflow behavior', () => {
-      // JavaScript Date allows some overflow - Feb 30 rolls to Mar 1
-      // parseFilterDate accepts YYYY-MM-DD format if it parses to valid Date
-      // NOTE: This means Feb 30 is accepted (becomes Mar 1 internally)
-      expect(parseFilterDate('2024-02-30')).toBe('2024-02-30');
+    it('rejects calendar dates that JS Date would silently roll over', () => {
+      // JavaScript Date normalizes overflow (e.g. Feb 30 -> Mar 1) instead of
+      // producing an Invalid Date. parseFilterDate checks the parsed components
+      // round-trip back to the exact input, so a rolled-over date is rejected
+      // rather than silently accepted as a different day.
+      expect(parseFilterDate('2024-02-30')).toBeNull();
 
       // Month 13 creates Invalid Date
       expect(parseFilterDate('2024-13-01')).toBeNull();
@@ -85,9 +86,9 @@ describe('parseFilterDate', () => {
       // 2024 is a leap year - Feb 29 is valid
       expect(parseFilterDate('2024-02-29')).toBe('2024-02-29');
 
-      // 2023 is not a leap year - Feb 29 rolls to Mar 1
-      // But parseFilterDate only validates format, not date validity
-      expect(parseFilterDate('2023-02-29')).toBe('2023-02-29');
+      // 2023 is not a leap year - Feb 29 rolls to Mar 1 in JS Date, so
+      // parseFilterDate must reject it as an invalid calendar date.
+      expect(parseFilterDate('2023-02-29')).toBeNull();
     });
   });
 

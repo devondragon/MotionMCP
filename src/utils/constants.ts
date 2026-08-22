@@ -198,10 +198,20 @@ export function parseFilterDate(dateInput: string, timeZone?: string): string | 
   }
 
   // Validate YYYY-MM-DD format
-  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-  if (datePattern.test(dateInput)) {
+  const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const match = datePattern.exec(dateInput);
+  if (match) {
+    const [, yearStr, monthStr, dayStr] = match;
     const parsedDate = new Date(dateInput + 'T00:00:00Z');
-    if (!isNaN(parsedDate.getTime())) {
+    // Date.UTC silently normalizes overflow (e.g. 2026-02-31 becomes March 3), so
+    // a non-NaN result alone doesn't mean the input was a real calendar date.
+    // Confirm the parsed components round-trip back to the exact input.
+    if (
+      !isNaN(parsedDate.getTime()) &&
+      parsedDate.getUTCFullYear() === Number(yearStr) &&
+      parsedDate.getUTCMonth() === Number(monthStr) - 1 &&
+      parsedDate.getUTCDate() === Number(dayStr)
+    ) {
       return dateInput;
     }
   }
