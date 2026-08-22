@@ -454,7 +454,7 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
           { type: "number", minimum: 0 },
           { type: "string", enum: ["REMINDER"] }
         ],
-        description: "Task duration in minutes (non-negative integer) or REMINDER"
+        description: "Task duration in minutes (non-negative number) or REMINDER"
       },
       startingOn: {
         type: "string",

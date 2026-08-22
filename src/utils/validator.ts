@@ -54,7 +54,15 @@ export class InputValidator {
       };
     }
 
-    const coerced = structuredClone(args);
+    let coerced: unknown;
+    try {
+      coerced = structuredClone(args);
+    } catch {
+      return {
+        valid: false,
+        errors: `Arguments for tool ${toolName} are not serializable`
+      };
+    }
     const valid = validator(coerced);
 
     if (!valid) {

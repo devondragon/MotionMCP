@@ -80,7 +80,6 @@ export async function fetchAllPages<T>(
           truncatedSize: LIMITS.MAX_PAGE_SIZE
         });
         unwrapped.data = unwrapped.data.slice(0, LIMITS.MAX_PAGE_SIZE);
-        truncation = { wasTruncated: true, returnedCount: 0, reason: 'page_size_limit', limit: LIMITS.MAX_PAGE_SIZE };
         pageSizeLimitReached = true;
       }
       
@@ -111,7 +110,12 @@ export async function fetchAllPages<T>(
       if (pageSizeLimitReached) {
         // A single page exceeded MAX_PAGE_SIZE and was sliced to an honest prefix.
         // Stop here rather than advancing the cursor, which would silently drop
-        // items 201+ of this page.
+        // items 201+ of this page. Record the truncation with the count actually
+        // returned, unless the max_items cap already fired this iteration (its
+        // truncation reason takes precedence).
+        if (truncation?.reason !== 'max_items') {
+          truncation = { wasTruncated: true, returnedCount: allItems.length, reason: 'page_size_limit', limit: LIMITS.MAX_PAGE_SIZE };
+        }
         hasMore = false;
       } else if (unwrapped.meta?.nextCursor) {
         const newCursor = unwrapped.meta.nextCursor;
