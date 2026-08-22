@@ -119,5 +119,7 @@ export interface MotionSchedulesArgs {
 }
 
 export interface MotionStatusesArgs {
+  operation?: 'list';
   workspaceId?: string;
+  workspaceName?: string;
 }

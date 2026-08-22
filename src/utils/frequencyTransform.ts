@@ -151,11 +151,24 @@ function transformMonthlyPattern(daysOfWeek?: number[], dayOfMonth?: number, wee
         const dayAbbrev = DAY_ABBREVIATIONS[daysOfWeek[0] as keyof typeof DAY_ABBREVIATIONS];
         return `monthly_${weekOfMonth}_${dayAbbrev}`;
       }
-      // Specific week + multiple days (not supported directly, use week pattern)
+      // Specific week + weekdays (Mon-Fri) maps to the any-week-day pattern
       if (isWeekdaysPattern(daysOfWeek)) {
         return `monthly_any_week_day_${weekOfMonth}_week`;
       }
-      return `monthly_any_day_${weekOfMonth}_week`;
+      // Specific week + all seven days is equivalent to "any day of that week";
+      // it discards nothing, so map it to the any-day pattern rather than reject.
+      if (new Set(daysOfWeek).size === 7) {
+        return `monthly_any_day_${weekOfMonth}_week`;
+      }
+      // Specific week + an arbitrary multi-day set cannot be represented without
+      // discarding which days were requested. Reject rather than silently lose them.
+      throw new Error(
+        'Unsupported multi-day recurrence pattern for monthly with weekOfMonth: ' + JSON.stringify(daysOfWeek) +
+        '. Monthly week patterns only support a single day-of-week (e.g., "monthly_first_MO"), ' +
+        'weekdays (Mon-Fri, "monthly_any_week_day_first_week"), or any day (omit daysOfWeek, "monthly_any_day_first_week"). ' +
+        'Returning "monthly_any_day_..._week" would silently discard the requested days. ' +
+        'See https://docs.usemotion.com/cookbooks/frequency/ for supported monthly patterns.'
+      );
     } else {
       // No week specified, use general month patterns
       if (isWeekdaysPattern(daysOfWeek)) {
@@ -196,6 +209,23 @@ function transformQuarterlyPattern(daysOfWeek?: number[], weekOfMonth?: string, 
   if (weekOfMonth) {
     if (daysOfWeek && isWeekdaysPattern(daysOfWeek)) {
       return `quarterly_any_week_day_${weekOfMonth}_week`;
+    }
+    // All seven days is equivalent to "any day of that week"; it discards
+    // nothing, so map it to the any-day pattern rather than reject.
+    if (daysOfWeek && new Set(daysOfWeek).size === 7) {
+      return `quarterly_any_day_${weekOfMonth}_week`;
+    }
+    // A single day is already handled above; reaching here with more than one
+    // day means an arbitrary multi-day set that cannot be represented without
+    // discarding which days were requested. Reject rather than silently lose them.
+    if (daysOfWeek && daysOfWeek.length > 1) {
+      throw new Error(
+        'Unsupported multi-day recurrence pattern for quarterly with weekOfMonth: ' + JSON.stringify(daysOfWeek) +
+        '. Quarterly week patterns only support a single day-of-week (e.g., "quarterly_first_MO"), ' +
+        'weekdays (Mon-Fri, "quarterly_any_week_day_first_week"), or any day (omit daysOfWeek, "quarterly_any_day_first_week"). ' +
+        'Returning "quarterly_any_day_..._week" would silently discard the requested days. ' +
+        'See https://docs.usemotion.com/cookbooks/frequency/#quarterly-patterns for supported quarterly patterns.'
+      );
     }
     return `quarterly_any_day_${weekOfMonth}_week`;
   }
@@ -331,6 +361,20 @@ export function validateFrequencyObject(frequency: FrequencyObject): FrequencyVa
       if (frequency.dayOfMonth) {
         return { valid: false, reason: 'dayOfMonth is not supported for quarterly patterns' };
       }
+      // A specific week plus an arbitrary multi-day set cannot be represented
+      // without discarding which days were requested (see transformQuarterlyPattern).
+      if (
+        frequency.weekOfMonth &&
+        frequency.daysOfWeek &&
+        frequency.daysOfWeek.length > 1 &&
+        !isWeekdaysPattern(frequency.daysOfWeek) &&
+        new Set(frequency.daysOfWeek).size !== 7
+      ) {
+        return {
+          valid: false,
+          reason: 'Unsupported multi-day recurrence pattern: quarterly with weekOfMonth supports a single day-of-week (e.g., "quarterly_first_MO"), weekdays (Mon-Fri), or all seven days, not an arbitrary set of days'
+        };
+      }
       break;
 
     case 'biweekly':
@@ -362,6 +406,20 @@ export function validateFrequencyObject(frequency: FrequencyObject): FrequencyVa
       // Monthly doesn't use monthOfQuarter
       if (frequency.monthOfQuarter) {
         return { valid: false, reason: 'monthOfQuarter is not supported for monthly patterns' };
+      }
+      // A specific week plus an arbitrary multi-day set cannot be represented
+      // without discarding which days were requested (see transformMonthlyPattern).
+      if (
+        frequency.weekOfMonth &&
+        frequency.daysOfWeek &&
+        frequency.daysOfWeek.length > 1 &&
+        !isWeekdaysPattern(frequency.daysOfWeek) &&
+        new Set(frequency.daysOfWeek).size !== 7
+      ) {
+        return {
+          valid: false,
+          reason: 'Unsupported multi-day recurrence pattern: monthly with weekOfMonth supports a single day-of-week (e.g., "monthly_first_MO"), weekdays (Mon-Fri), or all seven days, not an arbitrary set of days'
+        };
       }
       break;
   }

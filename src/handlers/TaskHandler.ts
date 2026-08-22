@@ -9,7 +9,8 @@ import {
   parseArrayParam,
   formatTaskList,
   formatTaskDetail,
-  normalizeDueDateForApi
+  normalizeDueDateForApi,
+  parseDurationValue
 } from '../utils';
 import { resolveDisplayTimeZone } from '../utils/dateFormat';
 import { isValidPriority, parseFilterDate, ValidPriority, LOG_LEVELS } from '../utils/constants';
@@ -28,6 +29,8 @@ interface CreateTaskParams {
   dueDate?: string;
   duration?: string | number;
   labels?: string[];
+  assigneeId?: string;
+  assignee?: string;
   autoScheduled?: Record<string, unknown> | null;
 }
 
@@ -66,6 +69,7 @@ interface UpdateTaskParams {
   labels?: string[];
   autoScheduled?: Record<string, unknown> | null;
   assigneeId?: string;
+  assignee?: string;
 }
 
 /** Parameters for deleting a task */
@@ -78,6 +82,7 @@ interface MoveTaskParams {
   taskId?: string;
   targetWorkspaceId?: string;
   assigneeId?: string;
+  assignee?: string;
 }
 
 /** Parameters for removing the assignee from a task */
@@ -202,6 +207,14 @@ export class TaskHandler extends BaseHandler {
       targetWorkspaceId
     );
 
+    // Resolve a supplied assignee name or the 'me' shortcut to a concrete user ID
+    // in the task's target workspace. A supplied name that cannot be found throws.
+    const { resolvedId: resolvedAssigneeId } = await this.resolveAssignee(
+      taskData.assigneeId,
+      taskData.assignee,
+      targetWorkspaceId
+    );
+
     // Zone-aware relative-date resolution ('today' means today in the account's
     // schedule zone, not UTC). Cached lookup; failure degrades to UTC resolution.
     const dueDateZone = taskData.dueDate ? await this.resolveTimeZone() : undefined;
@@ -215,7 +228,7 @@ export class TaskHandler extends BaseHandler {
       dueDate: normalizeDueDateForApi(taskData.dueDate, dueDateZone),
       duration: convertedDuration,
       labels: convertedLabels,
-      assigneeId: taskData.assigneeId,
+      assigneeId: resolvedAssigneeId,
       autoScheduled: taskData.autoScheduled,
       workspaceId: targetWorkspaceId
     });
@@ -418,22 +431,41 @@ export class TaskHandler extends BaseHandler {
     }
     // API accepts labels as plain string array per docs
     if (params.labels !== undefined) updateData.labels = params.labels;
-    if (params.assigneeId !== undefined) updateData.assigneeId = params.assigneeId;
+
+    // Resolve the task's workspaceId once (fetching only if needed) so assignee
+    // resolution and auto-scheduling validation both scope to the task's actual
+    // workspace instead of falling into a cross-workspace name lookup.
+    const needsWorkspaceId =
+      params.assigneeId !== undefined ||
+      params.assignee !== undefined ||
+      params.autoScheduled !== undefined;
+    let resolvedWorkspaceId = params.workspaceId;
+    if (!resolvedWorkspaceId && needsWorkspaceId) {
+      const task = await this.motionService.getTask(params.taskId!);
+      resolvedWorkspaceId = task.workspaceId;
+    }
+
+    if (params.assigneeId !== undefined || params.assignee !== undefined) {
+      // Resolve the 'me' shortcut and assignee names, scoped to the task's
+      // workspace. A supplied name that cannot be found throws.
+      const { resolvedId } = await this.resolveAssignee(
+        params.assigneeId,
+        params.assignee,
+        resolvedWorkspaceId
+      );
+      if (resolvedId !== undefined) {
+        updateData.assigneeId = resolvedId;
+      }
+    }
     if (params.autoScheduled !== undefined) {
       // Normalize string shorthand (e.g., "Work Hours") to { schedule: "Work Hours" }
       updateData.autoScheduled = parseAutoScheduledParam(params.autoScheduled);
 
       // Validate auto-scheduling (same as create): catches "true" → {} silent no-op
       if (updateData.autoScheduled !== null && updateData.autoScheduled !== undefined) {
-        // Use provided workspaceId to avoid an extra GET; fall back to fetching if not supplied
-        let workspaceId = params.workspaceId;
-        if (!workspaceId) {
-          const task = await this.motionService.getTask(params.taskId!);
-          workspaceId = task.workspaceId;
-        }
         updateData.autoScheduled = await this.validateAndNormalizeAutoScheduling(
           updateData.autoScheduled,
-          workspaceId
+          resolvedWorkspaceId!
         );
       }
     }
@@ -470,7 +502,16 @@ export class TaskHandler extends BaseHandler {
       return this.handleError(new Error("Target workspace ID is required for move operation"));
     }
 
-    const movedTask = await this.motionService.moveTask(params.taskId, params.targetWorkspaceId, params.assigneeId);
+    // Resolve the 'me' shortcut and assignee names, scoped to the destination
+    // workspace, so a reassignment during the move uses a concrete user ID from
+    // the workspace the task is moving into. Unresolvable names throw.
+    const { resolvedId: resolvedAssigneeId } = await this.resolveAssignee(
+      params.assigneeId,
+      params.assignee,
+      params.targetWorkspaceId
+    );
+
+    const movedTask = await this.motionService.moveTask(params.taskId, params.targetWorkspaceId, resolvedAssigneeId);
     if (movedTask?.name) {
       return formatMcpSuccess(`Successfully moved task "${movedTask.name}" (ID: ${movedTask.id})`);
     }
@@ -583,25 +624,10 @@ export class TaskHandler extends BaseHandler {
   /**
    * Parse and validate task duration from user input.
    * Accepts non-negative integer minutes or special values NONE/REMINDER.
+   * Delegates to the shared parseDurationValue helper.
    */
   private parseDurationValue(duration: string | number): number | 'NONE' | 'REMINDER' {
-    if (typeof duration === 'number') {
-      if (!Number.isInteger(duration) || duration < 0) {
-        throw new Error('Duration must be a non-negative integer number of minutes, or "NONE"/"REMINDER".');
-      }
-      return duration;
-    }
-
-    const trimmed = duration.trim();
-    if (trimmed === 'NONE' || trimmed === 'REMINDER') {
-      return trimmed;
-    }
-
-    if (!/^\d+$/.test(trimmed)) {
-      throw new Error('Duration must be a non-negative integer number of minutes, or "NONE"/"REMINDER".');
-    }
-
-    return parseInt(trimmed, 10);
+    return parseDurationValue(duration, ['NONE', 'REMINDER']) as number | 'NONE' | 'REMINDER';
   }
 
   /**

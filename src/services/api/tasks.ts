@@ -195,10 +195,13 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
     const response = await fetchPage();
     const unwrapped = unwrapApiResponse<MotionTask>(response.data, 'tasks');
     let tasks = applyClientFilters(unwrapped.data);
+    const hasMoreData = Boolean(unwrapped.meta?.nextCursor);
 
     // Apply limit if specified
-    if (limit && limit > 0) {
+    let slicedToLimit = false;
+    if (limit && limit > 0 && tasks.length > limit) {
       tasks = tasks.slice(0, limit);
+      slicedToLimit = true;
     }
 
     mcpLog(LOG_LEVELS.INFO, 'Tasks fetched successfully (single page)', {
@@ -209,7 +212,15 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
       limitApplied: limit
     });
 
-    return { items: tasks, truncation: { wasTruncated: true, returnedCount: tasks.length, reason: 'error' } };
+    // Report truncation only when it reflects reality: the fallback page had more
+    // data (a nextCursor) or the result was sliced down to the requested limit.
+    let truncation: TruncationInfo | undefined;
+    if (slicedToLimit) {
+      truncation = { wasTruncated: true, returnedCount: tasks.length, reason: 'max_items', limit };
+    } else if (hasMoreData) {
+      truncation = { wasTruncated: true, returnedCount: tasks.length, reason: 'error' };
+    }
+    return { items: tasks, truncation };
   } catch (error: unknown) {
     mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch tasks', {
       method: 'getTasks',

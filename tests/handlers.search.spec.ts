@@ -57,6 +57,40 @@ describe('SearchHandler', () => {
     expect(text).not.toContain('[project]');
   });
 
+  it('echoes the actual searchScope value (not the joined entity types)', async () => {
+    const ctx = makeContext();
+    const handler = new SearchHandler(ctx);
+
+    const both = (await handler.handle({ operation: 'content', query: 'foo', searchScope: 'both', workspaceName: 'Dev' } as any)).content?.[0] as any;
+    expect(both.text).toContain('(Scope: both)');
+    expect(both.text).not.toContain('tasks,projects');
+
+    const projectsOnly = (await handler.handle({ operation: 'content', query: 'foo', searchScope: 'projects', workspaceName: 'Dev' } as any)).content?.[0] as any;
+    expect(projectsOnly.text).toContain('(Scope: projects)');
+  });
+
+  it('defaults to both scope when searchScope is omitted', async () => {
+    const ctx = makeContext();
+    const handler = new SearchHandler(ctx);
+
+    const res = await handler.handle({ operation: 'content', query: 'foo', workspaceName: 'Dev' } as any);
+
+    expect(ctx.motionService.searchTasks).toHaveBeenCalled();
+    expect(ctx.motionService.searchProjects).toHaveBeenCalled();
+    const text = (res.content?.[0] as any)?.text || '';
+    expect(text).toContain('(Scope: both)');
+  });
+
+  it('searches projects only for projects scope', async () => {
+    const ctx = makeContext();
+    const handler = new SearchHandler(ctx);
+
+    await handler.handle({ operation: 'content', query: 'foo', searchScope: 'projects', limit: 5, workspaceName: 'Dev' } as any);
+
+    expect(ctx.motionService.searchProjects).toHaveBeenCalledWith('foo', 'w1', 5);
+    expect(ctx.motionService.searchTasks).not.toHaveBeenCalled();
+  });
+
   it('does not mutate per-source truncation metadata during merge', async () => {
     const ctx = makeContext();
     const sourceTruncation = { wasTruncated: true, returnedCount: 50, reason: 'max_pages', limit: 50 } as const;

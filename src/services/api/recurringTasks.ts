@@ -18,7 +18,8 @@ export async function getRecurringTasks(
   options?: { maxPages?: number; limit?: number }
 ): Promise<ListResult<MotionRecurringTask>> {
   const { maxPages = LIMITS.MAX_PAGES, limit } = options || {};
-  const cacheKey = workspaceId ? `recurring-tasks:workspace:${workspaceId}` : 'recurring-tasks:all';
+  const cacheScope = workspaceId ? `workspace:${workspaceId}` : 'all';
+  const cacheKey = `recurring-tasks:${cacheScope}:maxPages:${maxPages ?? 'default'}:limit:${limit ?? 'none'}`;
 
   // Check cache - return items only (no stale truncation info)
   const cachedItems = ctx.cache.recurringTask.get(cacheKey);
@@ -61,8 +62,11 @@ export async function getRecurringTasks(
       workspaceId
     });
 
-    // Cache only items, not truncation metadata
-    ctx.cache.recurringTask.set(cacheKey, paginatedResult.items);
+    // Cache only complete (non-truncated) results, and only items (not truncation metadata).
+    // Caching a truncated list would later return it as if complete, since truncation info is not cached.
+    if (!paginatedResult.truncation?.wasTruncated) {
+      ctx.cache.recurringTask.set(cacheKey, paginatedResult.items);
+    }
     return { items: paginatedResult.items, truncation: paginatedResult.truncation };
   } catch (error: unknown) {
     mcpLog(LOG_LEVELS.ERROR, 'Failed to fetch recurring tasks', {

@@ -57,7 +57,7 @@ export class CustomFieldHandler extends BaseHandler {
     if (!isSelectType && args.options) {
       return this.handleError(new Error('Options parameter is only allowed for select/multiSelect field types'));
     }
-    if (isSelectType && !args.options) {
+    if (isSelectType && (!args.options || args.options.length === 0)) {
       return this.handleError(new Error('Options parameter is required for select/multiSelect field types'));
     }
 

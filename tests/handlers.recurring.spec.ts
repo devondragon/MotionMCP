@@ -62,6 +62,7 @@ function makeContext() {
       labels: [],
     }),
     deleteRecurringTask: vi.fn().mockResolvedValue(undefined),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'me-id', name: 'Me', email: 'me@example.com' }),
   } as any;
 
   const workspaceResolver = {
@@ -129,6 +130,26 @@ describe('RecurringTaskHandler', () => {
       expect(res.isError).toBeFalsy();
     });
 
+    it("resolves the assigneeId 'me' shortcut to the current user, consistent with motion_tasks", async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new RecurringTaskHandler(ctx);
+      const args: MotionRecurringTasksArgs = {
+        operation: 'create',
+        name: 'New Recurring Task',
+        workspaceId: 'ws1',
+        assigneeId: 'me',
+        frequency: { type: 'weekly' },
+      };
+
+      const res = await handler.handle(args);
+
+      expect(motionService.getCurrentUser).toHaveBeenCalled();
+      expect(motionService.createRecurringTask).toHaveBeenCalledWith(expect.objectContaining({
+        assigneeId: 'me-id',
+      }));
+      expect(res.isError).toBeFalsy();
+    });
+
     it('creates recurring task with all optional fields', async () => {
       const { ctx, motionService } = makeContext();
       const handler = new RecurringTaskHandler(ctx);
@@ -179,6 +200,66 @@ describe('RecurringTaskHandler', () => {
         duration: 0,
       }));
       expect(res.isError).toBeFalsy();
+    });
+
+    it('rejects a negative duration', async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new RecurringTaskHandler(ctx);
+      const args: MotionRecurringTasksArgs = {
+        operation: 'create',
+        name: 'Bad Duration',
+        workspaceId: 'ws1',
+        assigneeId: 'user1',
+        frequency: { type: 'daily' },
+        duration: -5,
+      };
+
+      const res = await handler.handle(args);
+
+      expect(res.isError).toBe(true);
+      expect(motionService.createRecurringTask).not.toHaveBeenCalled();
+      const text = (res.content?.[0] as any)?.text || '';
+      expect(text).toContain('Duration must be a non-negative integer');
+    });
+
+    it('rejects a non-integer duration', async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new RecurringTaskHandler(ctx);
+      const args: MotionRecurringTasksArgs = {
+        operation: 'create',
+        name: 'Fractional Duration',
+        workspaceId: 'ws1',
+        assigneeId: 'user1',
+        frequency: { type: 'daily' },
+        duration: 30.5,
+      };
+
+      const res = await handler.handle(args);
+
+      expect(res.isError).toBe(true);
+      expect(motionService.createRecurringTask).not.toHaveBeenCalled();
+      const text = (res.content?.[0] as any)?.text || '';
+      expect(text).toContain('Duration must be a non-negative integer');
+    });
+
+    it("accepts the 'REMINDER' duration sentinel", async () => {
+      const { ctx, motionService } = makeContext();
+      const handler = new RecurringTaskHandler(ctx);
+      const args: MotionRecurringTasksArgs = {
+        operation: 'create',
+        name: 'Reminder Duration',
+        workspaceId: 'ws1',
+        assigneeId: 'user1',
+        frequency: { type: 'daily' },
+        duration: 'REMINDER',
+      };
+
+      const res = await handler.handle(args);
+
+      expect(res.isError).toBeFalsy();
+      expect(motionService.createRecurringTask).toHaveBeenCalledWith(expect.objectContaining({
+        duration: 'REMINDER',
+      }));
     });
 
     it('formats creator and assignee details from create response', async () => {

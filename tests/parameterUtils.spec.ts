@@ -7,7 +7,8 @@ import {
   parseArrayParam,
   validateRequiredParams,
   validateParameterTypes,
-  normalizeDueDateForApi
+  normalizeDueDateForApi,
+  parseDurationValue
 } from '../src/utils/parameterUtils';
 
 describe('parameterUtils', () => {
@@ -44,6 +45,30 @@ describe('parameterUtils', () => {
   it('normalizeDueDateForApi expands relative dates', () => {
     const result = normalizeDueDateForApi('today');
     expect(result).toMatch(/T23:59:59\.000Z$/);
+  });
+
+  describe('parseDurationValue', () => {
+    it('accepts non-negative integers and numeric strings', () => {
+      expect(parseDurationValue(30)).toBe(30);
+      expect(parseDurationValue(0)).toBe(0);
+      expect(parseDurationValue('45')).toBe(45);
+    });
+
+    it('accepts allowed sentinels', () => {
+      expect(parseDurationValue('NONE')).toBe('NONE');
+      expect(parseDurationValue('REMINDER')).toBe('REMINDER');
+    });
+
+    it('rejects a sentinel not in the allowed list', () => {
+      // Recurring tasks allow only REMINDER, not NONE.
+      expect(() => parseDurationValue('NONE', ['REMINDER'])).toThrow(/non-negative integer/);
+    });
+
+    it('rejects negatives and non-integers', () => {
+      expect(() => parseDurationValue(-5)).toThrow(/non-negative integer/);
+      expect(() => parseDurationValue(30.5)).toThrow(/non-negative integer/);
+      expect(() => parseDurationValue('abc')).toThrow(/non-negative integer/);
+    });
   });
 
   describe('parseAutoScheduledParam JSON-stringified objects', () => {

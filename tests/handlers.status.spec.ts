@@ -23,10 +23,29 @@ describe('StatusHandler', () => {
     const { ctx, motionService } = makeContext();
     const handler = new StatusHandler(ctx);
     const res = await handler.handle({} as any);
-    expect(motionService.getStatuses).toHaveBeenCalled();
+    expect(motionService.getStatuses).toHaveBeenCalledWith(undefined);
     const text = (res.content?.[0] as any)?.text || '';
     expect(text).toContain('Open');
     expect(text).toContain('Done');
+  });
+
+  it('passes a supplied workspaceId straight through', async () => {
+    const { ctx, motionService } = makeContext();
+    const handler = new StatusHandler(ctx);
+    await handler.handle({ workspaceId: 'ws1' } as any);
+    expect(motionService.getStatuses).toHaveBeenCalledWith('ws1');
+  });
+
+  it('resolves a workspaceName to an ID before listing', async () => {
+    const { ctx, motionService } = makeContext();
+    const resolveWorkspace = vi.fn().mockResolvedValue({ id: 'ws-resolved', name: 'Dev' });
+    ctx.workspaceResolver = { resolveWorkspace } as any;
+    const handler = new StatusHandler(ctx);
+
+    await handler.handle({ workspaceName: 'Dev' } as any);
+
+    expect(resolveWorkspace).toHaveBeenCalledWith({ workspaceName: 'Dev' });
+    expect(motionService.getStatuses).toHaveBeenCalledWith('ws-resolved');
   });
 });
 

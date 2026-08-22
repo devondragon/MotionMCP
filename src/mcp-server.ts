@@ -112,7 +112,8 @@ class MotionMCPServer {
       try {
         const { name, arguments: args } = request.params;
 
-        // Runtime validation
+        // Runtime validation. validateInput coerces against a clone and
+        // returns the coerced data, so the caller's args are not mutated.
         const validation = this.context.validator.validateInput(name, args);
         if (!validation.valid) {
           return formatMcpError(
@@ -120,9 +121,9 @@ class MotionMCPServer {
           );
         }
 
-        // Create handler and delegate
+        // Create handler and delegate, passing the coerced values.
         const handler = this.handlerFactory.createHandler(name);
-        return await handler.handle(args);
+        return await handler.handle(validation.data);
       } catch (error: unknown) {
         return formatMcpError(error instanceof Error ? error : new Error(String(error)));
       }

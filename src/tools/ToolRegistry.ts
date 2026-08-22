@@ -100,7 +100,12 @@ export class ToolRegistry {
       default:
         // Handle custom:tool1,tool2,... format
         if (config.startsWith('custom:')) {
-          const customTools = config.substring(7).split(',').map(s => s.trim());
+          // De-duplicate so a repeated name (e.g. custom:motion_tasks,motion_tasks)
+          // does not yield duplicate definitions, which crash the Worker's
+          // McpServer.tool() registration on the repeated tool name.
+          const customTools = Array.from(
+            new Set(config.substring(7).split(',').map(s => s.trim()))
+          );
           return customTools
             .map(name => toolsMap.get(name))
             .filter((tool): tool is McpToolDefinition => tool !== undefined);

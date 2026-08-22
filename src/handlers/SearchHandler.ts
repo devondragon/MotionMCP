@@ -5,7 +5,6 @@ import { formatSearchResults, LIMITS } from '../utils';
 
 interface ContentSearchArgs {
   query: string;
-  entityTypes?: Array<'tasks' | 'projects'>;
   searchScope?: 'tasks' | 'projects' | 'both';
   workspaceId?: string;
   workspaceName?: string;
@@ -33,7 +32,8 @@ export class SearchHandler extends BaseHandler {
       return this.handleError(new Error("Query is required for content search"));
     }
 
-    const entityTypes = this.resolveEntityTypes(args);
+    const searchScope = args.searchScope || 'both';
+    const entityTypes = this.resolveEntityTypes(searchScope);
 
     // Use configurable limit to prevent resource exhaustion
     const limit = args.limit || LIMITS.MAX_SEARCH_RESULTS;
@@ -82,21 +82,17 @@ export class SearchHandler extends BaseHandler {
 
     return formatSearchResults(slicedResults, args.query, {
       limit,
-      searchScope: entityTypes.join(',') || 'both',
+      searchScope,
       truncation: mergedTruncation
     });
   }
 
-  private resolveEntityTypes(args: ContentSearchArgs): Array<'tasks' | 'projects'> {
-    if (args.entityTypes && args.entityTypes.length > 0) {
-      return Array.from(new Set(args.entityTypes));
-    }
-
-    if (args.searchScope === 'tasks') {
+  private resolveEntityTypes(searchScope: 'tasks' | 'projects' | 'both'): Array<'tasks' | 'projects'> {
+    if (searchScope === 'tasks') {
       return ['tasks'];
     }
 
-    if (args.searchScope === 'projects') {
+    if (searchScope === 'projects') {
       return ['projects'];
     }
 
