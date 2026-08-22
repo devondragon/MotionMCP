@@ -217,7 +217,7 @@ describe("worker auth", () => {
       ["a wrong secret", `/mcp/wrong-${SECRET}`],
       ["a secret with an extra suffix", `/mcp/${SECRET}x`],
       ["no secret segment", "/mcp"],
-      ["an empty segment where the secret belongs", "/mcp//sse"],
+      ["a collapsed empty segment, leaving \"sse\" in the secret slot", "/mcp//sse"],
       ["a non-mcp prefix", `/notmcp/${SECRET}`],
       ["the secret at the wrong position", `/${SECRET}/mcp`],
     ])("rejects %s with 404", async (_label, path) => {
@@ -293,6 +293,16 @@ describe("worker auth", () => {
       const url = agentUrl();
       expect(url.pathname).toBe("/mcp/message");
       expect(url.searchParams.get("sessionId")).toBe("session-1");
+    });
+
+    it("puts no secret on the URL for a GET to a message-shaped path", async () => {
+      // A GET is not by itself a stream open: /mcp/<secret>/message authenticates
+      // on the path secret and reaches mount(), but advertises nothing.
+      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/message`));
+
+      expect(agentUrl().pathname).toBe("/mcp/message");
+      expect(agentUrl().searchParams.has("mcpSecret")).toBe(false);
+      expect(onlyAgentCall().url).not.toContain(SECRET);
     });
 
     it("puts the secret on the URL only for SSE stream opens, never a message POST", async () => {

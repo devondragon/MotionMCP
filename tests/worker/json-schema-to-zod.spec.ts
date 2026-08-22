@@ -87,14 +87,18 @@ describe("jsonSchemaToZodObject", () => {
     expect(result.success).toBe(false);
   });
 
-  it("covers every tool definition that declares additionalProperties: false", () => {
-    const strictCount = allToolDefinitions.filter(
-      (tool) => (tool.inputSchema as { additionalProperties?: boolean }).additionalProperties === false
-    ).length;
+  it("declares additionalProperties: false on every tool definition", () => {
+    // Guards the it.each above from silently covering nothing, and names the
+    // offender if a newly added tool forgets the flag: without it, the Worker
+    // accepts unknown keys on that tool while the stdio AJV path rejects them.
+    const missing = allToolDefinitions
+      .filter(
+        (tool) =>
+          (tool.inputSchema as { additionalProperties?: boolean }).additionalProperties !== false
+      )
+      .map((tool) => tool.name);
 
-    // Guards the it.each above from silently covering nothing if the
-    // definitions change shape.
-    expect(strictCount).toBeGreaterThan(0);
-    expect(strictCount).toBe(10);
+    expect(missing).toEqual([]);
+    expect(allToolDefinitions.length).toBeGreaterThan(0);
   });
 });
