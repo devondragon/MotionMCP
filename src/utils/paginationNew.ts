@@ -176,11 +176,6 @@ export async function fetchAllPages<T>(
     truncation = { wasTruncated: true, returnedCount: allItems.length, reason: 'max_pages', limit: absoluteMaxPages };
   }
 
-  // Update returnedCount on page_size_limit truncation now that we know the final count
-  if (truncation?.reason === 'page_size_limit') {
-    truncation.returnedCount = allItems.length;
-  }
-
   return {
     items: allItems,
     nextCursor: cursor,
