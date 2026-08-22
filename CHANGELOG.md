@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### 🔒 Security
+
+- **Fixed fail-open authentication in the Cloudflare Worker (critical)**: when `MOTION_MCP_SECRET` was unset, the path-secret check compared `undefined !== undefined` and authorized every request, exposing unauthenticated MCP access to the Motion account. The Worker now fails closed with a 500. (#132)
+- **Closed an authentication bypass on the SSE message endpoint (critical)**: `POST /mcp/message?sessionId=...` was forwarded to `McpAgent` with no credential check. The agents SDK instantiates a Durable Object for any `sessionId` without verifying the id was issued on a secret-authenticated stream, so this route could invoke tools without the secret. It is now authenticated like every other route. (#132)
+- **Constant-time secret comparison**: secrets are compared as SHA-256 digests via `crypto.subtle.timingSafeEqual` rather than with `!==`. (#132)
+- **`Authorization: Bearer <secret>` support**: the recommended way to authenticate, keeping the secret out of the URL. The existing `/mcp/SECRET/...` path secret remains supported as a backward-compatible fallback, and the scheme name is matched case-insensitively per RFC 7235. (#132)
+- **Worker tool schemas are now strict**: tools are registered with the full `ZodObject` via `registerTool` instead of the raw shape via `tool()`, which had discarded `additionalProperties: false` and silently stripped unknown properties. (#132)
+
+> **Note for path-secret + legacy SSE users**: authenticating the message endpoint requires threading the secret through an `mcpSecret` query parameter, so the secret appears in query strings for those clients. It is never added for Bearer clients. Prefer `Authorization: Bearer`; replacing this with an expiring session credential is tracked as follow-up work.
+
+### 🐛 Bug Fixes
+
+- **Assignee names resolved against the wrong workspace**: `move` and `update` resolved an assignee name through a cross-workspace search that returned the first match found, so a name held by users in two workspaces could reassign a task to the wrong person. Resolution is now scoped to the destination workspace on `move` and to the task's own workspace on `update`. (#132)
+- **`assignee` name and the `me` shortcut were dropped**: both were silently discarded or forwarded literally on task create/update/move, and `me` was unresolved on recurring task creation. (#132)
+- **`sanitize` deleted ordinary text**: the tag-stripping regex removed any `<...>` span, so text like `x < 5 and y > 3` lost content. It is now anchored to real HTML tag names. (#132)
+- **Oversized pages dropped items**: pagination sliced a page exceeding `MAX_PAGE_SIZE` and then advanced the cursor, silently discarding the remainder. It now stops and reports the count actually returned instead of `0`. (#132)
+- **Truncated result sets were cached as complete**: projects and recurring tasks cached items without the truncation metadata, so a later hit returned a partial list as if whole. Truncated results are no longer cached, and the recurring-tasks cache key now includes `limit`/`maxPages`. (#132)
+- **Search missed matches past the first page**: client-side filtering only saw ~100 items per workspace. It now overfetches up to `MAX_SEARCH_FETCH`. (#132)
+- **Invalid calendar dates were accepted**: `Date.UTC` normalizes overflow, so `2026-02-31` became March 3 and was sent to the API as a date the caller never requested. `parseFilterDate` now rejects dates that do not round-trip. (#132)
+- **Date-only due dates shifted a day east of UTC**: they are now stored at local end-of-day in the resolved time zone. (#132)
+- **Multi-day monthly/quarterly recurrence silently discarded days**: unsupported `weekOfMonth` combinations are now rejected with an explanatory error; an all-seven-days set maps losslessly to the any-day pattern. (#132)
+- **Validator mutated caller arguments**: AJV's `coerceTypes` rewrote the input object in place. Validation now runs against a clone, and handlers receive the coerced values. (#132)
+- **A duplicate name in `MOTION_MCP_TOOLS=custom:...` crashed Worker startup**: the custom tool list is de-duplicated. (#132)
+- **Empty select `options` were accepted** when creating a custom field, and recurring task `duration` was unvalidated. Both are now rejected, with matching schema constraints (`minItems: 1`, `minimum: 0`). (#132)
+
+### 🛠️ API Changes
+
+- `motion_statuses` accepts `operation` and `workspaceName` (with name resolution), matching the other tools. (#132)
+- All 10 tool schemas set `additionalProperties: false`, so unknown properties are rejected rather than ignored. Note this makes the previously undocumented `entityTypes` property on `motion_search` an error; use `searchScope`. (#132)
+- `motion_tasks` `update` with `assigneeId: ""` is now a no-op rather than forwarding an empty string. Use the `unassign` operation to clear an assignee. (#132)
+
+### 🧪 Testing
+
+- Added regression coverage for assignee resolution and workspace scoping, sanitize tag anchoring, frequency transforms, duration parsing, validator cloning/coercion, custom tool de-duplication, and status/search/custom-field/recurring handler paths. 539 tests across 30 files.
+- **Known gap**: `src/worker.ts` has no test coverage. `crypto.subtle.timingSafeEqual` is workerd-only and unavailable in the plain-Node Vitest setup, so covering the auth path needs `@cloudflare/vitest-pool-workers`. Tracked as follow-up work.
+
 ## [2.8.0] - 2026-03-02
 
 ### 🐛 Bug Fixes
