@@ -265,7 +265,9 @@ describe("worker auth", () => {
       expect(agentUrl().searchParams.get("mcpSecret")).toBe(SECRET);
     });
 
-    it("preserves the caller's query string in Bearer mode", async () => {
+    it("forwards no caller query params in Bearer mode", async () => {
+      // The agent reads only sessionId, and only on a message route. Anything
+      // else a client appends is inert to it and is not carried across.
       await fetchWorker(
         new Request("https://example.com/mcp/sse?foo=bar&baz=1", {
           headers: { Authorization: `Bearer ${SECRET}` },
@@ -273,15 +275,16 @@ describe("worker auth", () => {
       );
 
       const url = agentUrl();
-      expect(url.searchParams.get("foo")).toBe("bar");
-      expect(url.searchParams.get("baz")).toBe("1");
+      expect(url.pathname).toBe("/mcp/sse");
+      expect(url.search).toBe("");
     });
 
-    it("preserves the caller's query string in path secret mode", async () => {
+    it("forwards no caller query params in path secret mode, only the Worker's own", async () => {
       await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/sse?foo=bar`));
 
       const url = agentUrl();
-      expect(url.searchParams.get("foo")).toBe("bar");
+      expect(url.searchParams.has("foo")).toBe(false);
+      expect([...url.searchParams.keys()]).toEqual(["mcpSecret"]);
       expect(url.searchParams.get("mcpSecret")).toBe(SECRET);
     });
 
@@ -314,7 +317,7 @@ describe("worker auth", () => {
 
       const url = agentUrl();
       expect(url.searchParams.has("sessionId")).toBe(false);
-      expect(url.searchParams.get("keep")).toBe("this");
+      expect(url.searchParams.has("keep")).toBe(false);
     });
 
     it("keeps sessionId on a message POST, which is not a stream open", async () => {
@@ -371,8 +374,7 @@ describe("worker auth", () => {
       );
 
       const url = agentUrl();
-      expect(url.searchParams.has("mcpSecret")).toBe(false);
-      expect(url.searchParams.get("foo")).toBe("bar");
+      expect(url.search).toBe("");
       expect(onlyAgentCall().url).not.toContain(SECRET);
     });
   });
@@ -436,6 +438,14 @@ describe("worker auth", () => {
       expect(url.searchParams.get("sessionId")).toBe("session-1");
       expect(url.pathname).toBe("/mcp/message");
       expect(onlyAgentCall().url).not.toContain(SECRET);
+    });
+
+    it("forwards only sessionId, dropping other caller params", async () => {
+      await fetchWorker(
+        messageRequest(`sessionId=session-1&mcpSecret=${encodeURIComponent(SECRET)}&foo=bar`)
+      );
+
+      expect([...agentUrl().searchParams.keys()]).toEqual(["sessionId"]);
     });
 
     it("authorizes a Bearer client without any query param", async () => {

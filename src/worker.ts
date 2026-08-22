@@ -123,13 +123,37 @@ export default {
     const SSE_SECRET_PARAM = "mcpSecret";
     const SESSION_ID_PARAM = "sessionId";
 
+    /**
+     * Builds the URL handed to the agent, carrying only what the agent reads.
+     *
+     * The agent reads exactly one query param, sessionId: once when opening a
+     * legacy SSE stream, where it names the Durable Object, and once in the
+     * message handler (see createLegacySseHandler in agents/dist/mcp). Every
+     * other param a client appends is inert to it.
+     *
+     * So this starts from an empty query and adds back only that param, rather
+     * than forwarding the caller's query string and subtracting what must not
+     * reach the agent. Subtracting requires having thought of each param in
+     * advance; two separate defects came from not having. If an agents SDK
+     * upgrade starts reading a new param, this is the place to add it, and the
+     * symptom will be a feature that visibly does not work rather than an
+     * unaudited value reaching the agent.
+     */
+    const buildAgentUrl = (pathname: string, sessionId: string | null): URL => {
+      const agentUrl = new URL(pathname, url.origin);
+      if (sessionId !== null) {
+        agentUrl.searchParams.set(SESSION_ID_PARAM, sessionId);
+      }
+      return agentUrl;
+    };
+
     // Legacy SSE message endpoint (POST /mcp/message?sessionId=...). It must be
     // authenticated like every other path: the agents SDK spins up a Durable
     // Object for ANY sessionId with no check that the id was issued on a
     // secret-authenticated stream, so an unauthenticated POST here would
     // otherwise be able to invoke tools. Accept the Bearer header, or the secret
-    // carried on the advertised endpoint's query param; strip the param before
-    // handing the request to the agent.
+    // carried on the advertised endpoint's query param; the secret is not
+    // among the params buildAgentUrl carries, so it cannot reach the agent.
     if (
       pathParts[0] === "mcp" &&
       pathParts[1] === "message" &&
@@ -142,8 +166,7 @@ export default {
       if (!(await secretsMatch(messageSecret, env.MOTION_MCP_SECRET))) {
         return new Response("Not found", { status: 404 });
       }
-      const messageUrl = new URL(request.url);
-      messageUrl.searchParams.delete(SSE_SECRET_PARAM);
+      const messageUrl = buildAgentUrl(url.pathname, url.searchParams.get(SESSION_ID_PARAM));
       const messageRequest = new Request(messageUrl, request);
       return (
         MotionMCPAgent.mount("/mcp") as { fetch: (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response> }
@@ -162,15 +185,15 @@ export default {
     const cleanPath = usedBearer
       ? "/" + pathParts.join("/")
       : "/mcp" + (pathParts.length > 2 ? "/" + pathParts.slice(2).join("/") : "");
-    // Carry the caller's query string across the rewrite. Only the path holds
-    // the secret in path-secret mode, so building the rewritten URL from the
-    // path alone silently dropped every query param the agent needs (notably
-    // sessionId on a message POST that did not match the branch above).
-    // SSE_SECRET_PARAM is this Worker's own signalling param: drop whatever a
-    // client sent under that name so only the value set below reaches the agent.
-    const cleanUrl = new URL(cleanPath, url.origin);
-    cleanUrl.search = url.search;
-    cleanUrl.searchParams.delete(SSE_SECRET_PARAM);
+    // A message POST that did not match the branch above (e.g. addressed as
+    // /mcp/<secret>/message) still reaches the agent's message handler, which
+    // reads sessionId, so carry it there. Everywhere else the agent reads no
+    // query param at all: a stream open takes its session id from the SDK, and
+    // streamable HTTP uses the mcp-session-id header.
+    const cleanUrl = buildAgentUrl(
+      cleanPath,
+      cleanPath === "/mcp/message" ? url.searchParams.get(SESSION_ID_PARAM) : null
+    );
 
     // Streamable HTTP (POST/DELETE /mcp, or GET with an mcp-session-id header)
     // is served by serve(); a bare GET on /mcp is a legacy SSE stream via mount().
@@ -189,25 +212,13 @@ export default {
     // reaching mount() advertises nothing, and the secret on its URL would be a
     // pointless exposure: an exception inside the Durable Object surfaces the
     // request URL in Workers trace events, so it would reach `wrangler tail`
-    // and any Logpush sink. The dedicated message branch strips the param for
-    // the same reason, and this keeps both paths agreeing that a
-    // /mcp/message URL never carries the secret.
+    // and any Logpush sink. This keeps both routes handling /mcp/message
+    // agreeing that its URL never carries the secret.
     const opensStream =
       !isStreamableHttp && request.method === "GET" && cleanPath !== "/mcp/message";
 
-    if (opensStream) {
-      // Session ids on a stream open are the SDK's to issue, not the caller's:
-      // createLegacySseHandler names the Durable Object `sse:${sessionId}` and
-      // falls back to a fresh unique id when the param is absent. Forwarding a
-      // caller-supplied id would let two clients open streams onto the same DO
-      // and receive each other's messages. Before query strings were carried
-      // across the rewrite this was unreachable, because the query was always
-      // dropped here.
-      cleanUrl.searchParams.delete(SESSION_ID_PARAM);
-
-      if (!usedBearer) {
-        cleanUrl.searchParams.set(SSE_SECRET_PARAM, env.MOTION_MCP_SECRET);
-      }
+    if (opensStream && !usedBearer) {
+      cleanUrl.searchParams.set(SSE_SECRET_PARAM, env.MOTION_MCP_SECRET);
     }
 
     const cleanRequest = new Request(cleanUrl, request);
