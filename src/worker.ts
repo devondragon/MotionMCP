@@ -5,7 +5,7 @@ import { WorkspaceResolver } from "./utils/workspaceResolver";
 import { InputValidator } from "./utils/validator";
 import { HandlerFactory } from "./handlers/HandlerFactory";
 import { ToolRegistry, ToolConfigurator } from "./tools";
-import { jsonSchemaToZodShape } from "./utils/jsonSchemaToZod";
+import { jsonSchemaToZodObject } from "./utils/jsonSchemaToZod";
 import { SERVER_INSTRUCTIONS } from "./utils/serverInstructions";
 
 interface Env {
@@ -40,12 +40,14 @@ export class MotionMCPAgent extends McpAgent<Env> {
     // validateInput() is only called from the stdio entry point.
 
     for (const tool of enabledTools) {
-      const zodShape = jsonSchemaToZodShape(tool.inputSchema as Parameters<typeof jsonSchemaToZodShape>[0]);
+      const inputSchema = jsonSchemaToZodObject(tool.inputSchema as Parameters<typeof jsonSchemaToZodObject>[0]);
 
-      this.server.tool(
+      this.server.registerTool(
         tool.name,
-        tool.description,
-        zodShape,
+        {
+          description: tool.description,
+          inputSchema,
+        },
         async (params) => {
           const handler = handlerFactory.createHandler(tool.name);
           return await handler.handle(params);
@@ -86,32 +88,18 @@ export default {
       );
     }
 
-    // Fail closed if no secret is configured. Without this, an unset
-    // MOTION_MCP_SECRET makes the comparison below `undefined === undefined`
-    // (or an empty-string match), which would authorize every request.
+    // Fail closed if no secret is configured, rather than relying on
+    // secretsMatch below to reject an unset/empty expected secret. This also
+    // guarantees the secret passed to secretsMatch is non-empty, so an empty
+    // provided secret (e.g. `Authorization: Bearer ` or a missing path
+    // segment) can never match.
     if (!env.MOTION_MCP_SECRET) {
       return new Response("Server misconfigured", { status: 500 });
     }
 
     const pathParts = url.pathname.split("/").filter(Boolean);
 
-    // SSE message endpoint: the SSE stream's `endpoint` event advertises the
-    // rewritten path (/mcp/message?sessionId=...), which has no secret segment.
-    // The sessionId is unguessable and only issued on a stream opened with the
-    // secret, so it authenticates these POSTs. This branch remains
-    // sessionId-authenticated for legacy SSE compatibility.
-    if (
-      pathParts[0] === "mcp" &&
-      pathParts[1] === "message" &&
-      request.method === "POST" &&
-      url.searchParams.has("sessionId")
-    ) {
-      return (
-        MotionMCPAgent.mount("/mcp") as { fetch: (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response> }
-      ).fetch(request, env, ctx);
-    }
-
-    // Two authentication modes, both checked in constant time:
+    // Two authentication modes, both compared in constant time:
     //   1. Authorization: Bearer <secret> header (preferred; keeps the secret
     //      out of the URL for header-capable clients). The path is already
     //      clean in this mode (e.g. /mcp or /mcp/sse), so no rewrite is needed.
@@ -124,6 +112,40 @@ export default {
         ? authHeader.slice("Bearer ".length).trim()
         : null;
     const usedBearer = bearerSecret !== null;
+
+    // Query param that carries the secret on the legacy-SSE message endpoint.
+    // The agent's `endpoint` event advertises /mcp/message?sessionId=... with no
+    // secret path segment, so for path-secret clients we thread the secret
+    // through this param (see the message branch and the SSE-GET rewrite below).
+    const SSE_SECRET_PARAM = "mcpSecret";
+
+    // Legacy SSE message endpoint (POST /mcp/message?sessionId=...). It must be
+    // authenticated like every other path: the agents SDK spins up a Durable
+    // Object for ANY sessionId with no check that the id was issued on a
+    // secret-authenticated stream, so an unauthenticated POST here would
+    // otherwise be able to invoke tools. Accept the Bearer header, or the secret
+    // carried on the advertised endpoint's query param; strip the param before
+    // handing the request to the agent.
+    if (
+      pathParts[0] === "mcp" &&
+      pathParts[1] === "message" &&
+      request.method === "POST" &&
+      url.searchParams.has("sessionId")
+    ) {
+      const messageSecret = usedBearer
+        ? bearerSecret
+        : (url.searchParams.get(SSE_SECRET_PARAM) ?? "");
+      if (!(await secretsMatch(messageSecret, env.MOTION_MCP_SECRET))) {
+        return new Response("Not found", { status: 404 });
+      }
+      const messageUrl = new URL(request.url);
+      messageUrl.searchParams.delete(SSE_SECRET_PARAM);
+      const messageRequest = new Request(messageUrl, request);
+      return (
+        MotionMCPAgent.mount("/mcp") as { fetch: (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response> }
+      ).fetch(messageRequest, env, ctx);
+    }
+
     const providedSecret = usedBearer ? bearerSecret : (pathParts[1] ?? "");
 
     if (pathParts[0] !== "mcp" || !(await secretsMatch(providedSecret, env.MOTION_MCP_SECRET))) {
@@ -137,13 +159,24 @@ export default {
       ? "/" + pathParts.join("/")
       : "/mcp" + (pathParts.length > 2 ? "/" + pathParts.slice(2).join("/") : "");
     const cleanUrl = new URL(cleanPath, url.origin);
-    const cleanRequest = new Request(cleanUrl, request);
 
     // Streamable HTTP (POST/DELETE /mcp, or GET with an mcp-session-id header)
     // is served by serve(); a bare GET on /mcp is a legacy SSE stream via mount().
     const isStreamableHttp =
       cleanPath === "/mcp" &&
       (request.method !== "GET" || request.headers.has("mcp-session-id"));
+
+    // Opening a legacy SSE stream (path-secret mode): carry the secret into the
+    // stream URL so the agent advertises it on the message endpoint it emits.
+    // The client echoes that endpoint on its subsequent POST /mcp/message, which
+    // the branch above then authenticates. Bearer clients send the header on the
+    // POST instead, so no param is added for them (keeping the secret out of the
+    // URL, which is the point of Bearer mode).
+    if (!isStreamableHttp && !usedBearer) {
+      cleanUrl.searchParams.set(SSE_SECRET_PARAM, env.MOTION_MCP_SECRET);
+    }
+
+    const cleanRequest = new Request(cleanUrl, request);
 
     return (
       (isStreamableHttp
