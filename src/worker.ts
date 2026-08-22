@@ -107,10 +107,11 @@ export default {
     //      configure URL as https://your-worker.workers.dev/mcp/YOUR_SECRET.
     // If a Bearer header is present it is used; otherwise the path segment is.
     const authHeader = request.headers.get("Authorization");
-    const bearerSecret =
-      authHeader && authHeader.startsWith("Bearer ")
-        ? authHeader.slice("Bearer ".length).trim()
-        : null;
+    // The "Bearer" auth scheme name is case-insensitive per RFC 7235 — match it
+    // that way so clients sending e.g. "bearer <secret>" aren't forced to fall
+    // back to the legacy path-secret mode.
+    const bearerMatch = authHeader ? /^Bearer[ \t]+(.+)$/i.exec(authHeader) : null;
+    const bearerSecret = bearerMatch ? (bearerMatch[1] ?? "").trim() : null;
     const usedBearer = bearerSecret !== null;
 
     // Query param that carries the secret on the legacy-SSE message endpoint.
