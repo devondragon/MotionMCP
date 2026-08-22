@@ -7,6 +7,7 @@ import { HandlerFactory } from "./handlers/HandlerFactory";
 import { ToolRegistry, ToolConfigurator } from "./tools";
 import { jsonSchemaToZodObject } from "./utils/jsonSchemaToZod";
 import { SERVER_INSTRUCTIONS } from "./utils/serverInstructions";
+import { mintSessionCredential, verifySessionCredential } from "./utils/sessionCredential";
 
 interface Env {
   MOTION_API_KEY: string;
@@ -152,11 +153,15 @@ export default {
     const bearerSecret = bearerMatch ? (bearerMatch[1] ?? "").trim() : null;
     const usedBearer = bearerSecret !== null;
 
-    // Query param that carries the secret on the legacy-SSE message endpoint.
-    // The agent's `endpoint` event advertises /mcp/message?sessionId=... with no
-    // secret path segment, so for path-secret clients we thread the secret
-    // through this param (see the message branch and the SSE-GET rewrite below).
-    const SSE_SECRET_PARAM = "mcpSecret";
+    // Query param that carries the session credential on the legacy-SSE message
+    // endpoint. The agent's `endpoint` event advertises /mcp/message?sessionId=...
+    // with no secret path segment, so for path-secret clients we thread a
+    // credential through this param (see the message branch and the SSE-GET
+    // rewrite below). The value is no longer the raw secret but an expiring
+    // HMAC credential (src/utils/sessionCredential.ts), so the clearer wire name
+    // "mcpSession" is safe: clients echo the advertised URL verbatim and never
+    // hardcode the param name.
+    const SSE_CREDENTIAL_PARAM = "mcpSession";
     const SESSION_ID_PARAM = "sessionId";
 
     /**
@@ -187,19 +192,27 @@ export default {
     // authenticated like every other path: the agents SDK spins up a Durable
     // Object for ANY sessionId with no check that the id was issued on a
     // secret-authenticated stream, so an unauthenticated POST here would
-    // otherwise be able to invoke tools. Accept the Bearer header, or the secret
-    // carried on the advertised endpoint's query param; the secret is not
-    // among the params buildAgentUrl carries, so it cannot reach the agent.
+    // otherwise be able to invoke tools.
+    //
+    // Two credentials are accepted. A Bearer client sends the raw secret in the
+    // header, matched in constant time by secretsMatch. A path-secret client has
+    // no header, so it echoes the expiring session credential the Worker set on
+    // the stream-open URL (SSE_CREDENTIAL_PARAM), verified by HMAC + TTL. The raw
+    // secret no longer travels in this param, and neither credential is among the
+    // params buildAgentUrl carries, so neither reaches the agent or its logs.
     if (
       pathParts[0] === "mcp" &&
       pathParts[1] === "message" &&
       request.method === "POST" &&
       url.searchParams.has(SESSION_ID_PARAM)
     ) {
-      const messageSecret = usedBearer
-        ? bearerSecret
-        : (url.searchParams.get(SSE_SECRET_PARAM) ?? "");
-      if (!(await secretsMatch(messageSecret, env.MOTION_MCP_SECRET))) {
+      const authorized = usedBearer
+        ? await secretsMatch(bearerSecret, env.MOTION_MCP_SECRET)
+        : await verifySessionCredential(
+            url.searchParams.get(SSE_CREDENTIAL_PARAM) ?? "",
+            env.MOTION_MCP_SECRET,
+          );
+      if (!authorized) {
         return new Response("Not found", { status: 404 });
       }
       const messageUrl = buildAgentUrl(url.pathname, url.searchParams.get(SESSION_ID_PARAM));
@@ -233,10 +246,10 @@ export default {
     // /mcp/message; any other sub-path (e.g. /mcp/sse) 404s inside the SDK.
     //
     // So a path-secret request whose stripped path is neither /mcp nor
-    // /mcp/message cannot succeed. Rejecting it here also keeps the long-lived
-    // secret off a dead-end URL: the SSE-GET branch below would otherwise set
-    // SSE_SECRET_PARAM on a URL that then 404s inside the Durable Object, and an
-    // exception there surfaces the request URL in Workers trace events. Match
+    // /mcp/message cannot succeed. Rejecting it here also keeps the session
+    // credential off a dead-end URL: the SSE-GET branch below would otherwise set
+    // SSE_CREDENTIAL_PARAM on a URL that then 404s inside the Durable Object, and
+    // an exception there surfaces the request URL in Workers trace events. Match
     // the gate's "Not found" 404 convention: no detail, no hint that /mcp exists.
     if (!usedBearer && pathParts.length > 2 && cleanPath !== "/mcp/message") {
       return new Response("Not found", { status: 404 });
@@ -258,24 +271,34 @@ export default {
       cleanPath === "/mcp" &&
       (request.method !== "GET" || request.headers.has("mcp-session-id"));
 
-    // Opening a legacy SSE stream (path-secret mode): carry the secret into the
-    // stream URL so the agent advertises it on the message endpoint it emits.
-    // The client echoes that endpoint on its subsequent POST /mcp/message, which
-    // the branch above then authenticates. Bearer clients send the header on the
-    // POST instead, so no param is added for them (keeping the secret out of the
-    // URL, which is the point of Bearer mode).
+    // Opening a legacy SSE stream (path-secret mode): mint an expiring session
+    // credential and carry it into the stream URL so the agent advertises it on
+    // the message endpoint it emits. The client echoes that endpoint on its
+    // subsequent POST /mcp/message, which the branch above then verifies. Bearer
+    // clients send the header on the POST instead, so no param is added for them
+    // (keeping any credential out of the URL, which is the point of Bearer mode).
     //
-    // Restricted to requests that actually open a stream. Anything else
-    // reaching mount() advertises nothing, and the secret on its URL would be a
-    // pointless exposure: an exception inside the Durable Object surfaces the
-    // request URL in Workers trace events, so it would reach `wrangler tail`
-    // and any Logpush sink. This keeps both routes handling /mcp/message
-    // agreeing that its URL never carries the secret.
+    // The credential is an HMAC over its own issue time (see sessionCredential.ts):
+    // the raw MOTION_MCP_SECRET never lands in the query string or in access logs,
+    // and a leaked credential expires after SESSION_CREDENTIAL_TTL_MS where a
+    // leaked shared secret never would. It is minted here, once per stream open,
+    // and verified statelessly on each message POST because the outer handler has
+    // no sessionId to bind server-side state to.
+    //
+    // Restricted to requests that actually open a stream. Anything else reaching
+    // mount() advertises nothing, and a credential on its URL would be a pointless
+    // exposure: an exception inside the Durable Object surfaces the request URL in
+    // Workers trace events, so it would reach `wrangler tail` and any Logpush sink.
+    // This keeps both routes handling /mcp/message agreeing that its URL never
+    // carries a credential.
     const opensStream =
       !isStreamableHttp && request.method === "GET" && cleanPath !== "/mcp/message";
 
     if (opensStream && !usedBearer) {
-      cleanUrl.searchParams.set(SSE_SECRET_PARAM, env.MOTION_MCP_SECRET);
+      cleanUrl.searchParams.set(
+        SSE_CREDENTIAL_PARAM,
+        await mintSessionCredential(env.MOTION_MCP_SECRET),
+      );
     }
 
     const cleanRequest = new Request(cleanUrl, request);

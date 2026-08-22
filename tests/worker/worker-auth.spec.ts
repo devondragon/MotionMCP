@@ -14,8 +14,15 @@ import { env } from "cloudflare:workers";
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import worker, { MotionMCPAgent, secretsMatch } from "../../src/worker";
+import {
+  mintSessionCredential,
+  verifySessionCredential,
+} from "../../src/utils/sessionCredential";
 
 const SECRET = "test-worker-secret";
+
+/** The query param the Worker now sets on a path-secret SSE stream-open URL. */
+const CREDENTIAL_PARAM = "mcpSession";
 
 /** Sentinel status returned by the stubbed agent: the request was authorized. */
 const AGENT_STATUS = 299;
@@ -387,12 +394,18 @@ describe("worker auth", () => {
       expect(agentUrl().pathname).toBe("/mcp");
     });
 
-    it("carries the secret into the SSE stream URL so the agent advertises it", async () => {
+    it("carries an expiring session credential into the SSE stream URL, not the raw secret", async () => {
       // The path-secret stream open is the bare /mcp/<secret> GET (cleanPath
       // "/mcp"); path-secret SSE sub-paths like /mcp/<secret>/sse are rejected.
+      // The Worker now advertises an expiring HMAC credential on the message
+      // endpoint, so the raw secret never lands in the query string (issue #135).
       await fetchWorker(new Request(`https://example.com/mcp/${SECRET}`));
 
-      expect(agentUrl().searchParams.get("mcpSecret")).toBe(SECRET);
+      const credential = agentUrl().searchParams.get(CREDENTIAL_PARAM);
+      expect(credential).not.toBeNull();
+      expect(credential).not.toBe(SECRET);
+      expect(onlyAgentCall().url).not.toContain(SECRET);
+      await expect(verifySessionCredential(credential!, SECRET)).resolves.toBe(true);
     });
 
     it("forwards no caller query params in Bearer mode", async () => {
@@ -409,13 +422,15 @@ describe("worker auth", () => {
       expect(url.search).toBe("");
     });
 
-    it("forwards no caller query params in path secret mode, only the Worker's own", async () => {
+    it("forwards no caller query params in path secret mode, only the Worker's own credential", async () => {
       await fetchWorker(new Request(`https://example.com/mcp/${SECRET}?foo=bar`));
 
       const url = agentUrl();
       expect(url.searchParams.has("foo")).toBe(false);
-      expect([...url.searchParams.keys()]).toEqual(["mcpSecret"]);
-      expect(url.searchParams.get("mcpSecret")).toBe(SECRET);
+      expect([...url.searchParams.keys()]).toEqual([CREDENTIAL_PARAM]);
+      const credential = url.searchParams.get(CREDENTIAL_PARAM);
+      expect(credential).not.toBe(SECRET);
+      await expect(verifySessionCredential(credential!, SECRET)).resolves.toBe(true);
     });
 
     it("keeps sessionId on a message POST addressed with the secret in the path", async () => {
@@ -451,28 +466,29 @@ describe("worker auth", () => {
     });
 
     it("keeps sessionId on a message POST, which is not a stream open", async () => {
+      const credential = await mintSessionCredential(SECRET);
       await fetchWorker(
-        new Request(`https://example.com/mcp/message?sessionId=session-1&mcpSecret=${encodeURIComponent(SECRET)}`, {
-          method: "POST",
-          body: "{}",
-        })
+        new Request(
+          `https://example.com/mcp/message?sessionId=session-1&${CREDENTIAL_PARAM}=${encodeURIComponent(credential)}`,
+          { method: "POST", body: "{}" }
+        )
       );
 
       expect(agentUrl().searchParams.get("sessionId")).toBe("session-1");
     });
 
-    it("puts no secret on the URL for a GET to a message-shaped path", async () => {
+    it("puts no credential on the URL for a GET to a message-shaped path", async () => {
       // A GET is not by itself a stream open: /mcp/<secret>/message authenticates
       // on the path secret and reaches mount(), but advertises nothing.
       await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/message`));
 
       expect(agentUrl().pathname).toBe("/mcp/message");
-      expect(agentUrl().searchParams.has("mcpSecret")).toBe(false);
+      expect(agentUrl().searchParams.has(CREDENTIAL_PARAM)).toBe(false);
       expect(onlyAgentCall().url).not.toContain(SECRET);
     });
 
-    it("puts the secret on the URL only for SSE stream opens, never a message POST", async () => {
-      // Nothing is advertised on a POST, so the secret on its URL would be a
+    it("puts a credential on the URL only for SSE stream opens, never a message POST", async () => {
+      // Nothing is advertised on a POST, so a credential on its URL would be a
       // pointless exposure via Workers trace events. The dedicated /mcp/message
       // branch strips the param; this fall-through path must agree with it.
       await fetchWorker(
@@ -482,21 +498,21 @@ describe("worker auth", () => {
         })
       );
 
-      expect(agentUrl().searchParams.has("mcpSecret")).toBe(false);
+      expect(agentUrl().searchParams.has(CREDENTIAL_PARAM)).toBe(false);
       expect(onlyAgentCall().url).not.toContain(SECRET);
     });
 
-    it("drops a client-supplied mcpSecret param, which only this Worker may set", async () => {
+    it("drops a client-supplied credential param, which only this Worker may set", async () => {
       await fetchWorker(
-        new Request("https://example.com/mcp/sse?mcpSecret=client-injected", {
+        new Request(`https://example.com/mcp/sse?${CREDENTIAL_PARAM}=client-injected`, {
           headers: { Authorization: `Bearer ${SECRET}` },
         })
       );
 
-      expect(agentUrl().searchParams.has("mcpSecret")).toBe(false);
+      expect(agentUrl().searchParams.has(CREDENTIAL_PARAM)).toBe(false);
     });
 
-    it("adds no secret query param when a Bearer client opens an SSE stream", async () => {
+    it("adds no credential query param when a Bearer client opens an SSE stream", async () => {
       await fetchWorker(
         new Request("https://example.com/mcp?foo=bar", {
           headers: { Authorization: `Bearer ${SECRET}` },
@@ -552,28 +568,30 @@ describe("worker auth", () => {
       });
     }
 
-    it("authorizes the secret carried on the advertised query param", async () => {
-      const response = await fetchWorker(
-        messageRequest(`sessionId=session-1&mcpSecret=${encodeURIComponent(SECRET)}`)
-      );
+    /** A query string carrying a freshly minted, valid session credential. */
+    async function credentialQuery(sessionId = "session-1", extra = ""): Promise<string> {
+      const credential = await mintSessionCredential(SECRET);
+      return `sessionId=${sessionId}&${CREDENTIAL_PARAM}=${encodeURIComponent(credential)}${extra}`;
+    }
+
+    it("authorizes a valid session credential carried on the advertised query param", async () => {
+      const response = await fetchWorker(messageRequest(await credentialQuery()));
 
       expect(response.status).toBe(AGENT_STATUS);
     });
 
-    it("strips the secret param before the agent sees the request, keeping sessionId", async () => {
-      await fetchWorker(messageRequest(`sessionId=session-1&mcpSecret=${encodeURIComponent(SECRET)}`));
+    it("strips the credential param before the agent sees the request, keeping sessionId", async () => {
+      await fetchWorker(messageRequest(await credentialQuery()));
 
       const url = agentUrl();
-      expect(url.searchParams.has("mcpSecret")).toBe(false);
+      expect(url.searchParams.has(CREDENTIAL_PARAM)).toBe(false);
       expect(url.searchParams.get("sessionId")).toBe("session-1");
       expect(url.pathname).toBe("/mcp/message");
       expect(onlyAgentCall().url).not.toContain(SECRET);
     });
 
     it("forwards only sessionId, dropping other caller params", async () => {
-      await fetchWorker(
-        messageRequest(`sessionId=session-1&mcpSecret=${encodeURIComponent(SECRET)}&foo=bar`)
-      );
+      await fetchWorker(messageRequest(await credentialQuery("session-1", "&foo=bar")));
 
       expect([...agentUrl().searchParams.keys()]).toEqual(["sessionId"]);
     });
@@ -584,13 +602,26 @@ describe("worker auth", () => {
       );
 
       expect(response.status).toBe(AGENT_STATUS);
-      expect(agentUrl().searchParams.has("mcpSecret")).toBe(false);
+      expect(agentUrl().searchParams.has(CREDENTIAL_PARAM)).toBe(false);
+    });
+
+    it("rejects the raw secret in the credential param: the downgrade path is closed (#135)", async () => {
+      // Before #135 the raw MOTION_MCP_SECRET was accepted here. It no longer is:
+      // only an expiring HMAC credential verifies, so a secret leaked from an old
+      // log cannot authenticate a message POST.
+      const response = await fetchWorker(
+        messageRequest(`sessionId=session-1&${CREDENTIAL_PARAM}=${encodeURIComponent(SECRET)}`)
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe("Not found");
+      expect(agentCalls).toHaveLength(0);
     });
 
     it.each([
       ["no credentials at all", "sessionId=session-1", {}],
-      ["a wrong query secret", "sessionId=session-1&mcpSecret=wrong", {}],
-      ["an empty query secret", "sessionId=session-1&mcpSecret=", {}],
+      ["a garbage credential", `sessionId=session-1&${CREDENTIAL_PARAM}=not-a-credential`, {}],
+      ["an empty credential", `sessionId=session-1&${CREDENTIAL_PARAM}=`, {}],
     ])("rejects a message POST with %s", async (_label, query, init) => {
       const response = await fetchWorker(messageRequest(query, init));
 
@@ -599,9 +630,21 @@ describe("worker auth", () => {
       expect(agentCalls).toHaveLength(0);
     });
 
-    it("rejects a wrong Bearer token even when a valid query secret is present", async () => {
+    it("rejects a tampered credential (valid shape, wrong MAC)", async () => {
+      const credential = await mintSessionCredential(SECRET);
+      const [issuedAt, mac] = credential.split(".") as [string, string];
+      const tampered = `${issuedAt}.${(mac[0] === "A" ? "B" : "A") + mac.slice(1)}`;
       const response = await fetchWorker(
-        messageRequest(`sessionId=session-1&mcpSecret=${encodeURIComponent(SECRET)}`, {
+        messageRequest(`sessionId=session-1&${CREDENTIAL_PARAM}=${encodeURIComponent(tampered)}`)
+      );
+
+      expect(response.status).toBe(404);
+      expect(agentCalls).toHaveLength(0);
+    });
+
+    it("rejects a wrong Bearer token even when a valid credential is present", async () => {
+      const response = await fetchWorker(
+        messageRequest(await credentialQuery(), {
           headers: { Authorization: "Bearer wrong-secret" },
         })
       );
@@ -611,17 +654,17 @@ describe("worker auth", () => {
     });
 
     it("rejects a GET on the message endpoint", async () => {
-      const response = await fetchWorker(
-        new Request(`https://example.com/mcp/message?sessionId=session-1&mcpSecret=${encodeURIComponent(SECRET)}`)
-      );
+      const query = await credentialQuery();
+      const response = await fetchWorker(new Request(`https://example.com/mcp/message?${query}`));
 
       expect(response.status).toBe(404);
       expect(agentCalls).toHaveLength(0);
     });
 
-    it("does not apply the query-param secret fallback when sessionId is absent", async () => {
+    it("does not apply the query-param credential fallback when sessionId is absent", async () => {
+      const credential = await mintSessionCredential(SECRET);
       const response = await fetchWorker(
-        messageRequest(`mcpSecret=${encodeURIComponent(SECRET)}`)
+        messageRequest(`${CREDENTIAL_PARAM}=${encodeURIComponent(credential)}`)
       );
 
       expect(response.status).toBe(404);

@@ -176,6 +176,7 @@ This is separate from the main `npm run type-check` / `npm run build` which comp
 - `MotionApiService` receives the API key from Worker env bindings instead of `process.env`
 - Tool JSON Schemas are converted to Zod schemas at init time (via `src/utils/jsonSchemaToZod.ts`) because `McpServer.tool()` requires Zod
 - Access is controlled by a secret token in the URL path — treat the full URL like a password
+- On the legacy-SSE message endpoint the raw secret is not used as the per-message credential. When a path-secret client opens an SSE stream, the Worker mints a short-lived HMAC credential (`src/utils/sessionCredential.ts`) and advertises it on the message endpoint the client then POSTs to, so the long-lived secret never lands in access/proxy logs. The credential expires after 24 hours (`SESSION_CREDENTIAL_TTL_MS`); a session held open longer gets 404s on message POSTs and reconnects, which mints a fresh one. Bearer-mode clients send the secret in the `Authorization` header instead and are unaffected.
 
 ## Troubleshooting
 
