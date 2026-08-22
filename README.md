@@ -71,6 +71,8 @@ Your MCP URL will be:
 https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp/YOUR_SECRET
 ```
 
+Use exactly that address. The secret goes at the end of the path and nothing follows it: the server advertises its own sub-paths (such as the message endpoint) during a session, so do not append `/sse` or any other sub-path to the secret.
+
 #### Connecting from Claude
 
 1. Go to [claude.ai](https://claude.ai) > Settings > Connectors

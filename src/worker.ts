@@ -221,6 +221,27 @@ export default {
     const cleanPath = usedBearer
       ? "/" + pathParts.join("/")
       : "/mcp" + (pathParts.length > 2 ? "/" + pathParts.slice(2).join("/") : "");
+
+    // Reject unsupported path-secret sub-paths here, at the Worker, before the
+    // secret is attached to the agent URL below.
+    //
+    // In path-secret mode the only addresses the agent can serve are the bare
+    // stream/streamable-HTTP endpoint at /mcp/<secret> (cleanPath "/mcp") and
+    // the message POST at /mcp/<secret>/message (cleanPath "/mcp/message").
+    // MotionMCPAgent.mount("/mcp") matches the legacy SSE stream on the EXACT
+    // path /mcp (the SDK's basePattern) and serves the message handler on
+    // /mcp/message; any other sub-path (e.g. /mcp/sse) 404s inside the SDK.
+    //
+    // So a path-secret request whose stripped path is neither /mcp nor
+    // /mcp/message cannot succeed. Rejecting it here also keeps the long-lived
+    // secret off a dead-end URL: the SSE-GET branch below would otherwise set
+    // SSE_SECRET_PARAM on a URL that then 404s inside the Durable Object, and an
+    // exception there surfaces the request URL in Workers trace events. Match
+    // the gate's "Not found" 404 convention: no detail, no hint that /mcp exists.
+    if (!usedBearer && pathParts.length > 2 && cleanPath !== "/mcp/message") {
+      return new Response("Not found", { status: 404 });
+    }
+
     // A message POST that did not match the branch above (e.g. addressed as
     // /mcp/<secret>/message) still reaches the agent's message handler, which
     // reads sessionId, so carry it there. Everywhere else the agent reads no

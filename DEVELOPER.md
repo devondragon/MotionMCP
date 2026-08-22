@@ -152,6 +152,8 @@ npm run worker:deploy
 
 Your MCP URL will be: `https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp/YOUR_SECRET`
 
+The secret is the final path segment; clients use that address as-is. The server advertises its own sub-paths (such as the message endpoint) during a session, so do not append `/sse` or any other sub-path to the secret. A path-secret request to any other sub-path returns 404.
+
 ### Connecting clients
 
 - **Claude (web/mobile):** Add the URL in [claude.ai](https://claude.ai) > Settings > Connectors. Syncs to mobile automatically.
