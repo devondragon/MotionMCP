@@ -101,6 +101,42 @@ export default {
 
     const pathParts = url.pathname.split("/").filter(Boolean);
 
+    // CORS preflight, answered BEFORE the auth gate below.
+    //
+    // A browser strips Authorization from a CORS preflight and announces the
+    // header it intends to send via Access-Control-Request-Headers instead, so
+    // an OPTIONS request under /mcp carries no credential the gate could accept.
+    // Left to the gate it 404s with no CORS headers, and the browser then blocks
+    // the real (credentialed) request that would follow. That made Bearer mode
+    // unusable from any browser-origin MCP client, and broke the legacy-SSE
+    // preflight on OPTIONS /mcp/message too (issue #138).
+    //
+    // These headers mirror the agents SDK's own corsHeaders()/handleCORS()
+    // exactly (agents/dist/mcp/index.js): a null body, the default 200 status,
+    // and the SDK's default header values. Allow-Headers therefore includes
+    // authorization and mcp-session-id, which is what a Bearer-mode client's
+    // preflight asks about. Kept in sync with the SDK so the answer a preflight
+    // gets here matches what it would get from the agent on any other method.
+    //
+    // Scoped to pathParts[0] === "mcp": only the MCP routes get an open
+    // preflight responder, not the whole Worker. The trade-off is that this
+    // reveals /mcp answers OPTIONS without a credential. That grants no access:
+    // a preflight carries none and returns no data, and every non-OPTIONS
+    // request still falls through to the auth gate unchanged. The point of the
+    // gate (a real request needs the secret) is preserved.
+    if (request.method === "OPTIONS" && pathParts[0] === "mcp") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Headers":
+            "Content-Type, Accept, Authorization, mcp-session-id, mcp-protocol-version",
+          "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Expose-Headers": "mcp-session-id",
+          "Access-Control-Max-Age": "86400",
+        },
+      });
+    }
+
     // Two authentication modes, both compared in constant time:
     //   1. Authorization: Bearer <secret> header (preferred; keeps the secret
     //      out of the URL for header-capable clients). The path is already

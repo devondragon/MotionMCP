@@ -136,6 +136,92 @@ describe("worker auth", () => {
     });
   });
 
+  describe("CORS preflight (issue #138)", () => {
+    // A browser strips Authorization from a preflight, so an OPTIONS under /mcp
+    // carries no credential. The Worker answers it before the auth gate, with
+    // the same CORS headers the agents SDK emits, so the real request that
+    // follows is allowed. The preflight itself never reaches the agent.
+
+    it("answers OPTIONS /mcp without auth, with CORS headers", async () => {
+      const response = await fetchWorker(
+        new Request("https://example.com/mcp", {
+          method: "OPTIONS",
+          headers: {
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization, content-type",
+          },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(agentCalls).toHaveLength(0);
+
+      const allowHeaders = response.headers.get("Access-Control-Allow-Headers")!;
+      expect(allowHeaders.toLowerCase()).toContain("authorization");
+      expect(allowHeaders.toLowerCase()).toContain("mcp-session-id");
+      expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, DELETE, OPTIONS");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(response.headers.get("Access-Control-Max-Age")).toBe("86400");
+    });
+
+    it("answers OPTIONS on the legacy SSE message endpoint (was 404)", async () => {
+      const response = await fetchWorker(
+        new Request("https://example.com/mcp/message?sessionId=abc", { method: "OPTIONS" })
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(
+        response.headers.get("Access-Control-Allow-Headers")!.toLowerCase()
+      ).toContain("authorization");
+      expect(agentCalls).toHaveLength(0);
+    });
+
+    it("answers OPTIONS /mcp/<secret> with CORS headers", async () => {
+      const response = await fetchWorker(
+        new Request(`https://example.com/mcp/${SECRET}`, { method: "OPTIONS" })
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(agentCalls).toHaveLength(0);
+    });
+
+    it("does not answer OPTIONS outside /mcp", async () => {
+      // The preflight responder is scoped to /mcp; other paths fall through to
+      // the auth gate, which rejects a non-mcp prefix.
+      const response = await fetchWorker(
+        new Request("https://example.com/other", { method: "OPTIONS" })
+      );
+
+      expect(response.status).toBe(404);
+      expect(agentCalls).toHaveLength(0);
+    });
+
+    it("leaves non-OPTIONS auth unchanged: POST /mcp with no credential still 404s", async () => {
+      const response = await fetchWorker(
+        new Request("https://example.com/mcp", { method: "POST", body: "{}" })
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe("Not found");
+      expect(agentCalls).toHaveLength(0);
+    });
+
+    it("leaves the SSE message endpoint gated: POST with no secret still 404s", async () => {
+      const response = await fetchWorker(
+        new Request("https://example.com/mcp/message?sessionId=abc", {
+          method: "POST",
+          body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 1 }),
+        })
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe("Not found");
+      expect(agentCalls).toHaveLength(0);
+    });
+  });
+
   describe("secretsMatch", () => {
     it("accepts the correct secret", async () => {
       await expect(secretsMatch(SECRET, SECRET)).resolves.toBe(true);
