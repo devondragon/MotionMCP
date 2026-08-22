@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - **Validator mutated caller arguments**: AJV's `coerceTypes` rewrote the input object in place. Validation now runs against a clone, and handlers receive the coerced values. (#132)
 - **A duplicate name in `MOTION_MCP_TOOLS=custom:...` crashed Worker startup**: the custom tool list is de-duplicated. (#132)
 - **Empty select `options` were accepted** when creating a custom field, and recurring task `duration` was unvalidated. Both are now rejected, with matching schema constraints (`minItems: 1`, `minimum: 0`). (#132)
+- **`structuredContent` omitted fields the text output shows**: `taskToStructuredContent` now projects `duration`, `deadlineType`, and `labels`, so machine consumers see the same task fields human readers do. `duration` is projected directly rather than summed from `chunks`, which read `0` for exactly the unschedulable tasks (`schedulingIssue: true`, `chunks: []`) an at-risk report exists to surface. (#140)
 
 ### 🛠️ API Changes
 
