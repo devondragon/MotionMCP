@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - **Validator mutated caller arguments**: AJV's `coerceTypes` rewrote the input object in place. Validation now runs against a clone, and handlers receive the coerced values. (#132)
 - **A duplicate name in `MOTION_MCP_TOOLS=custom:...` crashed Worker startup**: the custom tool list is de-duplicated. (#132)
 - **Empty select `options` were accepted** when creating a custom field, and recurring task `duration` was unvalidated. Both are now rejected, with matching schema constraints (`minItems: 1`, `minimum: 0`). (#132)
+- **CORS preflight was rejected on `/mcp` (Bearer mode) and `/mcp/message`**: the auth gate answered `OPTIONS` with a 404, but browsers send preflights without credentials, so browser-origin MCP clients could not use Bearer mode or the legacy SSE message endpoint at all. Preflights under `/mcp` are now answered before the gate with the same CORS headers the agents SDK emits; every non-`OPTIONS` request stays fully gated. (#138)
 
 ### 🛠️ API Changes
 
