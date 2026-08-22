@@ -22,5 +22,5 @@
     "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/worker.ts", "src/utils/jsonSchemaToZod.ts"]
+  "exclude": ["node_modules", "dist", "src/worker.ts", "src/utils/jsonSchemaToZod.ts", "src/utils/sessionCredential.ts"]
 }
