@@ -73,18 +73,62 @@ describe("jsonSchemaToZodObject", () => {
     expect(result.success).toBe(false);
   });
 
+  /**
+   * Smallest payload a tool accepts: every required property, using the first
+   * enum value where the schema constrains one. A fixed payload like
+   * `{ operation: "list" }` is not usable here — motion_search only accepts
+   * operation "content", and motion_comments also requires taskId — so those
+   * tools would reject it for reasons unrelated to additionalProperties and the
+   * assertion would pass even with strictness stripped out.
+   */
+  function minimalValidPayload(tool: (typeof allToolDefinitions)[number]): Record<string, unknown> {
+    const schema = tool.inputSchema as {
+      properties?: Record<string, { type?: string; enum?: unknown[] }>;
+      required?: string[];
+    };
+
+    const payload: Record<string, unknown> = {};
+    for (const key of schema.required ?? []) {
+      const property = schema.properties?.[key];
+      if (property?.enum?.length) {
+        payload[key] = property.enum[0];
+        continue;
+      }
+      switch (property?.type) {
+        case "number":
+        case "integer":
+          payload[key] = 1;
+          break;
+        case "boolean":
+          payload[key] = true;
+          break;
+        case "array":
+          payload[key] = [];
+          break;
+        case "object":
+          payload[key] = {};
+          break;
+        default:
+          payload[key] = "placeholder";
+      }
+    }
+    return payload;
+  }
+
   it.each(
     allToolDefinitions
       .filter((tool) => (tool.inputSchema as { additionalProperties?: boolean }).additionalProperties === false)
       .map((tool) => [tool.name, tool] as const)
-  )("rejects unknown properties for %s", (_name, tool) => {
+  )("rejects unknown properties for %s, and accepts the same payload without them", (_name, tool) => {
     const schema = jsonSchemaToZodObject(
       tool.inputSchema as Parameters<typeof jsonSchemaToZodObject>[0]
     );
+    const valid = minimalValidPayload(tool);
 
-    const result = schema.safeParse({ operation: "list", definitelyNotAParam: true });
-
-    expect(result.success).toBe(false);
+    // Control: without the control the rejection below could come from a failed
+    // enum or a missing required key rather than from additionalProperties.
+    expect(schema.safeParse(valid).success).toBe(true);
+    expect(schema.safeParse({ ...valid, definitelyNotAParam: true }).success).toBe(false);
   });
 
   it("declares additionalProperties: false on every tool definition", () => {

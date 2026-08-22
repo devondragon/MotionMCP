@@ -121,6 +121,7 @@ export default {
     // secret path segment, so for path-secret clients we thread the secret
     // through this param (see the message branch and the SSE-GET rewrite below).
     const SSE_SECRET_PARAM = "mcpSecret";
+    const SESSION_ID_PARAM = "sessionId";
 
     // Legacy SSE message endpoint (POST /mcp/message?sessionId=...). It must be
     // authenticated like every other path: the agents SDK spins up a Durable
@@ -133,7 +134,7 @@ export default {
       pathParts[0] === "mcp" &&
       pathParts[1] === "message" &&
       request.method === "POST" &&
-      url.searchParams.has("sessionId")
+      url.searchParams.has(SESSION_ID_PARAM)
     ) {
       const messageSecret = usedBearer
         ? bearerSecret
@@ -194,8 +195,19 @@ export default {
     const opensStream =
       !isStreamableHttp && request.method === "GET" && cleanPath !== "/mcp/message";
 
-    if (opensStream && !usedBearer) {
-      cleanUrl.searchParams.set(SSE_SECRET_PARAM, env.MOTION_MCP_SECRET);
+    if (opensStream) {
+      // Session ids on a stream open are the SDK's to issue, not the caller's:
+      // createLegacySseHandler names the Durable Object `sse:${sessionId}` and
+      // falls back to a fresh unique id when the param is absent. Forwarding a
+      // caller-supplied id would let two clients open streams onto the same DO
+      // and receive each other's messages. Before query strings were carried
+      // across the rewrite this was unreachable, because the query was always
+      // dropped here.
+      cleanUrl.searchParams.delete(SESSION_ID_PARAM);
+
+      if (!usedBearer) {
+        cleanUrl.searchParams.set(SSE_SECRET_PARAM, env.MOTION_MCP_SECRET);
+      }
     }
 
     const cleanRequest = new Request(cleanUrl, request);

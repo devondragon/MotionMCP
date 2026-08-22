@@ -230,6 +230,12 @@ describe("worker auth", () => {
   });
 
   describe("path rewriting", () => {
+    // These assert what the Worker hands to the agent, not end-to-end
+    // reachability. MotionMCPAgent.mount("/mcp") matches the stream on /mcp
+    // only (agents/dist/mcp/index.js, basePattern), so a /mcp/sse sub-path is
+    // rewritten correctly here and then 404s inside the SDK. That is
+    // pre-existing product behavior; the rewrite is what these pin.
+
     it("preserves the path in Bearer mode and adds no secret query param", async () => {
       await fetchWorker(
         new Request("https://example.com/mcp/sse", { headers: { Authorization: `Bearer ${SECRET}` } })
@@ -293,6 +299,33 @@ describe("worker auth", () => {
       const url = agentUrl();
       expect(url.pathname).toBe("/mcp/message");
       expect(url.searchParams.get("sessionId")).toBe("session-1");
+    });
+
+    it.each([
+      ["path secret mode", `/mcp/${SECRET}`, {}],
+      ["Bearer mode", "/mcp", { Authorization: `Bearer ${SECRET}` }],
+    ])("drops a caller-supplied sessionId when opening a stream in %s", async (_label, path, headers) => {
+      // The SDK names the stream's Durable Object sse:<sessionId>, so honouring a
+      // caller-supplied id would let two clients share one stream object and
+      // receive each other's messages. Ids stay server-issued.
+      await fetchWorker(
+        new Request(`https://example.com${path}?sessionId=chosen-by-caller&keep=this`, { headers })
+      );
+
+      const url = agentUrl();
+      expect(url.searchParams.has("sessionId")).toBe(false);
+      expect(url.searchParams.get("keep")).toBe("this");
+    });
+
+    it("keeps sessionId on a message POST, which is not a stream open", async () => {
+      await fetchWorker(
+        new Request(`https://example.com/mcp/message?sessionId=session-1&mcpSecret=${encodeURIComponent(SECRET)}`, {
+          method: "POST",
+          body: "{}",
+        })
+      );
+
+      expect(agentUrl().searchParams.get("sessionId")).toBe("session-1");
     });
 
     it("puts no secret on the URL for a GET to a message-shaped path", async () => {
