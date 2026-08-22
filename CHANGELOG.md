@@ -46,6 +46,7 @@ All notable changes to this project will be documented in this file.
 
 - Added regression coverage for assignee resolution and workspace scoping, sanitize tag anchoring, frequency transforms, duration parsing, validator cloning/coercion, custom tool de-duplication, and status/search/custom-field/recurring handler paths. 539 tests across 30 files.
 - **Known gap**: `src/worker.ts` has no test coverage. `crypto.subtle.timingSafeEqual` is workerd-only and unavailable in the plain-Node Vitest setup, so covering the auth path needs `@cloudflare/vitest-pool-workers`. Tracked as follow-up work.
+- Covered four implemented-but-untested paths surfaced by the #132 review: `jsonSchemaToZodObject` strictness (rejects unknown keys; enforces `minLength`, `minimum: 0`, `minItems: 1`), `fetchAllPages` truncation (oversized-page stop without cursor advance, accurate `returnedCount`, `max_items` precedence, `max_pages` ceiling), the `workspaceResolver` ambiguous case-insensitive-match warning, and `endOfDayInZone` across DST transitions in both hemispheres plus a fixed-offset control. (#136)
 
 ## [2.8.0] - 2026-03-02
 
