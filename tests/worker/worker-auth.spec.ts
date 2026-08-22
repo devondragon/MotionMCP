@@ -315,6 +315,54 @@ describe("worker auth", () => {
     });
   });
 
+  describe("path-secret sub-path rejection (issue #141)", () => {
+    // Only /mcp/<secret> (stream open / streamable HTTP) and
+    // /mcp/<secret>/message (message POST) are valid path-secret addresses. The
+    // SDK mounts the stream on /mcp and the message handler on /mcp/message
+    // only, so any other path-secret sub-path cannot succeed. The Worker rejects
+    // it before the secret is ever attached to the agent URL, so the secret
+    // never lands on a URL that dead-ends in a 404 inside the Durable Object.
+
+    it("rejects GET /mcp/<secret>/sse with 404 and never reaches the agent", async () => {
+      const response = await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/sse`));
+
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe("Not found");
+      // The cleanest proof the secret was never attached: the agent, which is
+      // where SSE_SECRET_PARAM would be set, was not called at all.
+      expect(agentCalls).toHaveLength(0);
+    });
+
+    it("rejects GET /mcp/<secret>/anything-else with 404 (guard is general, not sse-specific)", async () => {
+      const response = await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/anything-else`));
+
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe("Not found");
+      expect(agentCalls).toHaveLength(0);
+    });
+
+    it("still opens the stream for the bare /mcp/<secret>", async () => {
+      const response = await fetchWorker(new Request(`https://example.com/mcp/${SECRET}`));
+
+      expect(response.status).toBe(AGENT_STATUS);
+      expect(onlyAgentCall().mode).toBe("mount");
+      expect(agentUrl().pathname).toBe("/mcp");
+    });
+
+    it("still reaches the message handler for POST /mcp/<secret>/message?sessionId=abc", async () => {
+      const response = await fetchWorker(
+        new Request(`https://example.com/mcp/${SECRET}/message?sessionId=abc`, {
+          method: "POST",
+          body: "{}",
+        })
+      );
+
+      expect(response.status).toBe(AGENT_STATUS);
+      expect(agentUrl().pathname).toBe("/mcp/message");
+      expect(agentUrl().searchParams.get("sessionId")).toBe("abc");
+    });
+  });
+
   describe("path rewriting", () => {
     // These assert what the Worker hands to the agent, not end-to-end
     // reachability. MotionMCPAgent.mount("/mcp") matches the stream on /mcp
@@ -339,14 +387,10 @@ describe("worker auth", () => {
       expect(agentUrl().pathname).toBe("/mcp");
     });
 
-    it("strips the secret segment and keeps the sub-path in path secret mode", async () => {
-      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/sse`));
-
-      expect(agentUrl().pathname).toBe("/mcp/sse");
-    });
-
     it("carries the secret into the SSE stream URL so the agent advertises it", async () => {
-      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/sse`));
+      // The path-secret stream open is the bare /mcp/<secret> GET (cleanPath
+      // "/mcp"); path-secret SSE sub-paths like /mcp/<secret>/sse are rejected.
+      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}`));
 
       expect(agentUrl().searchParams.get("mcpSecret")).toBe(SECRET);
     });
@@ -366,7 +410,7 @@ describe("worker auth", () => {
     });
 
     it("forwards no caller query params in path secret mode, only the Worker's own", async () => {
-      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/sse?foo=bar`));
+      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}?foo=bar`));
 
       const url = agentUrl();
       expect(url.searchParams.has("foo")).toBe(false);
