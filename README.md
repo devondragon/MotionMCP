@@ -13,7 +13,7 @@
 
 ## Getting Started
 
-**Prerequisites:** Node.js 18+ and a [Motion API key](https://app.usemotion.com/settings/api).
+**Prerequisites:** Node.js 20+ and a [Motion API key](https://app.usemotion.com/settings/api).
 
 ### Local Setup (npx)
 

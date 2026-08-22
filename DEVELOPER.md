@@ -4,7 +4,7 @@ This guide is for contributors and anyone running Motion MCP locally from source
 
 ## Prerequisites
 
-- Node.js 18 or newer (Node 20 recommended)
+- Node.js 20 or newer (Node 24 recommended; the repo pins 24 via `mise.toml`)
 - npm (comes with Node)
 - A Motion API key: https://app.usemotion.com/settings/api
 
