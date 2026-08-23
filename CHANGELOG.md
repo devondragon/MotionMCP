@@ -47,10 +47,11 @@ All notable changes to this project will be documented in this file.
 ### 🧪 Testing
 
 - Added regression coverage for assignee resolution and workspace scoping, sanitize tag anchoring, frequency transforms, duration parsing, validator cloning/coercion, custom tool de-duplication, and status/search/custom-field/recurring handler paths. 539 tests across 30 files.
-- **Known gap**: `src/worker.ts` has no test coverage. `crypto.subtle.timingSafeEqual` is workerd-only and unavailable in the plain-Node Vitest setup, so covering the auth path needs `@cloudflare/vitest-pool-workers`. Tracked as follow-up work.
+- **`src/worker.ts` auth is now covered under workerd**: a `worker` Vitest project runs the auth path inside `@cloudflare/vitest-pool-workers`, so `crypto.subtle.timingSafeEqual`, the real `Request`/`URL` rewrite semantics, and the Durable Object bindings are exercised in the same runtime as production. (#139)
 - Covered four implemented-but-untested paths surfaced by the #132 review: `jsonSchemaToZodObject` strictness (rejects unknown keys; enforces `minLength`, `minimum: 0`, `minItems: 1`), `fetchAllPages` truncation (oversized-page stop without cursor advance, accurate `returnedCount`, `max_items` precedence, `max_pages` ceiling), the `workspaceResolver` ambiguous case-insensitive-match warning, and `endOfDayInZone` across DST transitions in both hemispheres plus a fixed-offset control. (#136)
 - **`npm run test:types` was failing**: `tsconfig.tests.json` type-checked `src/utils/sessionCredential.ts`, which uses workerd-only APIs (`CryptoKey`, `crypto.subtle.timingSafeEqual`) unavailable under the Node libs of that config. It is now excluded there, matching `tsconfig.json`; the file stays type-checked under Workers types via `tests/worker/tsconfig.json`.
 - **Integration tests silently skipped even with a key set**: `vitest.integration.config.ts` never loaded `.env`, so the `describe.skip` guard saw no `MOTION_API_KEY` and skipped all 26 tests while exiting 0. The config now loads `.env` via a `dotenv/config` setup file.
+- **Added a CI workflow** (`.github/workflows/ci.yml`) that runs the type-checks, build, and the node + worker test suites on every push to `main` and every pull request. It runs on Node 24 (the workerd test project requires Node >= 22); integration tests are excluded as they need a live API key.
 
 ### 📖 Documentation
 
