@@ -52,9 +52,9 @@ Both commands start the MCP server on stdio (no HTTP port). Clients like Claude 
 
 Set MOTION_MCP_TOOLS in your environment (for example in .env) to control the exposed tools:
 
-- minimal — core consolidated tools only: motion_tasks, motion_projects, motion_workspaces
-- essential (default) — consolidated tools plus commonly-used endpoints and helpers
-- complete — all consolidated tools
+- minimal — 3 tools: motion_tasks, motion_projects, motion_workspaces
+- essential — 7 tools: adds motion_users, motion_search, motion_comments, motion_schedules
+- complete (default) — all 10 tools: adds motion_custom_fields, motion_recurring_tasks, motion_statuses
 - custom:tool1,tool2 — specify exactly which tools to enable
 
 Examples:
@@ -62,7 +62,7 @@ Examples:
 # Only core consolidated tools
 MOTION_MCP_TOOLS=minimal npm run mcp:dev
 
-# Default set (explicit)
+# Reduced set
 MOTION_MCP_TOOLS=essential npm run mcp
 
 # Custom selection

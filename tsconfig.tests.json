@@ -7,5 +7,5 @@
     "noUnusedParameters": false
   },
   "include": ["src/**/*", "tests/services/**/*"],
-  "exclude": ["node_modules", "dist", "src/worker.ts", "src/utils/jsonSchemaToZod.ts"]
+  "exclude": ["node_modules", "dist", "src/worker.ts", "src/utils/jsonSchemaToZod.ts", "src/utils/sessionCredential.ts"]
 }
