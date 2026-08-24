@@ -125,9 +125,11 @@ MOTION_MCP_TOOLS=custom:motion_tasks,motion_projects,motion_search npx motionmcp
 ## Tools Reference
 
 ### motion_tasks
-**Operations:** `create`, `list`, `get`, `update`, `delete`, `move`, `unassign`
+**Operations:** `create`, `list`, `list_all_uncompleted`, `get`, `update`, `delete`, `move`, `unassign`
 
 The primary tool for task management. Supports all Motion API parameters including `name`, `description`, `priority`, `dueDate`, `duration`, `labels`, `assigneeId`, and `autoScheduled`. You can reference workspaces and projects by name — the server resolves them automatically.
+
+`list_all_uncompleted` spans every workspace in one call (it ignores `workspaceId`/`workspaceName`) and honors the `dueDate` and `priority` filters, so "what's due this week across all my workspaces?" resolves directly. On `list`, `dueDate` is an inclusive on-or-before-day bound that includes overdue tasks (so `dueDate: "today"` answers "what's due today?"), and `completedAfter` / `completedBefore` bound by completion date in your account's time zone for "what did I get done this week?". Dates are interpreted in your Motion account's time zone, and list responses lead with a header naming that zone and today's local date.
 
 ```json
 {
@@ -181,7 +183,7 @@ Read and add comments on tasks and projects.
 ### motion_schedules
 **Operations:** `list`
 
-Retrieve user schedules and time zones. Supports prioritized scheduling with conflict detection and workload breakdowns by status, priority, and project.
+Retrieve user schedules, showing each day's working hours (start-end per day) and time zones. These are recurring working-hour templates only — they do not expose actual calendar events or meetings, so they cannot by themselves show a true free/busy picture; combine with tasks' `scheduledStart`/`scheduledEnd` to see what Motion has auto-booked.
 
 ### motion_custom_fields
 **Operations:** `list`, `create`, `delete`, `add_to_project`, `remove_from_project`, `add_to_task`, `remove_from_task`

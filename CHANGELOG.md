@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### ✨ Added
+
+- **Account timezone and today's date on list responses**: task-list responses (`list`, `list_all_uncompleted`) and schedule responses now begin with a one-line header, e.g. `Account timezone: America/Denver | Today: 2026-08-24 (Monday)`. Date-relative reasoning the model does itself (weekday, "now") previously had nothing in the payload naming the account's zone, so fresh agents inferred "now" from the newest `updatedTime` and sometimes reported the wrong day. The zone is already resolved for rendering, so this adds no API calls, and it lands on both the stdio and Worker entry points. (#151, closes #150)
+- **`list_all_uncompleted` honors `dueDate` and `priority`**: these were on the shared `motion_tasks` schema but silently dropped, so "due this week across all workspaces" returned everything. Both filters are now threaded (dueDate validated in the account zone) through the per-workspace queries. (#149)
+- **`list` gains `completedAfter` / `completedBefore`**: Motion has no server-side completion-date filter, so "what did I get done this week?" meant dumping all statuses and filtering by hand. These client-side day-granularity bounds (account zone, both inclusive) auto-imply `includeAllStatuses`; a very large window stays bounded by `MAX_PAGES` and surfaces in truncation metadata rather than truncating silently. (#149)
+- **Schedule responses print each day's working hours**: `formatScheduleList` now shows the start-end times per day instead of only a working-days count, so "when am I free?" can anchor to real hours. The times were already in the payload. The tool description notes these are recurring working-hour templates only and do not expose calendar events or meetings. (#149)
+- **`motion_statuses` moved into the `essential` tier** (now 8 tools), so marking a task done can look up the workspace's resolved status name instead of guessing it. (#149)
+- **Cloudflare Worker observability enabled**: `wrangler.toml` now turns on Workers logs, so invocations are traceable in the Cloudflare dashboard for debugging.
+
 ### 🔒 Security
 
 - **Fixed fail-open authentication in the Cloudflare Worker (critical)**: when `MOTION_MCP_SECRET` was unset, the path-secret check compared `undefined !== undefined` and authorized every request, exposing unauthenticated MCP access to the Motion account. The Worker now fails closed with a 500. (#132)
@@ -17,6 +26,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- **`dueDate` filter dropped same-day tasks for accounts west of UTC**: `list` compared each task's raw UTC date against a local calendar filter value. A task due end-of-day local time is stored as a UTC instant on the *next* calendar day, so it sorted after "today" and was silently dropped from "what's due today?" even though its display (rendered in the account zone) showed the correct day. Each task's `dueDate` is now reduced to a calendar date in the account timezone before comparing (new `calendarDateInZone` helper), falling back to the UTC date portion when no zone is resolvable. The `dueDate` filter is also now documented as an inclusive on-or-before-day bound that includes overdue tasks. (#148)
 - **Assignee names resolved against the wrong workspace**: `move` and `update` resolved an assignee name through a cross-workspace search that returned the first match found, so a name held by users in two workspaces could reassign a task to the wrong person. Resolution is now scoped to the destination workspace on `move` and to the task's own workspace on `update`. (#132)
 - **`assignee` name and the `me` shortcut were dropped**: both were silently discarded or forwarded literally on task create/update/move, and `me` was unresolved on recurring task creation. (#132)
 - **`sanitize` deleted ordinary text**: the tag-stripping regex removed any `<...>` span, so text like `x < 5 and y > 3` lost content. It is now anchored to real HTML tag names. (#132)
