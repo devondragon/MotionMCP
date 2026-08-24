@@ -30,6 +30,8 @@ export interface MotionTasksArgs {
   assignee?: string;
   priority?: 'ASAP' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate?: string;
+  completedAfter?: string;
+  completedBefore?: string;
   labels?: string[];
   name?: string;
   description?: string;
