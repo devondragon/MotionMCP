@@ -26,7 +26,7 @@ describe('ToolConfigurator', () => {
     expect(names.length).toBe(3);
   });
 
-  it('essential preset exposes expected 7 tools', () => {
+  it('essential preset exposes expected 8 tools', () => {
     const cfg = new ToolConfigurator('essential', registry);
     const tools = cfg.getEnabledTools();
     const names = tools.map(t => t.name);
@@ -38,8 +38,9 @@ describe('ToolConfigurator', () => {
       TOOL_NAMES.SEARCH,
       TOOL_NAMES.COMMENTS,
       TOOL_NAMES.SCHEDULES,
+      TOOL_NAMES.STATUSES,
     ]));
-    expect(names.length).toBe(7);
+    expect(names.length).toBe(8);
   });
 
   it('complete preset exposes expected 10 tools', () => {

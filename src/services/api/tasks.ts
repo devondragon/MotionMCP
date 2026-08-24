@@ -25,10 +25,14 @@ export interface GetTasksOptions {
   assigneeId?: string;
   priority?: ValidPriority;
   dueDate?: string;
+  /** Keep only tasks completed on or after this local calendar date (YYYY-MM-DD). Implies includeAllStatuses. */
+  completedAfter?: string;
+  /** Keep only tasks completed on or before this local calendar date (YYYY-MM-DD). Implies includeAllStatuses. */
+  completedBefore?: string;
   labels?: string[];
   limit?: number;
   maxPages?: number;
-  /** Account zone for reducing task dueDate instants to a local calendar date when filtering by dueDate. */
+  /** Account zone for reducing task dueDate/completedTime instants to a local calendar date when filtering. */
   timeZone?: string;
 }
 
@@ -42,11 +46,18 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
     assigneeId,
     priority,
     dueDate,
+    completedAfter,
+    completedBefore,
     labels,
     limit,
     maxPages = LIMITS.MAX_PAGES,
     timeZone
   } = options;
+
+  // A completion-date filter needs completed/resolved tasks in the fetch, which the
+  // API omits by default. Imply includeAllStatuses so those tasks are present to filter.
+  const wantsCompleted = Boolean(completedAfter || completedBefore);
+  const effectiveIncludeAllStatuses = includeAllStatuses || wantsCompleted;
 
   // Validate limit parameter if provided
   if (limit !== undefined && (limit < 0 || !Number.isInteger(limit))) {
@@ -92,6 +103,17 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
           return taskDate <= dueDate;
         });
       }
+      if (completedAfter || completedBefore) {
+        // Compare completion date at day granularity in the account zone (completedTime
+        // is a UTC instant, the bounds are local calendar dates). Both ends inclusive.
+        filtered = filtered.filter(t => {
+          if (!t.completedTime) return false;
+          const done = calendarDateInZone(t.completedTime, timeZone);
+          if (completedAfter && done < completedAfter) return false;
+          if (completedBefore && done > completedBefore) return false;
+          return true;
+        });
+      }
       return filtered;
     };
 
@@ -118,7 +140,7 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
           params.append('status', status);
         }
       }
-      if (includeAllStatuses) {
+      if (effectiveIncludeAllStatuses) {
         params.append('includeAllStatuses', 'true');
       }
       if (assigneeId) {
@@ -147,7 +169,7 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
       // When client-side filters are active, don't cap pagination with maxItems
       // because valid matches may exist beyond the first batch. Fetch all pages
       // and apply the limit after filtering instead.
-      const hasClientFilters = Boolean(name || priority || dueDate);
+      const hasClientFilters = Boolean(name || priority || dueDate || completedAfter || completedBefore);
       const paginatedResult = await fetchAllPagesNew<MotionTask>(fetchPage, 'tasks', {
         maxPages,
         logProgress: false,  // Less verbose for tasks
@@ -450,12 +472,25 @@ export async function unassignTask(ctx: ResourceContext, taskId: string): Promis
  * Get all uncompleted tasks across all workspaces and projects
  * Filters tasks where status.isResolvedStatus is false or undefined
  */
-export async function getAllUncompletedTasks(ctx: ResourceContext, limit?: number, assigneeId?: string): Promise<ListResult<MotionTask>> {
+export interface GetAllUncompletedOptions {
+  limit?: number;
+  assigneeId?: string;
+  /** Keep only tasks due ON OR BEFORE this local calendar date (YYYY-MM-DD or a validated date). */
+  dueDate?: string;
+  priority?: ValidPriority;
+  /** Account zone for reducing task dueDate instants to a local calendar date when filtering by dueDate. */
+  timeZone?: string;
+}
+
+export async function getAllUncompletedTasks(ctx: ResourceContext, options: GetAllUncompletedOptions = {}): Promise<ListResult<MotionTask>> {
+  const { limit, assigneeId, dueDate, priority, timeZone } = options;
   try {
     mcpLog(LOG_LEVELS.DEBUG, 'Fetching all uncompleted tasks across workspaces', {
       method: 'getAllUncompletedTasks',
       limit,
-      assigneeId
+      assigneeId,
+      dueDate,
+      priority
     });
 
     // Apply limit to prevent resource exhaustion
@@ -487,6 +522,9 @@ export async function getAllUncompletedTasks(ctx: ResourceContext, limit?: numbe
           const { items: workspaceTasks, truncation: wsTruncation } = await getTasks(ctx, {
             workspaceId: workspace.id,
             assigneeId,
+            dueDate,
+            priority,
+            timeZone,
             limit: fetchLimit,
             maxPages: LIMITS.MAX_PAGES
           });

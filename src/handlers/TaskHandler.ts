@@ -47,6 +47,8 @@ interface ListTaskParams {
   assignee?: string;
   priority?: string;
   dueDate?: string;
+  completedAfter?: string;
+  completedBefore?: string;
   labels?: string[];
   limit?: number;
 }
@@ -94,6 +96,8 @@ interface UnassignTaskParams {
 interface ListAllUncompletedParams {
   assigneeId?: string;
   assignee?: string;
+  priority?: string;
+  dueDate?: string;
   limit?: number;
 }
 
@@ -322,6 +326,28 @@ export class TaskHandler extends BaseHandler {
       validatedDueDate = parsedDate;
     }
 
+    // Validate and parse completion-date bounds if provided
+    let validatedCompletedAfter: string | undefined;
+    if (params.completedAfter) {
+      const parsed = parseFilterDate(params.completedAfter, timeZone);
+      if (!parsed) {
+        return this.handleError(new Error(
+          `Invalid date format "${params.completedAfter}". Use YYYY-MM-DD format or relative dates like 'today', 'yesterday'`
+        ));
+      }
+      validatedCompletedAfter = parsed;
+    }
+    let validatedCompletedBefore: string | undefined;
+    if (params.completedBefore) {
+      const parsed = parseFilterDate(params.completedBefore, timeZone);
+      if (!parsed) {
+        return this.handleError(new Error(
+          `Invalid date format "${params.completedBefore}". Use YYYY-MM-DD format or relative dates like 'today', 'yesterday'`
+        ));
+      }
+      validatedCompletedBefore = parsed;
+    }
+
     // Validate labels if provided
     if (params.labels && (!Array.isArray(params.labels) || params.labels.some(label => !label || typeof label !== 'string'))) {
       return this.handleError(new Error('Labels must be an array of non-empty strings'));
@@ -339,6 +365,8 @@ export class TaskHandler extends BaseHandler {
       assigneeId: resolvedAssigneeId,
       priority: params.priority as ValidPriority | undefined,
       dueDate: validatedDueDate,
+      completedAfter: validatedCompletedAfter,
+      completedBefore: validatedCompletedBefore,
       labels: params.labels,
       limit: params.limit,
       timeZone
@@ -546,18 +574,45 @@ export class TaskHandler extends BaseHandler {
    * @returns Formatted list of uncompleted tasks from all workspaces
    */
   private async handleListAllUncompleted(params: ListAllUncompletedParams): Promise<McpToolResponse> {
+    if (params.priority && !isValidPriority(params.priority)) {
+      return this.handleError(new Error(
+        `Invalid priority "${params.priority}". Valid values are: ASAP, HIGH, MEDIUM, LOW`
+      ));
+    }
+
+    const timeZone = await this.resolveTimeZone();
+
+    let validatedDueDate: string | undefined;
+    if (params.dueDate) {
+      const parsedDate = parseFilterDate(params.dueDate, timeZone);
+      if (!parsedDate) {
+        return this.handleError(new Error(
+          `Invalid date format "${params.dueDate}". Use YYYY-MM-DD format or relative dates like 'today', 'tomorrow'`
+        ));
+      }
+      validatedDueDate = parsedDate;
+    }
+
     const { resolvedId, display } =
       await this.resolveAssignee(params.assigneeId, params.assignee);
 
-    const { items: tasks, truncation } = await this.motionService.getAllUncompletedTasks(params.limit, resolvedId);
+    const { items: tasks, truncation } = await this.motionService.getAllUncompletedTasks({
+      limit: params.limit,
+      assigneeId: resolvedId,
+      dueDate: validatedDueDate,
+      priority: params.priority as ValidPriority | undefined,
+      timeZone
+    });
 
     return formatTaskList(tasks, {
       status: 'uncompleted',
       assigneeName: display || resolvedId,
+      priority: params.priority,
+      dueDate: params.dueDate,
       limit: params.limit,
       allWorkspaces: true,
       truncation,
-      timeZone: await this.resolveTimeZone()
+      timeZone
     });
   }
 

@@ -53,7 +53,7 @@ export class ToolRegistry {
    *
    * Supported configurations:
    * - 'minimal': Core tools only (tasks, projects, workspaces) - 3 tools
-   * - 'essential': Core plus common features (users, search, comments, schedules) - 7 tools
+   * - 'essential': Core plus common features (users, search, comments, schedules, statuses) - 8 tools
    * - 'complete': All available tools - 10 tools
    * - 'custom:tool1,tool2,...': Specific tools by name
    *
@@ -80,7 +80,10 @@ export class ToolRegistry {
           toolsMap.get(TOOL_NAMES.USERS),
           toolsMap.get(TOOL_NAMES.SEARCH),
           toolsMap.get(TOOL_NAMES.COMMENTS),
-          toolsMap.get(TOOL_NAMES.SCHEDULES)
+          toolsMap.get(TOOL_NAMES.SCHEDULES),
+          // Statuses lets the model resolve a workspace's done/resolved status name
+          // instead of guessing it when marking tasks complete.
+          toolsMap.get(TOOL_NAMES.STATUSES)
         ].filter((tool): tool is McpToolDefinition => tool !== undefined);
 
       case 'complete':
