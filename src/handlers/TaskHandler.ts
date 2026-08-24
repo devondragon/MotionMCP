@@ -307,10 +307,13 @@ export class TaskHandler extends BaseHandler {
       ));
     }
 
+    // Resolve the account zone once; reused for filtering by dueDate and for display.
+    const timeZone = await this.resolveTimeZone();
+
     // Validate and parse due date if provided
     let validatedDueDate: string | undefined;
     if (params.dueDate) {
-      const parsedDate = parseFilterDate(params.dueDate, await this.resolveTimeZone());
+      const parsedDate = parseFilterDate(params.dueDate, timeZone);
       if (!parsedDate) {
         return this.handleError(new Error(
           `Invalid date format "${params.dueDate}". Use YYYY-MM-DD format or relative dates like 'today', 'tomorrow'`
@@ -337,7 +340,8 @@ export class TaskHandler extends BaseHandler {
       priority: params.priority as ValidPriority | undefined,
       dueDate: validatedDueDate,
       labels: params.labels,
-      limit: params.limit
+      limit: params.limit,
+      timeZone
     });
 
     const statusDisplay = params.includeAllStatuses
@@ -357,7 +361,7 @@ export class TaskHandler extends BaseHandler {
       dueDate: params.dueDate,
       limit: params.limit,
       truncation,
-      timeZone: await this.resolveTimeZone()
+      timeZone
     });
   }
 

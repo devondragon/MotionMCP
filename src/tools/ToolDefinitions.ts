@@ -71,11 +71,11 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       workspaceId: {
         type: "string",
-        description: "Filter by workspace (for list)"
+        description: "Filter by workspace (for list). Ignored by list_all_uncompleted, which always spans every workspace."
       },
       workspaceName: {
         type: "string",
-        description: "Filter by workspace name (for list)"
+        description: "Filter by workspace name (for list). Ignored by list_all_uncompleted, which always spans every workspace."
       },
       projectId: {
         type: "string",
@@ -113,7 +113,7 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       dueDate: {
         type: "string",
-        description: "Due date (for create/update) or filter (for list, filtered client-side — returns tasks due on or before this date). Format: YYYY-MM-DD, a full ISO 8601 timestamp with offset, or relative like 'today', 'tomorrow'. A date-only value is stored as end of day (23:59:59) in the account's schedule timezone when all schedules agree on one, so it renders back as the same calendar day; it falls back to end-of-day UTC when no single zone is resolvable. Pass an explicit ISO timestamp with an offset to control the exact instant. Relative keywords resolve against the same account timezone, falling back to UTC otherwise."
+        description: "Due date (for create/update) or filter (for list). Format: YYYY-MM-DD, a full ISO 8601 timestamp with offset, or relative like 'today', 'tomorrow'. FILTER (list): an inclusive upper bound at day granularity in the account timezone — returns every task due ON OR BEFORE that day, which INCLUDES overdue tasks. So dueDate:'today' answers \"what's due today?\" (including anything overdue) in a single list call. There is no exact-date or date-range filter; to show only tasks due exactly on a day, filter the returned results by their Due Date yourself. CREATE/UPDATE: a date-only value is stored as end of day (23:59:59) in the account's schedule timezone when all schedules agree on one, so it renders back as the same calendar day; it falls back to end-of-day UTC when no single zone is resolvable. Pass an explicit ISO timestamp with an offset to control the exact instant. Relative keywords resolve against the same account timezone, falling back to UTC otherwise."
       },
       labels: {
         type: "array",
