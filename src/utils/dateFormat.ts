@@ -88,6 +88,38 @@ function renderInZone(date: Date, timeZone: string, withTime: boolean): string |
 }
 
 /**
+ * Reduce an instant to its calendar date (YYYY-MM-DD) in a given zone.
+ *
+ * Motion returns dueDate as a UTC instant, so the raw ISO date portion is the
+ * UTC calendar day, which for a zone west of UTC is a day ahead of the local
+ * date near end-of-day. Callers comparing against a local calendar date (e.g.
+ * "today") must reduce the instant in the same zone first, or same-day tasks
+ * whose UTC date has rolled over are silently misclassified.
+ *
+ * Falls back to the UTC date portion when no zone is given or the runtime
+ * cannot honour it; returns the input's leading 10 chars for unparseable input.
+ */
+export function calendarDateInZone(value: string, timeZone?: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+
+  if (timeZone) {
+    try {
+      // en-CA formats as YYYY-MM-DD.
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(date);
+    } catch {
+      // fall through to UTC
+    }
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+/**
  * Format a full timestamp. Always emits the unambiguous ISO 8601 instant;
  * appends a zone-labelled local rendering when a zone is supplied.
  *

@@ -14,6 +14,7 @@ import { TruncationInfo, ListResult } from '../../types/mcp';
 import { ResourceContext } from './types';
 import { getErrorMessage } from './ApiClient';
 import { getWorkspaces } from './workspaces';
+import { calendarDateInZone } from '../../utils/dateFormat';
 
 export interface GetTasksOptions {
   workspaceId?: string;
@@ -27,6 +28,8 @@ export interface GetTasksOptions {
   labels?: string[];
   limit?: number;
   maxPages?: number;
+  /** Account zone for reducing task dueDate instants to a local calendar date when filtering by dueDate. */
+  timeZone?: string;
 }
 
 export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): Promise<ListResult<MotionTask>> {
@@ -41,7 +44,8 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
     dueDate,
     labels,
     limit,
-    maxPages = LIMITS.MAX_PAGES
+    maxPages = LIMITS.MAX_PAGES,
+    timeZone
   } = options;
 
   // Validate limit parameter if provided
@@ -77,10 +81,13 @@ export async function getTasks(ctx: ResourceContext, options: GetTasksOptions): 
         filtered = filtered.filter(t => t.priority === priority);
       }
       if (dueDate) {
-        // Compare date portion only (YYYY-MM-DD)
+        // Compare calendar dates (YYYY-MM-DD). The task's dueDate is a UTC instant,
+        // so reduce it in the account zone before comparing against the filter value
+        // (itself a local calendar date); a raw UTC substring drops same-day tasks
+        // whose UTC date has rolled past midnight in a zone west of UTC.
         filtered = filtered.filter(t => {
           if (!t.dueDate) return false;
-          const taskDate = t.dueDate.substring(0, 10);
+          const taskDate = calendarDateInZone(t.dueDate, timeZone);
           // Upper-bound filter: returns tasks due ON OR BEFORE the given date (inclusive)
           return taskDate <= dueDate;
         });
