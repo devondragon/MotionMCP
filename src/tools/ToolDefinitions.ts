@@ -108,12 +108,20 @@ export const tasksToolDefinition: McpToolDefinition = {
       },
       priority: {
         type: "string",
-        description: "Task priority: ASAP, HIGH, MEDIUM, LOW. Set on create/update; filters results on list (filtered client-side)",
+        description: "Task priority: ASAP, HIGH, MEDIUM, LOW. Set on create/update; filters results on list and list_all_uncompleted (filtered client-side)",
         enum: ["ASAP", "HIGH", "MEDIUM", "LOW"]
       },
       dueDate: {
         type: "string",
-        description: "Due date (for create/update) or filter (for list). Format: YYYY-MM-DD, a full ISO 8601 timestamp with offset, or relative like 'today', 'tomorrow'. FILTER (list): an inclusive upper bound at day granularity in the account timezone — returns every task due ON OR BEFORE that day, which INCLUDES overdue tasks. So dueDate:'today' answers \"what's due today?\" (including anything overdue) in a single list call. There is no exact-date or date-range filter; to show only tasks due exactly on a day, filter the returned results by their Due Date yourself. CREATE/UPDATE: a date-only value is stored as end of day (23:59:59) in the account's schedule timezone when all schedules agree on one, so it renders back as the same calendar day; it falls back to end-of-day UTC when no single zone is resolvable. Pass an explicit ISO timestamp with an offset to control the exact instant. Relative keywords resolve against the same account timezone, falling back to UTC otherwise."
+        description: "Due date (for create/update) or filter (for list and list_all_uncompleted). Format: YYYY-MM-DD, a full ISO 8601 timestamp with offset, or relative like 'today', 'tomorrow'. FILTER (list, list_all_uncompleted): an inclusive upper bound at day granularity in the account timezone — returns every task due ON OR BEFORE that day, which INCLUDES overdue tasks. So dueDate:'today' answers \"what's due today?\" (including anything overdue) in a single call. There is no exact-date or date-range filter; to show only tasks due exactly on a day, filter the returned results by their Due Date yourself. CREATE/UPDATE: a date-only value is stored as end of day (23:59:59) in the account's schedule timezone when all schedules agree on one, so it renders back as the same calendar day; it falls back to end-of-day UTC when no single zone is resolvable. Pass an explicit ISO timestamp with an offset to control the exact instant. Relative keywords resolve against the same account timezone, falling back to UTC otherwise."
+      },
+      completedAfter: {
+        type: "string",
+        description: "Filter (for list): keep only tasks COMPLETED on or after this local calendar date. Format: YYYY-MM-DD or relative like 'today', 'yesterday'. Filtered client-side and auto-includes completed/resolved tasks, so 'what did I get done this week?' is completedAfter set to the week's start date. Combine with completedBefore for a window. Note: this filters on completion date, not due date; a very high-volume window can be capped by pagination (reported in the response), not silently."
+      },
+      completedBefore: {
+        type: "string",
+        description: "Filter (for list): keep only tasks COMPLETED on or before this local calendar date. Format: YYYY-MM-DD or relative like 'today'. Filtered client-side; pair with completedAfter to bound a completion window."
       },
       labels: {
         type: "array",
@@ -484,7 +492,7 @@ export const recurringTasksToolDefinition: McpToolDefinition = {
 
 export const schedulesToolDefinition: McpToolDefinition = {
   name: TOOL_NAMES.SCHEDULES,
-  description: "Get all schedules showing weekly working hours and time zones. The Motion API returns all schedules with no filtering options.",
+  description: "Get all schedules showing each day's working hours (start-end per day) and time zones. The Motion API returns all schedules with no filtering options. These are recurring working-hour templates only — they do NOT expose actual calendar events or meetings, so they cannot by themselves show a true free/busy picture; combine with tasks' scheduledStart/scheduledEnd to see what Motion has auto-booked.",
   inputSchema: {
     type: "object",
     properties: {

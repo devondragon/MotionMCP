@@ -113,8 +113,8 @@ All 10 tools are enabled by default. If you run multiple MCP servers and want to
 | Level | Tools | Description |
 |---|---|---|
 | **minimal** | 3 | Tasks, projects, workspaces only |
-| **essential** | 7 | Adds users, search, comments, schedules |
-| **complete** (default) | 10 | Full API access including custom fields, recurring tasks, statuses |
+| **essential** | 8 | Adds users, search, comments, schedules, statuses |
+| **complete** (default) | 10 | Full API access including custom fields and recurring tasks |
 | **custom** | varies | Pick exactly the tools you need |
 
 Custom example:

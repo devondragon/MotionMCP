@@ -32,7 +32,7 @@ import type { IApiClient, ResourceContext } from './api/types';
 // Resource module imports
 import { getWorkspaces as _getWorkspaces } from './api/workspaces';
 import { getUsers as _getUsers, getCurrentUser as _getCurrentUser } from './api/users';
-import { getTasks as _getTasks, getTask as _getTask, createTask as _createTask, updateTask as _updateTask, deleteTask as _deleteTask, moveTask as _moveTask, unassignTask as _unassignTask, getAllUncompletedTasks as _getAllUncompletedTasks } from './api/tasks';
+import { getTasks as _getTasks, getTask as _getTask, createTask as _createTask, updateTask as _updateTask, deleteTask as _deleteTask, moveTask as _moveTask, unassignTask as _unassignTask, getAllUncompletedTasks as _getAllUncompletedTasks, GetAllUncompletedOptions } from './api/tasks';
 import type { GetTasksOptions } from './api/tasks';
 import { getProjects as _getProjects, getAllProjects as _getAllProjects, getProject as _getProject, createProject as _createProject, updateProject as _updateProject, deleteProject as _deleteProject, getProjectByName as _getProjectByName } from './api/projects';
 import { getComments as _getComments, createComment as _createComment } from './api/comments';
@@ -109,8 +109,8 @@ export class MotionApiService {
     return _unassignTask(this._ctx, taskId);
   }
 
-  async getAllUncompletedTasks(limit?: number, assigneeId?: string): Promise<ListResult<MotionTask>> {
-    return _getAllUncompletedTasks(this._ctx, limit, assigneeId);
+  async getAllUncompletedTasks(options: GetAllUncompletedOptions = {}): Promise<ListResult<MotionTask>> {
+    return _getAllUncompletedTasks(this._ctx, options);
   }
 
   // ========================================

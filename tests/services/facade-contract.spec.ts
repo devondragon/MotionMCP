@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { MotionApiService } from '../../src/services/motionApi';
+import type { GetAllUncompletedOptions } from '../../src/services/api/tasks';
 import type {
   MotionWorkspace,
   MotionProject,
@@ -102,7 +103,7 @@ type _unassignTask = AssertMethod<
 const _tt7: _unassignTask = null! as MotionApiService['unassignTask'];
 
 type _getAllUncompletedTasks = AssertMethod<
-  (this: MotionApiService, limit?: number, assigneeId?: string) => Promise<ListResult<MotionTask>>
+  (this: MotionApiService, options?: GetAllUncompletedOptions) => Promise<ListResult<MotionTask>>
 >;
 const _tt8: _getAllUncompletedTasks = null! as MotionApiService['getAllUncompletedTasks'];
 

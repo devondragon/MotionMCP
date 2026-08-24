@@ -57,9 +57,9 @@ describe('ToolRegistry', () => {
       expect(tools.map(t => t.name)).toContain(TOOL_NAMES.WORKSPACES);
     });
 
-    it('returns 7 tools for essential config', () => {
+    it('returns 8 tools for essential config', () => {
       const tools = registry.getEnabled('essential');
-      expect(tools.length).toBe(7);
+      expect(tools.length).toBe(8);
       expect(tools.map(t => t.name)).toContain(TOOL_NAMES.TASKS);
       expect(tools.map(t => t.name)).toContain(TOOL_NAMES.PROJECTS);
       expect(tools.map(t => t.name)).toContain(TOOL_NAMES.WORKSPACES);
@@ -67,6 +67,7 @@ describe('ToolRegistry', () => {
       expect(tools.map(t => t.name)).toContain(TOOL_NAMES.SEARCH);
       expect(tools.map(t => t.name)).toContain(TOOL_NAMES.COMMENTS);
       expect(tools.map(t => t.name)).toContain(TOOL_NAMES.SCHEDULES);
+      expect(tools.map(t => t.name)).toContain(TOOL_NAMES.STATUSES);
     });
 
     it('returns 10 tools for complete config', () => {
@@ -177,7 +178,7 @@ describe('ToolConfigurator', () => {
 
     it('returns correct tool count for essential', () => {
       const configurator = new ToolConfigurator('essential', registry);
-      expect(configurator.getToolCount()).toBe(7);
+      expect(configurator.getToolCount()).toBe(8);
     });
 
     it('returns correct tool count for complete', () => {

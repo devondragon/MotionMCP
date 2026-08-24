@@ -71,8 +71,8 @@ Handlers access `this.motionService` (API client) and `this.workspaceResolver` (
 
 Configured via `MOTION_MCP_TOOLS` env var:
 - `minimal` (3): motion_tasks, motion_projects, motion_workspaces
-- `essential` (7): + motion_users, motion_search, motion_comments, motion_schedules
-- `complete` (10, default): + motion_custom_fields, motion_recurring_tasks, motion_statuses
+- `essential` (8): + motion_users, motion_search, motion_comments, motion_schedules, motion_statuses
+- `complete` (10, default): + motion_custom_fields, motion_recurring_tasks
 - `custom:tool1,tool2`: Exact tool selection
 
 ### Core Service (`src/services/motionApi.ts`)

@@ -512,22 +512,33 @@ export function formatScheduleList(schedules: MotionSchedule[]): CallToolResult 
     const name = schedule.name || 'Unnamed';
     const timezone = schedule.timezone || 'Unknown timezone';
     
-    // Count working days if schedule details are available
-    let workingDays = '';
+    // Surface each working day's hours (start-end per slot) so callers can reason
+    // about actual availability, not just how many days are worked.
+    let workingHours = '';
     if (schedule.schedule && typeof schedule.schedule === 'object') {
-      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-      const activeDays = days.filter(day => 
-        Array.isArray(schedule.schedule[day as keyof MotionScheduleDetails]) && 
-        schedule.schedule[day as keyof MotionScheduleDetails]!.length > 0
-      );
-      workingDays = activeDays.length > 0 
-        ? ` | Working days: ${activeDays.length}/7` 
+      const dayDefs: Array<[keyof MotionScheduleDetails, string]> = [
+        ['monday', 'Mon'], ['tuesday', 'Tue'], ['wednesday', 'Wed'], ['thursday', 'Thu'],
+        ['friday', 'Fri'], ['saturday', 'Sat'], ['sunday', 'Sun']
+      ];
+      const dayParts: string[] = [];
+      for (const [key, label] of dayDefs) {
+        const slots = schedule.schedule[key];
+        if (Array.isArray(slots) && slots.length > 0) {
+          const hours = slots
+            .filter(slot => slot && slot.start && slot.end)
+            .map(slot => `${slot.start}-${slot.end}`)
+            .join('/');
+          if (hours) dayParts.push(`${label} ${hours}`);
+        }
+      }
+      workingHours = dayParts.length > 0
+        ? ` | ${dayParts.join(', ')}`
         : ' | No working hours defined';
     } else {
-      workingDays = ' | Schedule details unavailable';
+      workingHours = ' | Schedule details unavailable';
     }
-    
-    return `- ${name} (${timezone})${workingDays}`;
+
+    return `- ${name} (${timezone})${workingHours}`;
   };
   
   return formatListResponse(schedules, `Found ${schedules.length} schedule${schedules.length === 1 ? '' : 's'}`, scheduleFormatter);
