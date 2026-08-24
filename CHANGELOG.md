@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-08-24
+
 ### ✨ Added
 
 - **Account timezone and today's date on list responses**: task-list responses (`list`, `list_all_uncompleted`) and schedule responses now begin with a one-line header, e.g. `Account timezone: America/Denver | Today: 2026-08-24 (Monday)`. Date-relative reasoning the model does itself (weekday, "now") previously had nothing in the payload naming the account's zone, so fresh agents inferred "now" from the newest `updatedTime` and sometimes reported the wrong day. The zone is already resolved for rendering, so this adds no API calls, and it lands on both the stdio and Worker entry points. (#151, closes #150)
