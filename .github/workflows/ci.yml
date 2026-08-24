@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only token: this workflow only builds and tests, it never pushes,
+# comments, or deploys. Pins GITHUB_TOKEN down from its default scope, which
+# matters because pull_request runs this for fork PRs too.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    # Fail fast if a workerd/DO test deadlocks instead of burning minutes up to
+    # GitHub's 6-hour default.
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Node 24 matches the mise.toml dev pin. The full test suite boots workerd
+      # via @cloudflare/vitest-pool-workers, whose engines require Node >= 22, so
+      # CI cannot run on the published Node 20 floor.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (stdio)
+        run: npm run type-check
+
+      - name: Type-check (worker)
+        run: npm run worker:type-check
+
+      - name: Type-check (tests)
+        run: npm run test:types
+
+      - name: Build
+        run: npm run build
+
+      # Runs the node + worker Vitest projects. Integration tests are excluded
+      # here and skip on their own without MOTION_API_KEY; they hit the live
+      # Motion API under rate limits and are not run in CI.
+      - name: Test
+        run: npm test
