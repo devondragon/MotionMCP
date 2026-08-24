@@ -88,6 +88,45 @@ function renderInZone(date: Date, timeZone: string, withTime: boolean): string |
 }
 
 /**
+ * One-line account date context: the resolved account timezone plus today's
+ * local date and weekday in that zone. Prepended to list responses so the model
+ * reasons about "this week", weekdays, and "now" against the account's actual
+ * zone instead of guessing (the wall-clock date it has from its own context is
+ * in an unknown zone, and nothing else in the payload states the account zone).
+ *
+ * `now` is injectable so callers/tests can pin the clock; production passes the
+ * real time. Falls back to a UTC-labelled reading when no usable zone is given.
+ */
+export function formatAccountDateContext(timeZone?: string, now: Date = new Date()): string {
+  const usableZone = timeZone && isValidTimeZone(timeZone) ? timeZone : undefined;
+  const zone = usableZone ?? 'UTC';
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      weekday: 'long'
+    })
+      .formatToParts(now)
+      .reduce<Record<string, string>>((acc, part) => {
+        acc[part.type] = part.value;
+        return acc;
+      }, {});
+
+    if (parts.year && parts.month && parts.day) {
+      const date = `${parts.year}-${parts.month}-${parts.day}`;
+      const weekday = parts.weekday ? ` (${parts.weekday})` : '';
+      const label = usableZone ?? 'unknown (times shown in UTC)';
+      return `Account timezone: ${label} | Today: ${date}${weekday}`;
+    }
+  } catch {
+    // fall through to a minimal UTC reading
+  }
+  return `Account timezone: ${usableZone ?? 'unknown (times shown in UTC)'} | Today: ${now.toISOString().slice(0, 10)}`;
+}
+
+/**
  * Reduce an instant to its calendar date (YYYY-MM-DD) in a given zone.
  *
  * Motion returns dueDate as a UTC instant, so the raw ISO date portion is the

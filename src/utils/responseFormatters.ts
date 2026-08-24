@@ -11,7 +11,7 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionCustomFieldValue, MotionRecurringTask, MotionSchedule, MotionScheduleDetails, MotionStatus } from '../types/motion';
 import { TruncationInfo } from '../types/mcp';
 import { LIMITS } from './constants';
-import { formatTimestamp, formatDateOnly } from './dateFormat';
+import { formatTimestamp, formatDateOnly, formatAccountDateContext, resolveDisplayTimeZone } from './dateFormat';
 
 const TRUNCATION_REASON_MESSAGES: Record<string, string> = {
   page_size_limit: 'due to page size limits',
@@ -166,7 +166,7 @@ export function formatTaskList(
   if (limit) title += ` (limit: ${limit})`;
 
   const list = tasks.map(taskFormatter).join('\n');
-  let responseText = `${title}:\n${list}`;
+  let responseText = `${formatAccountDateContext(timeZone)}\n${title}:\n${list}`;
   responseText += formatTruncationNotice(truncation);
 
   const structured: Record<string, unknown> = {
@@ -540,8 +540,11 @@ export function formatScheduleList(schedules: MotionSchedule[]): CallToolResult 
 
     return `- ${name} (${timezone})${workingHours}`;
   };
-  
-  return formatListResponse(schedules, `Found ${schedules.length} schedule${schedules.length === 1 ? '' : 's'}`, scheduleFormatter);
+
+  const contextLine = formatAccountDateContext(resolveDisplayTimeZone(schedules));
+  const list = schedules.map(scheduleFormatter).join('\n');
+  const title = `Found ${schedules.length} schedule${schedules.length === 1 ? '' : 's'}`;
+  return formatMcpSuccess(`${contextLine}\n${title}:\n${list}`);
 }
 
 export function formatStatusList(statuses: MotionStatus[]): CallToolResult {
