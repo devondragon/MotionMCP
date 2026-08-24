@@ -15,6 +15,11 @@ new_sqlite_classes = ["MotionMCPAgent"]
 [vars]
 MOTION_MCP_TOOLS = "essential"
 
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+
 # Secrets set via wrangler:
 #   npx wrangler secret put MOTION_API_KEY
 #   npx wrangler secret put MOTION_MCP_SECRET
