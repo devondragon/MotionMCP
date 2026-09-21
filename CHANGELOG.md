@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### 🔄 Changed
+
+- **Cloudflare Worker moved from `McpAgent` to the stateless `createMcpHandler`**: Cloudflare deprecated and feature-froze `McpAgent`. The Worker now serves MCP through the Agents SDK's `createMcpHandler` with an MCP SDK v2 `McpServer` (`@modelcontextprotocol/server` 2.0.0, pinned) built fresh per request. The Durable Object binding is gone (`wrangler.toml` carries a `deleted_classes` migration for `MotionMCPAgent`), and the Motion API client, handler factory, and converted tool schemas are shared per isolate so name-resolution caches stay warm across requests. Connector URLs are unchanged: `/mcp/SECRET` and `/mcp` with `Authorization: Bearer` both work as before. (#158)
+- **Only Streamable HTTP is served**: the stateless handler answers each `POST /mcp` on its own, issues no `Mcp-Session-Id`, and returns 405 for `GET` and `DELETE`. The 2024-era HTTP+SSE transport (a `GET` stream plus `POST /mcp/message`) is no longer available, so any client entry configured with transport type `sse` must be switched to `http`. Claude connectors (web, mobile, Desktop, Code) already use Streamable HTTP. The expiring `mcpSession` credential from #135 existed only for the SSE message endpoint and is removed with it. (#158)
+- **`@modelcontextprotocol/sdk` pinned to 1.30.0**, the exact version `agents` 0.21.0 requires as a peer. The stdio entry point still uses it. (#158)
+
 ## [2.9.0] - 2026-08-24
 
 ### ✨ Added

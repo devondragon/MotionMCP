@@ -19,7 +19,7 @@ npm run type-check         # Type checking without emitting files
 npm test                   # Run all unit tests (node + worker projects)
 npm test -- handlers.task  # Run a single test file by name fragment
 npm test -- --reporter=verbose  # Run with verbose output
-npm run test:worker        # Worker auth tests only (runs in workerd)
+npm run test:worker        # Worker tests only: auth gate + stateless MCP handler (runs in workerd)
 npm run test:integration   # Integration tests (requires MOTION_API_KEY in .env)
 
 # Worker (Cloudflare)
@@ -45,7 +45,7 @@ Integration tests live in `tests/integration/**/*.integration.test.ts` and use t
 
 - Integration tests: 60s timeout, sequential execution (rate limits), requires `MOTION_API_KEY` env var
 - Handler tests mock `MotionApiService` and `WorkspaceResolver`; service returns use `ListResult<T>` shape (`{ items, truncation }`)
-- Worker tests cover `src/worker.ts` authentication. They must run in workerd, not Node: `crypto.subtle.timingSafeEqual` is a Workers extension Node does not implement, and the path rewrites depend on Workers `Request`/`URL` semantics. Bindings come from `wrangler.toml` with fake `MOTION_API_KEY`/`MOTION_MCP_SECRET` values injected in the config, and `MotionMCPAgent.serve()/mount()` are stubbed so authorized requests are observable without a live MCP session.
+- Worker tests cover `src/worker.ts` authentication. They must run in workerd, not Node: `crypto.subtle.timingSafeEqual` is a Workers extension Node does not implement, and the path rewrites depend on Workers `Request`/`URL` semantics. Bindings come from `wrangler.toml` with fake `MOTION_API_KEY`/`MOTION_MCP_SECRET` values injected in the config. The auth tests stub `mcpTransport.handle` so authorized requests are observable; a second block runs unstubbed through the real `createMcpHandler` (initialize, tools/list, schema rejection, 405 on GET/DELETE) and stops short of any tool call that would reach Motion.
 - The config is `.mts` because `@cloudflare/vitest-pool-workers` is ESM-only and the package is CommonJS.
 
 ## Architecture
@@ -55,7 +55,7 @@ Integration tests live in `tests/integration/**/*.integration.test.ts` and use t
 Both share all handlers, services, tools, and utilities — they differ only in transport and API key source.
 
 - **Stdio Server** (`src/mcp-server.ts`): Uses `Server` from MCP SDK. API key from `MOTION_API_KEY` env var.
-- **Cloudflare Worker** (`src/worker.ts`): Uses `McpAgent` from Cloudflare Agents SDK with Durable Objects. API key from Worker secret. Auth via secret token in URL path (`/mcp/SECRET`).
+- **Cloudflare Worker** (`src/worker.ts`): Uses the stateless `createMcpHandler` from the Cloudflare Agents SDK (`agents/mcp/server`) with a v2 `McpServer` from `@modelcontextprotocol/server`, built fresh per request. No Durable Object. API key from Worker secret. Auth via `Authorization: Bearer SECRET` or a secret token in the URL path (`/mcp/SECRET`), checked before the handler runs.
 
 ### Handler Architecture (`src/handlers/`)
 

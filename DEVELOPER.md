@@ -121,7 +121,7 @@ Notes:
 
 ## Cloudflare Worker (remote MCP server)
 
-The project also includes a Cloudflare Worker entry point (`src/worker.ts`) that exposes the same MCP tools over HTTP. This enables access from Claude mobile/web and ChatGPT — any client that supports remote MCP servers via Streamable HTTP or SSE.
+The project also includes a Cloudflare Worker entry point (`src/worker.ts`) that exposes the same MCP tools over HTTP. This enables access from Claude mobile/web and ChatGPT — any client that supports remote MCP servers via Streamable HTTP.
 
 ### Prerequisites
 
@@ -152,12 +152,18 @@ npm run worker:deploy
 
 Your MCP URL will be: `https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp/YOUR_SECRET`
 
-The secret is the final path segment; clients use that address as-is. The server advertises its own sub-paths (such as the message endpoint) during a session, so do not append `/sse` or any other sub-path to the secret. A path-secret request to any other sub-path returns 404.
+The secret is the final path segment; clients use that address as-is. The Worker serves Streamable HTTP on that single endpoint, so do not append `/sse` or any other sub-path. A request to any sub-path returns 404 in both auth modes.
+
+Header-capable clients can use `https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp` with `Authorization: Bearer YOUR_SECRET` instead, which keeps the secret out of URLs and access logs.
 
 ### Connecting clients
 
 - **Claude (web/mobile):** Add the URL in [claude.ai](https://claude.ai) > Settings > Connectors. Syncs to mobile automatically.
+- **Claude Code:** `claude mcp add --transport http motion https://.../mcp --header "Authorization: Bearer YOUR_SECRET"`.
+- **Claude Desktop:** add the URL as a remote server of type `http`.
 - **ChatGPT (web/mobile):** Add the URL in Settings > Connectors.
+
+Only Streamable HTTP is served. The 2024-era HTTP+SSE transport (`GET` stream plus a `POST /message` endpoint) is no longer available; a client entry with transport type `sse` must be changed to `http`.
 
 ### Worker type checking
 
@@ -172,11 +178,13 @@ This is separate from the main `npm run type-check` / `npm run build` which comp
 ### Architecture notes
 
 - The Worker reuses all existing handlers, services, tools, and utilities — it only differs in transport
-- `McpAgent` from the Cloudflare Agents SDK handles Streamable HTTP and SSE via Durable Objects
+- The transport is `createMcpHandler` from the Cloudflare Agents SDK (`agents/mcp/server`), the stateless MCP SDK v2 handler. It serves one route, `/mcp`, and constructs a fresh `McpServer` (from `@modelcontextprotocol/server`) per request. No Durable Object is bound; `wrangler.toml` carries a `deleted_classes` migration that retired the earlier `McpAgent` class.
+- Stateless means no MCP session: a 2025-era Streamable HTTP client gets no `Mcp-Session-Id`, every `POST` is served on its own, and `GET`/`DELETE` on `/mcp` return 405. Server-initiated requests (sampling, elicitation) are unavailable; this server makes none.
+- `MotionApiService`, the handler factory, and the converted tool schemas are built once per isolate and shared across requests, so the service's workspace/project name caches stay warm even though each request gets its own `McpServer`. The handlers keep no per-session state; each tool call goes straight to Motion's REST API.
 - `MotionApiService` receives the API key from Worker env bindings instead of `process.env`
-- Tool JSON Schemas are converted to Zod schemas at init time (via `src/utils/jsonSchemaToZod.ts`) because `McpServer.tool()` requires Zod
-- Access is controlled by a secret token in the URL path — treat the full URL like a password
-- On the legacy-SSE message endpoint the raw secret is not used as the per-message credential. When a path-secret client opens an SSE stream, the Worker mints a short-lived HMAC credential (`src/utils/sessionCredential.ts`) and advertises it on the message endpoint the client then POSTs to, so the long-lived secret never lands in access/proxy logs. The credential expires after 24 hours (`SESSION_CREDENTIAL_TTL_MS`); a session held open longer gets 404s on message POSTs and reconnects, which mints a fresh one. Bearer-mode clients send the secret in the `Authorization` header instead and are unaffected.
+- Tool JSON Schemas are converted to Zod schemas once per isolate (via `src/utils/jsonSchemaToZod.ts`) because `McpServer.registerTool()` takes a Standard Schema; Zod v4 implements it
+- Access is controlled by a secret, sent as `Authorization: Bearer` or as the final URL path segment. The Worker authenticates before the handler ever sees the request, and hands it a URL carrying only `/mcp` (no secret segment, no caller query params). Because that gate is the trust boundary, the handler's browser `Origin` allow-list is set to `*`; the SDK's default would reject browser-origin clients on custom domains.
+- The stdio entry point (`src/mcp-server.ts`) still uses MCP SDK v1 (`@modelcontextprotocol/sdk`), pinned to the version `agents` requires as a peer. Both SDK packages are therefore direct dependencies.
 
 ## Troubleshooting
 
