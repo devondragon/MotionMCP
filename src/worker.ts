@@ -52,6 +52,11 @@ interface WorkerRuntime {
   handler: StatelessMcpHandler;
 }
 
+// getRuntime must stay synchronous from the key check to the assignment
+// below: with no await in between, two concurrent cold-start requests in one
+// isolate cannot both build and race to assign, and a request never observes
+// a runtime that is about to be discarded. Fetching anything during
+// construction would need a promise cached here instead.
 let runtime: WorkerRuntime | undefined;
 
 /**

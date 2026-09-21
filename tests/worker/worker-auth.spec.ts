@@ -13,8 +13,9 @@
  *   the MCP handler) without serving a real MCP exchange.
  * - The stateless MCP handler itself (createMcpHandler, issue #158). These
  *   run unstubbed, end to end through the Worker's default export, and speak
- *   JSON-RPC over streamable HTTP to the real handler. They stop at
- *   tools/list: a tools/call would reach Motion's REST API.
+ *   JSON-RPC over streamable HTTP to the real handler. The one successful
+ *   tools/call stubs the tool handler, since a real one would reach
+ *   Motion's REST API; everything up to and after that handler is real.
  */
 import { env } from "cloudflare:workers";
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
@@ -671,9 +672,13 @@ describe("stateless MCP handler (issue #158)", () => {
 
     expect(fromHandler.status).toBe(200);
     expect(fromWorker.status).toBe(200);
+    // Header names are case-insensitive; key on the lowercased name so the
+    // comparison does not depend on how a runtime reports casing.
     const corsHeaders = (response: Response) =>
       Object.fromEntries(
-        [...response.headers.entries()].filter(([name]) => name.toLowerCase().startsWith("access-control-"))
+        [...response.headers.entries()]
+          .map(([name, value]) => [name.toLowerCase(), value] as const)
+          .filter(([name]) => name.startsWith("access-control-"))
       );
     expect(corsHeaders(fromWorker)).toEqual(corsHeaders(fromHandler));
   });
