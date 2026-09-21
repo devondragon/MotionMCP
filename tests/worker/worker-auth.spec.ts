@@ -1,56 +1,37 @@
 /**
- * Authentication coverage for src/worker.ts (issue #133).
+ * Authentication and transport coverage for src/worker.ts (issues #133, #158).
  *
  * These run inside workerd via @cloudflare/vitest-pool-workers rather than
  * Node, because the code under test depends on runtime behaviour Node does
  * not provide: crypto.subtle.timingSafeEqual is a Workers extension, and the
  * path rewrites go through Workers Request/URL semantics.
  *
- * MotionMCPAgent.serve()/mount() are stubbed so an authorized request can be
- * observed (which mode was chosen, and the exact URL handed to the agent)
- * without standing up a real MCP session against a Durable Object.
+ * Two layers are covered:
+ *
+ * - The auth gate and path rewriting. `mcpTransport.handle` is stubbed so an
+ *   authorized request can be observed (the exact URL and method handed to
+ *   the MCP handler) without serving a real MCP exchange.
+ * - The stateless MCP handler itself (createMcpHandler, issue #158). These
+ *   run unstubbed, end to end through the Worker's default export, and speak
+ *   JSON-RPC over streamable HTTP to the real handler. They stop at
+ *   tools/list: a tools/call would reach Motion's REST API.
  */
 import { env } from "cloudflare:workers";
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import worker, { MotionMCPAgent, secretsMatch } from "../../src/worker";
-import {
-  mintSessionCredential,
-  verifySessionCredential,
-} from "../../src/utils/sessionCredential";
+import worker, { mcpTransport, secretsMatch } from "../../src/worker";
+import { HandlerFactory } from "../../src/handlers/HandlerFactory";
+import type { BaseHandler } from "../../src/handlers/base/BaseHandler";
 
 const SECRET = "test-worker-secret";
 
-/** The query param the Worker now sets on a path-secret SSE stream-open URL. */
-const CREDENTIAL_PARAM = "mcpSession";
-
-/** Sentinel status returned by the stubbed agent: the request was authorized. */
-const AGENT_STATUS = 299;
+/** Sentinel status returned by the stubbed transport: the request was authorized. */
+const TRANSPORT_STATUS = 299;
 
 type WorkerEnv = Parameters<typeof worker.fetch>[1];
-type AgentCall = { mode: "serve" | "mount"; mountPath: string; url: string; method: string };
+type TransportCall = { url: string; method: string };
 
 const testEnv = env as unknown as WorkerEnv;
-
-let agentCalls: AgentCall[];
-
-beforeEach(() => {
-  agentCalls = [];
-  for (const mode of ["serve", "mount"] as const) {
-    vi.spyOn(MotionMCPAgent as unknown as Record<string, () => unknown>, mode).mockImplementation(
-      ((mountPath: string) => ({
-        fetch: async (request: Request) => {
-          agentCalls.push({ mode, mountPath, url: request.url, method: request.method });
-          return new Response("agent reached", { status: AGENT_STATUS });
-        },
-      })) as unknown as () => unknown
-    );
-  }
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 async function fetchWorker(
   request: Request,
@@ -62,17 +43,31 @@ async function fetchWorker(
   return response;
 }
 
-/** The single call made to the stubbed agent; fails if the request never got there. */
-function onlyAgentCall(): AgentCall {
-  expect(agentCalls).toHaveLength(1);
-  return agentCalls[0]!;
-}
-
-function agentUrl(): URL {
-  return new URL(onlyAgentCall().url);
-}
-
 describe("worker auth", () => {
+  let transportCalls: TransportCall[];
+
+  beforeEach(() => {
+    transportCalls = [];
+    vi.spyOn(mcpTransport, "handle").mockImplementation(async (request: Request) => {
+      transportCalls.push({ url: request.url, method: request.method });
+      return new Response("transport reached", { status: TRANSPORT_STATUS });
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** The single call made to the stubbed transport; fails if the request never got there. */
+  function onlyTransportCall(): TransportCall {
+    expect(transportCalls).toHaveLength(1);
+    return transportCalls[0]!;
+  }
+
+  function transportUrl(): URL {
+    return new URL(onlyTransportCall().url);
+  }
+
   describe("test bindings", () => {
     it("uses fake credentials, never values from a local .env", () => {
       const bound = testEnv as unknown as Record<string, string>;
@@ -85,6 +80,10 @@ describe("worker auth", () => {
         "function"
       );
     });
+
+    it("binds no Durable Object: the MCP transport is stateless (issue #158)", () => {
+      expect((testEnv as unknown as Record<string, unknown>).MCP_OBJECT).toBeUndefined();
+    });
   });
 
   describe("health endpoint", () => {
@@ -93,7 +92,7 @@ describe("worker auth", () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ status: "ok", server: "motion-mcp-server" });
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
     });
 
     it("still serves health when no secret is configured", async () => {
@@ -116,7 +115,7 @@ describe("worker auth", () => {
 
       expect(response.status).toBe(500);
       expect(await response.text()).toBe("Server misconfigured");
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
     });
 
     it("returns 500 rather than authorizing a request whose empty secret would otherwise match", async () => {
@@ -126,20 +125,7 @@ describe("worker auth", () => {
       );
 
       expect(response.status).toBe(500);
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it("returns 500 on the SSE message endpoint", async () => {
-      const response = await fetchWorker(
-        new Request("https://example.com/mcp/message?sessionId=abc", {
-          method: "POST",
-          body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 1 }),
-        }),
-        { MOTION_MCP_SECRET: "" } as Partial<WorkerEnv>
-      );
-
-      expect(response.status).toBe(500);
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
     });
   });
 
@@ -147,7 +133,7 @@ describe("worker auth", () => {
     // A browser strips Authorization from a preflight, so an OPTIONS under /mcp
     // carries no credential. The Worker answers it before the auth gate, with
     // the same CORS headers the agents SDK emits, so the real request that
-    // follows is allowed. The preflight itself never reaches the agent.
+    // follows is allowed. The preflight itself never reaches the transport.
 
     it("answers OPTIONS /mcp without auth, with CORS headers", async () => {
       const response = await fetchWorker(
@@ -161,27 +147,15 @@ describe("worker auth", () => {
       );
 
       expect(response.status).toBe(200);
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
 
       const allowHeaders = response.headers.get("Access-Control-Allow-Headers")!;
       expect(allowHeaders.toLowerCase()).toContain("authorization");
       expect(allowHeaders.toLowerCase()).toContain("mcp-session-id");
+      expect(allowHeaders.toLowerCase()).toContain("mcp-protocol-version");
       expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, DELETE, OPTIONS");
       expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
       expect(response.headers.get("Access-Control-Max-Age")).toBe("86400");
-    });
-
-    it("answers OPTIONS on the legacy SSE message endpoint (was 404)", async () => {
-      const response = await fetchWorker(
-        new Request("https://example.com/mcp/message?sessionId=abc", { method: "OPTIONS" })
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
-      expect(
-        response.headers.get("Access-Control-Allow-Headers")!.toLowerCase()
-      ).toContain("authorization");
-      expect(agentCalls).toHaveLength(0);
     });
 
     it("answers OPTIONS /mcp/<secret> with CORS headers", async () => {
@@ -191,7 +165,7 @@ describe("worker auth", () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
     });
 
     it("does not answer OPTIONS outside /mcp", async () => {
@@ -202,7 +176,7 @@ describe("worker auth", () => {
       );
 
       expect(response.status).toBe(404);
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
     });
 
     it("leaves non-OPTIONS auth unchanged: POST /mcp with no credential still 404s", async () => {
@@ -212,20 +186,7 @@ describe("worker auth", () => {
 
       expect(response.status).toBe(404);
       expect(await response.text()).toBe("Not found");
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it("leaves the SSE message endpoint gated: POST with no secret still 404s", async () => {
-      const response = await fetchWorker(
-        new Request("https://example.com/mcp/message?sessionId=abc", {
-          method: "POST",
-          body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 1 }),
-        })
-      );
-
-      expect(response.status).toBe(404);
-      expect(await response.text()).toBe("Not found");
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
     });
   });
 
@@ -266,7 +227,7 @@ describe("worker auth", () => {
         })
       );
 
-      expect(response.status).toBe(AGENT_STATUS);
+      expect(response.status).toBe(TRANSPORT_STATUS);
     });
 
     it.each([
@@ -279,7 +240,7 @@ describe("worker auth", () => {
         new Request("https://example.com/mcp", { method: "POST", headers: { Authorization: header }, body: "{}" })
       );
 
-      expect(response.status).toBe(AGENT_STATUS);
+      expect(response.status).toBe(TRANSPORT_STATUS);
     });
 
     it.each([
@@ -295,15 +256,17 @@ describe("worker auth", () => {
 
       expect(response.status).toBe(404);
       expect(await response.text()).toBe("Not found");
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
     });
   });
 
   describe("path secret mode", () => {
     it("authorizes /mcp/<secret>", async () => {
-      const response = await fetchWorker(new Request(`https://example.com/mcp/${SECRET}`));
+      const response = await fetchWorker(
+        new Request(`https://example.com/mcp/${SECRET}`, { method: "POST", body: "{}" })
+      );
 
-      expect(response.status).toBe(AGENT_STATUS);
+      expect(response.status).toBe(TRANSPORT_STATUS);
     });
 
     it.each([
@@ -318,357 +281,407 @@ describe("worker auth", () => {
 
       expect(response.status).toBe(404);
       expect(await response.text()).toBe("Not found");
-      expect(agentCalls).toHaveLength(0);
+      expect(transportCalls).toHaveLength(0);
     });
   });
 
-  describe("path-secret sub-path rejection (issue #141)", () => {
-    // Only /mcp/<secret> (stream open / streamable HTTP) and
-    // /mcp/<secret>/message (message POST) are valid path-secret addresses. The
-    // SDK mounts the stream on /mcp and the message handler on /mcp/message
-    // only, so any other path-secret sub-path cannot succeed. The Worker rejects
-    // it before the secret is ever attached to the agent URL, so the secret
-    // never lands on a URL that dead-ends in a 404 inside the Durable Object.
+  describe("sub-path rejection (issues #141, #158)", () => {
+    // The stateless handler serves exactly one route, /mcp. The retired
+    // HTTP+SSE transport advertised sub-paths (/mcp/sse, /mcp/message); a
+    // client still addressing one is rejected at the Worker, in both auth
+    // modes, before anything reaches the handler. In path-secret mode that
+    // also keeps the secret off any URL the handler could surface in a trace.
 
-    it("rejects GET /mcp/<secret>/sse with 404 and never reaches the agent", async () => {
-      const response = await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/sse`));
-
-      expect(response.status).toBe(404);
-      expect(await response.text()).toBe("Not found");
-      // The cleanest proof the secret was never attached: the agent, which is
-      // where SSE_SECRET_PARAM would be set, was not called at all.
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it("rejects GET /mcp/<secret>/anything-else with 404 (guard is general, not sse-specific)", async () => {
-      const response = await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/anything-else`));
-
-      expect(response.status).toBe(404);
-      expect(await response.text()).toBe("Not found");
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it("still opens the stream for the bare /mcp/<secret>", async () => {
-      const response = await fetchWorker(new Request(`https://example.com/mcp/${SECRET}`));
-
-      expect(response.status).toBe(AGENT_STATUS);
-      expect(onlyAgentCall().mode).toBe("mount");
-      expect(agentUrl().pathname).toBe("/mcp");
-    });
-
-    it("still reaches the message handler for POST /mcp/<secret>/message?sessionId=abc", async () => {
+    it.each([
+      ["GET /mcp/<secret>/sse", `/mcp/${SECRET}/sse`, "GET", {}],
+      ["POST /mcp/<secret>/message?sessionId=abc", `/mcp/${SECRET}/message?sessionId=abc`, "POST", {}],
+      ["GET /mcp/<secret>/anything-else", `/mcp/${SECRET}/anything-else`, "GET", {}],
+      ["GET /mcp/sse (Bearer)", "/mcp/sse", "GET", { Authorization: `Bearer ${SECRET}` }],
+      [
+        "POST /mcp/message?sessionId=abc (Bearer)",
+        "/mcp/message?sessionId=abc",
+        "POST",
+        { Authorization: `Bearer ${SECRET}` },
+      ],
+    ])("rejects %s with 404 and never reaches the transport", async (_label, path, method, headers) => {
       const response = await fetchWorker(
-        new Request(`https://example.com/mcp/${SECRET}/message?sessionId=abc`, {
-          method: "POST",
-          body: "{}",
+        new Request(`https://example.com${path}`, {
+          method,
+          headers,
+          ...(method === "POST" ? { body: "{}" } : {}),
         })
       );
 
-      expect(response.status).toBe(AGENT_STATUS);
-      expect(agentUrl().pathname).toBe("/mcp/message");
-      expect(agentUrl().searchParams.get("sessionId")).toBe("abc");
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe("Not found");
+      expect(transportCalls).toHaveLength(0);
+    });
+
+    it("rejects the legacy message endpoint without any credential", async () => {
+      const response = await fetchWorker(
+        new Request("https://example.com/mcp/message?sessionId=abc", {
+          method: "POST",
+          body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 1 }),
+        })
+      );
+
+      expect(response.status).toBe(404);
+      expect(transportCalls).toHaveLength(0);
     });
   });
 
   describe("path rewriting", () => {
-    // These assert what the Worker hands to the agent, not end-to-end
-    // reachability. MotionMCPAgent.mount("/mcp") matches the stream on /mcp
-    // only (agents/dist/mcp/index.js, basePattern), so a /mcp/sse sub-path is
-    // rewritten correctly here and then 404s inside the SDK. That is
-    // pre-existing product behavior; the rewrite is what these pin.
+    // These assert what the Worker hands to the transport: always the bare
+    // /mcp route, never the secret, never a caller query param.
 
-    it("preserves the path in Bearer mode and adds no secret query param", async () => {
+    it("preserves /mcp in Bearer mode and adds nothing", async () => {
       await fetchWorker(
-        new Request("https://example.com/mcp/sse", { headers: { Authorization: `Bearer ${SECRET}` } })
+        new Request("https://example.com/mcp", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${SECRET}` },
+          body: "{}",
+        })
       );
 
-      const url = agentUrl();
-      expect(url.pathname).toBe("/mcp/sse");
+      const url = transportUrl();
+      expect(url.pathname).toBe("/mcp");
       expect(url.search).toBe("");
-      expect(onlyAgentCall().url).not.toContain(SECRET);
+      expect(onlyTransportCall().url).not.toContain(SECRET);
     });
 
     it("strips the secret segment in path secret mode", async () => {
       await fetchWorker(new Request(`https://example.com/mcp/${SECRET}`, { method: "POST", body: "{}" }));
 
-      expect(agentUrl().pathname).toBe("/mcp");
-    });
-
-    it("carries an expiring session credential into the SSE stream URL, not the raw secret", async () => {
-      // The path-secret stream open is the bare /mcp/<secret> GET (cleanPath
-      // "/mcp"); path-secret SSE sub-paths like /mcp/<secret>/sse are rejected.
-      // The Worker now advertises an expiring HMAC credential on the message
-      // endpoint, so the raw secret never lands in the query string (issue #135).
-      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}`));
-
-      const credential = agentUrl().searchParams.get(CREDENTIAL_PARAM);
-      expect(credential).not.toBeNull();
-      expect(credential).not.toBe(SECRET);
-      expect(onlyAgentCall().url).not.toContain(SECRET);
-      await expect(verifySessionCredential(credential!, SECRET)).resolves.toBe(true);
-    });
-
-    it("forwards no caller query params in Bearer mode", async () => {
-      // The agent reads only sessionId, and only on a message route. Anything
-      // else a client appends is inert to it and is not carried across.
-      await fetchWorker(
-        new Request("https://example.com/mcp/sse?foo=bar&baz=1", {
-          headers: { Authorization: `Bearer ${SECRET}` },
-        })
-      );
-
-      const url = agentUrl();
-      expect(url.pathname).toBe("/mcp/sse");
-      expect(url.search).toBe("");
-    });
-
-    it("forwards no caller query params in path secret mode, only the Worker's own credential", async () => {
-      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}?foo=bar`));
-
-      const url = agentUrl();
-      expect(url.searchParams.has("foo")).toBe(false);
-      expect([...url.searchParams.keys()]).toEqual([CREDENTIAL_PARAM]);
-      const credential = url.searchParams.get(CREDENTIAL_PARAM);
-      expect(credential).not.toBe(SECRET);
-      await expect(verifySessionCredential(credential!, SECRET)).resolves.toBe(true);
-    });
-
-    it("keeps sessionId on a message POST addressed with the secret in the path", async () => {
-      // /mcp/<secret>/message does not match the dedicated message branch, so it
-      // falls through to the generic rewrite. It must still reach the agent with
-      // the session it names.
-      await fetchWorker(
-        new Request(`https://example.com/mcp/${SECRET}/message?sessionId=session-1`, {
-          method: "POST",
-          body: "{}",
-        })
-      );
-
-      const url = agentUrl();
-      expect(url.pathname).toBe("/mcp/message");
-      expect(url.searchParams.get("sessionId")).toBe("session-1");
+      const url = transportUrl();
+      expect(url.pathname).toBe("/mcp");
+      expect(onlyTransportCall().url).not.toContain(SECRET);
     });
 
     it.each([
-      ["path secret mode", `/mcp/${SECRET}`, {}],
       ["Bearer mode", "/mcp", { Authorization: `Bearer ${SECRET}` }],
-    ])("drops a caller-supplied sessionId when opening a stream in %s", async (_label, path, headers) => {
-      // The SDK names the stream's Durable Object sse:<sessionId>, so honouring a
-      // caller-supplied id would let two clients share one stream object and
-      // receive each other's messages. Ids stay server-issued.
+      ["path secret mode", `/mcp/${SECRET}`, {}],
+    ])("forwards no caller query params in %s", async (_label, path, headers) => {
+      // The handler reads only the pathname. Anything a client appends is
+      // inert to it and is not carried across, so an unaudited value can
+      // never reach the handler or its logs.
       await fetchWorker(
-        new Request(`https://example.com${path}?sessionId=chosen-by-caller&keep=this`, { headers })
-      );
-
-      const url = agentUrl();
-      expect(url.searchParams.has("sessionId")).toBe(false);
-      expect(url.searchParams.has("keep")).toBe(false);
-    });
-
-    it("keeps sessionId on a message POST, which is not a stream open", async () => {
-      const credential = await mintSessionCredential(SECRET);
-      await fetchWorker(
-        new Request(
-          `https://example.com/mcp/message?sessionId=session-1&${CREDENTIAL_PARAM}=${encodeURIComponent(credential)}`,
-          { method: "POST", body: "{}" }
-        )
-      );
-
-      expect(agentUrl().searchParams.get("sessionId")).toBe("session-1");
-    });
-
-    it("puts no credential on the URL for a GET to a message-shaped path", async () => {
-      // A GET is not by itself a stream open: /mcp/<secret>/message authenticates
-      // on the path secret and reaches mount(), but advertises nothing.
-      await fetchWorker(new Request(`https://example.com/mcp/${SECRET}/message`));
-
-      expect(agentUrl().pathname).toBe("/mcp/message");
-      expect(agentUrl().searchParams.has(CREDENTIAL_PARAM)).toBe(false);
-      expect(onlyAgentCall().url).not.toContain(SECRET);
-    });
-
-    it("puts a credential on the URL only for SSE stream opens, never a message POST", async () => {
-      // Nothing is advertised on a POST, so a credential on its URL would be a
-      // pointless exposure via Workers trace events. The dedicated /mcp/message
-      // branch strips the param; this fall-through path must agree with it.
-      await fetchWorker(
-        new Request(`https://example.com/mcp/${SECRET}/message?sessionId=session-1`, {
+        new Request(`https://example.com${path}?sessionId=chosen-by-caller&foo=bar`, {
           method: "POST",
+          headers,
           body: "{}",
         })
       );
 
-      expect(agentUrl().searchParams.has(CREDENTIAL_PARAM)).toBe(false);
-      expect(onlyAgentCall().url).not.toContain(SECRET);
-    });
-
-    it("drops a client-supplied credential param, which only this Worker may set", async () => {
-      await fetchWorker(
-        new Request(`https://example.com/mcp/sse?${CREDENTIAL_PARAM}=client-injected`, {
-          headers: { Authorization: `Bearer ${SECRET}` },
-        })
-      );
-
-      expect(agentUrl().searchParams.has(CREDENTIAL_PARAM)).toBe(false);
-    });
-
-    it("adds no credential query param when a Bearer client opens an SSE stream", async () => {
-      await fetchWorker(
-        new Request("https://example.com/mcp?foo=bar", {
-          headers: { Authorization: `Bearer ${SECRET}` },
-        })
-      );
-
-      const url = agentUrl();
+      const url = transportUrl();
+      expect(url.pathname).toBe("/mcp");
       expect(url.search).toBe("");
-      expect(onlyAgentCall().url).not.toContain(SECRET);
     });
-  });
 
-  describe("transport selection", () => {
+    it("preserves the method and passes the origin through unchanged", async () => {
+      await fetchWorker(
+        new Request(`https://worker.example.com/mcp/${SECRET}`, { method: "DELETE" })
+      );
+
+      const call = onlyTransportCall();
+      expect(call.method).toBe("DELETE");
+      expect(new URL(call.url).origin).toBe("https://worker.example.com");
+    });
+
     it.each([
-      ["POST /mcp", "POST", {}],
-      ["DELETE /mcp", "DELETE", {}],
-      ["GET /mcp with an mcp-session-id header", "GET", { "mcp-session-id": "session-1" }],
-    ])("routes %s to serve() (streamable HTTP)", async (_label, method, extraHeaders) => {
+      ["POST", { body: "{}" }],
+      ["GET", {}],
+      ["DELETE", {}],
+    ])("hands %s /mcp to the transport rather than routing by method", async (method, init) => {
+      // The previous transport split GET (legacy SSE via mount) from
+      // POST/DELETE (streamable HTTP via serve). The stateless handler owns
+      // that decision now; the Worker forwards every authenticated method.
       await fetchWorker(
         new Request("https://example.com/mcp", {
           method,
-          headers: { Authorization: `Bearer ${SECRET}`, ...extraHeaders },
-          ...(method === "GET" || method === "DELETE" ? {} : { body: "{}" }),
+          headers: { Authorization: `Bearer ${SECRET}` },
+          ...init,
         })
       );
 
-      expect(onlyAgentCall().mode).toBe("serve");
-    });
-
-    it("routes a bare GET /mcp to mount() (legacy SSE)", async () => {
-      await fetchWorker(
-        new Request("https://example.com/mcp", { headers: { Authorization: `Bearer ${SECRET}` } })
-      );
-
-      expect(onlyAgentCall().mode).toBe("mount");
-    });
-
-    it("routes a sub-path to mount()", async () => {
-      await fetchWorker(
-        new Request("https://example.com/mcp/sse", { headers: { Authorization: `Bearer ${SECRET}` } })
-      );
-
-      expect(onlyAgentCall().mode).toBe("mount");
+      expect(onlyTransportCall().method).toBe(method);
     });
   });
+});
 
-  describe("SSE message endpoint", () => {
-    function messageRequest(query: string, init: RequestInit = {}): Request {
-      return new Request(`https://example.com/mcp/message?${query}`, {
+describe("stateless MCP handler (issue #158)", () => {
+  // End to end through the real createMcpHandler. Clients today speak the
+  // 2025-11-25 streamable HTTP protocol (the era the tailed claude.ai
+  // connector uses); the stateless handler serves each such POST with a
+  // fresh McpServer and no session, and answers the session operations GET
+  // and DELETE with 405.
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const JSON_RPC_HEADERS = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+
+  type JsonRpcResponse = { jsonrpc: "2.0"; id: number; result?: Record<string, unknown>; error?: unknown };
+
+  /** Extracts the JSON-RPC messages from a JSON or SSE-framed streamable HTTP response body. */
+  async function readJsonRpc(response: Response): Promise<JsonRpcResponse[]> {
+    const contentType = response.headers.get("content-type") ?? "";
+    const text = await response.text();
+    if (contentType.includes("application/json")) {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    }
+    expect(contentType).toContain("text/event-stream");
+    return text
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => JSON.parse(line.slice("data:".length).trim()));
+  }
+
+  function initializeRequest(id = 1): string {
+    return JSON.stringify({
+      jsonrpc: "2.0",
+      id,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-11-25",
+        capabilities: {},
+        clientInfo: { name: "worker-spec", version: "0.0.0" },
+      },
+    });
+  }
+
+  async function initialize(path: string, headers: Record<string, string> = {}): Promise<Response> {
+    return fetchWorker(
+      new Request(`https://example.com${path}`, {
         method: "POST",
-        body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 1 }),
-        ...init,
+        headers: { ...JSON_RPC_HEADERS, ...headers },
+        body: initializeRequest(),
+      })
+    );
+  }
+
+  it.each([
+    ["Bearer mode", "/mcp", { Authorization: `Bearer ${SECRET}` }],
+    ["path secret mode", `/mcp/${SECRET}`, {}],
+  ])("answers initialize on /mcp in %s", async (_label, path, headers) => {
+    const response = await initialize(path, headers);
+
+    expect(response.status).toBe(200);
+    const [message] = await readJsonRpc(response);
+    expect(message?.id).toBe(1);
+    expect(message?.error).toBeUndefined();
+    expect(message?.result).toMatchObject({
+      serverInfo: { name: "motion-mcp-server" },
+      capabilities: { tools: expect.any(Object) },
+    });
+    expect((message?.result as { instructions?: string }).instructions).toEqual(expect.any(String));
+  });
+
+  it("issues no session: the handler is stateless", async () => {
+    const response = await initialize("/mcp", { Authorization: `Bearer ${SECRET}` });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("mcp-session-id")).toBeNull();
+  });
+
+  it("lists the tools of the configured tier without an initialize on the same connection", async () => {
+    // Each POST gets a fresh server, so tools/list must stand on its own. This
+    // is exactly what a 2025-era client does on its second request once it
+    // received no session id. The tier comes from wrangler.toml [vars]
+    // (essential), so the count pins that binding reaches the Worker too.
+    const response = await fetchWorker(
+      new Request("https://example.com/mcp", {
+        method: "POST",
+        headers: { ...JSON_RPC_HEADERS, Authorization: `Bearer ${SECRET}` },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const [message] = await readJsonRpc(response);
+    const tools = (message?.result as { tools: Array<{ name: string; inputSchema: unknown }> }).tools;
+    const names = tools.map((tool) => tool.name).sort();
+    expect(names).toEqual([
+      "motion_comments",
+      "motion_projects",
+      "motion_schedules",
+      "motion_search",
+      "motion_statuses",
+      "motion_tasks",
+      "motion_users",
+      "motion_workspaces",
+    ]);
+    // The strict schemas survive the JSON Schema -> Zod -> JSON Schema round trip.
+    for (const tool of tools) {
+      expect(tool.inputSchema).toMatchObject({ type: "object", additionalProperties: false });
+    }
+  });
+
+  async function listToolNames(overrideEnv: Partial<WorkerEnv> = {}): Promise<string[]> {
+    const response = await fetchWorker(
+      new Request("https://example.com/mcp", {
+        method: "POST",
+        headers: { ...JSON_RPC_HEADERS, Authorization: `Bearer ${SECRET}` },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+      }),
+      overrideEnv
+    );
+    expect(response.status).toBe(200);
+    const [message] = await readJsonRpc(response);
+    return (message?.result as { tools: Array<{ name: string }> }).tools.map((tool) => tool.name).sort();
+  }
+
+  const ESSENTIAL_TOOLS = [
+    "motion_comments",
+    "motion_projects",
+    "motion_schedules",
+    "motion_search",
+    "motion_statuses",
+    "motion_tasks",
+    "motion_users",
+    "motion_workspaces",
+  ];
+  const MINIMAL_TOOLS = ["motion_projects", "motion_tasks", "motion_workspaces"];
+
+  it("rebuilds the per-isolate runtime when the bindings that shape it change, both ways", async () => {
+    // The runtime (tool table, handler factory, handler) is cached at module
+    // scope and keyed on the bindings it was built from. The module-scope
+    // cache persists across tests in this file, so each step asserts its own
+    // expected set rather than relying on order: hit or miss, the tools
+    // served must always be the ones for the env of that request.
+    expect(await listToolNames()).toEqual(ESSENTIAL_TOOLS);
+    expect(await listToolNames({ MOTION_MCP_TOOLS: "minimal" } as Partial<WorkerEnv>)).toEqual(MINIMAL_TOOLS);
+    expect(await listToolNames()).toEqual(ESSENTIAL_TOOLS);
+    expect(await listToolNames({ MOTION_MCP_TOOLS: "minimal" } as Partial<WorkerEnv>)).toEqual(MINIMAL_TOOLS);
+  });
+
+  async function callTool(id: number, name: string, args: Record<string, unknown>): Promise<JsonRpcResponse> {
+    const response = await fetchWorker(
+      new Request("https://example.com/mcp", {
+        method: "POST",
+        headers: { ...JSON_RPC_HEADERS, Authorization: `Bearer ${SECRET}` },
+        body: JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }),
+      })
+    );
+    expect(response.status).toBe(200);
+    const [message] = await readJsonRpc(response);
+    expect(message?.id).toBe(id);
+    return message!;
+  }
+
+  it("rejects a tools/call whose arguments fail the tool's schema before any handler runs", async () => {
+    // "operation" is required by every tool and validated by the Zod schema
+    // the Worker registers, so this never reaches the handler or Motion's API.
+    const createHandler = vi.spyOn(HandlerFactory.prototype, "createHandler");
+
+    const message = await callTool(3, "motion_workspaces", { unknownProperty: true });
+
+    expect(createHandler).not.toHaveBeenCalled();
+    const result = message.result as { isError?: boolean; content: Array<{ type: string; text: string }> };
+    expect(message.error).toBeUndefined();
+    expect(result.isError).toBe(true);
+    // The message is produced by schema validation and names the input, not a
+    // generic failure: it mentions the required "operation" key the caller omitted.
+    const text = result.content.map((item) => item.text).join("\n");
+    expect(text).toMatch(/operation/);
+    expect(text).toMatch(/validation|invalid/i);
+  });
+
+  it("answers a call to a tool that is not registered with a different error than a schema failure", async () => {
+    // Negative control for the schema test above: an unknown tool is a
+    // JSON-RPC error, not an isError result, so the two cannot both pass on
+    // one generic failure path.
+    const message = await callTool(4, "motion_nonexistent", { operation: "list" });
+
+    expect(message.result).toBeUndefined();
+    expect((message.error as { code: number; message: string }).message).toMatch(/motion_nonexistent/);
+  });
+
+  it("serves a successful tools/call through the real handler and shares one handler factory across requests", async () => {
+    // The tool handler is stubbed (a real one would call Motion's API); the
+    // path from JSON-RPC through the v2 McpServer, the registered Zod schema,
+    // the per-isolate HandlerFactory and back onto the wire is real. The
+    // stub's `this` is the factory the Worker called, so two requests hitting
+    // the same instance proves the runtime is reused rather than rebuilt.
+    const stubResult = {
+      content: [{ type: "text" as const, text: "stubbed workspaces" }],
+      structuredContent: { workspaces: [{ id: "ws_1", name: "Personal" }] },
+    };
+    const createHandler = vi
+      .spyOn(HandlerFactory.prototype, "createHandler")
+      .mockImplementation(function (this: HandlerFactory) {
+        return { handle: async () => stubResult } as unknown as BaseHandler;
       });
+
+    const first = await callTool(5, "motion_workspaces", { operation: "list" });
+    const second = await callTool(6, "motion_workspaces", { operation: "list" });
+
+    for (const message of [first, second]) {
+      expect(message.error).toBeUndefined();
+      expect(message.result).toMatchObject(stubResult);
+      expect((message.result as { isError?: boolean }).isError).toBeUndefined();
     }
+    expect(createHandler).toHaveBeenCalledTimes(2);
+    expect(createHandler.mock.calls.map(([name]) => name)).toEqual(["motion_workspaces", "motion_workspaces"]);
+    expect(createHandler.mock.contexts[0]).toBeInstanceOf(HandlerFactory);
+    expect(createHandler.mock.contexts[1]).toBe(createHandler.mock.contexts[0]);
+  });
 
-    /** A query string carrying a freshly minted, valid session credential. */
-    async function credentialQuery(sessionId = "session-1", extra = ""): Promise<string> {
-      const credential = await mintSessionCredential(SECRET);
-      return `sessionId=${sessionId}&${CREDENTIAL_PARAM}=${encodeURIComponent(credential)}${extra}`;
-    }
+  it.each(["GET", "DELETE"])("answers %s /mcp with 405: no sessions exist to stream or close", async (method) => {
+    const response = await fetchWorker(
+      new Request("https://example.com/mcp", {
+        method,
+        headers: { Accept: "application/json, text/event-stream", Authorization: `Bearer ${SECRET}` },
+      })
+    );
 
-    it("authorizes a valid session credential carried on the advertised query param", async () => {
-      const response = await fetchWorker(messageRequest(await credentialQuery()));
+    expect(response.status).toBe(405);
+  });
 
-      expect(response.status).toBe(AGENT_STATUS);
-    });
+  it("serves a second POST after the first with no shared session state", async () => {
+    const first = await initialize("/mcp", { Authorization: `Bearer ${SECRET}` });
+    const second = await initialize("/mcp", { Authorization: `Bearer ${SECRET}` });
 
-    it("strips the credential param before the agent sees the request, keeping sessionId", async () => {
-      await fetchWorker(messageRequest(await credentialQuery()));
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(first.headers.get("mcp-session-id")).toBeNull();
+    expect(second.headers.get("mcp-session-id")).toBeNull();
+    const [message] = await readJsonRpc(second);
+    expect(message?.error).toBeUndefined();
+  });
 
-      const url = agentUrl();
-      expect(url.searchParams.has(CREDENTIAL_PARAM)).toBe(false);
-      expect(url.searchParams.get("sessionId")).toBe("session-1");
-      expect(url.pathname).toBe("/mcp/message");
-      expect(onlyAgentCall().url).not.toContain(SECRET);
-    });
+  it("answers a preflight with the same CORS headers the Worker's own responder hardcodes", async () => {
+    // The Worker answers OPTIONS before the auth gate with a header set that
+    // is meant to mirror the handler's defaults exactly. Driving the handler
+    // directly with the same preflight pins that: an agents SDK bump that
+    // changes its defaults fails here instead of silently desyncing.
+    const preflight = () =>
+      new Request("https://example.com/mcp", {
+        method: "OPTIONS",
+        headers: { Origin: "https://app.example", "Access-Control-Request-Method": "POST" },
+      });
+    const ctx = createExecutionContext();
+    const fromHandler = await mcpTransport.handle(preflight(), testEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    const fromWorker = await fetchWorker(preflight());
 
-    it("forwards only sessionId, dropping other caller params", async () => {
-      await fetchWorker(messageRequest(await credentialQuery("session-1", "&foo=bar")));
-
-      expect([...agentUrl().searchParams.keys()]).toEqual(["sessionId"]);
-    });
-
-    it("authorizes a Bearer client without any query param", async () => {
-      const response = await fetchWorker(
-        messageRequest("sessionId=session-1", { headers: { Authorization: `Bearer ${SECRET}` } })
+    expect(fromHandler.status).toBe(200);
+    expect(fromWorker.status).toBe(200);
+    const corsHeaders = (response: Response) =>
+      Object.fromEntries(
+        [...response.headers.entries()].filter(([name]) => name.toLowerCase().startsWith("access-control-"))
       );
+    expect(corsHeaders(fromWorker)).toEqual(corsHeaders(fromHandler));
+  });
 
-      expect(response.status).toBe(AGENT_STATUS);
-      expect(agentUrl().searchParams.has(CREDENTIAL_PARAM)).toBe(false);
-    });
+  it("still gates the handler: an unauthenticated initialize never reaches it", async () => {
+    const response = await initialize("/mcp");
 
-    it("rejects the raw secret in the credential param: the downgrade path is closed (#135)", async () => {
-      // Before #135 the raw MOTION_MCP_SECRET was accepted here. It no longer is:
-      // only an expiring HMAC credential verifies, so a secret leaked from an old
-      // log cannot authenticate a message POST.
-      const response = await fetchWorker(
-        messageRequest(`sessionId=session-1&${CREDENTIAL_PARAM}=${encodeURIComponent(SECRET)}`)
-      );
-
-      expect(response.status).toBe(404);
-      expect(await response.text()).toBe("Not found");
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it.each([
-      ["no credentials at all", "sessionId=session-1", {}],
-      ["a garbage credential", `sessionId=session-1&${CREDENTIAL_PARAM}=not-a-credential`, {}],
-      ["an empty credential", `sessionId=session-1&${CREDENTIAL_PARAM}=`, {}],
-    ])("rejects a message POST with %s", async (_label, query, init) => {
-      const response = await fetchWorker(messageRequest(query, init));
-
-      expect(response.status).toBe(404);
-      expect(await response.text()).toBe("Not found");
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it("rejects a tampered credential (valid shape, wrong MAC)", async () => {
-      const credential = await mintSessionCredential(SECRET);
-      const [issuedAt, mac] = credential.split(".") as [string, string];
-      const tampered = `${issuedAt}.${(mac[0] === "A" ? "B" : "A") + mac.slice(1)}`;
-      const response = await fetchWorker(
-        messageRequest(`sessionId=session-1&${CREDENTIAL_PARAM}=${encodeURIComponent(tampered)}`)
-      );
-
-      expect(response.status).toBe(404);
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it("rejects a wrong Bearer token even when a valid credential is present", async () => {
-      const response = await fetchWorker(
-        messageRequest(await credentialQuery(), {
-          headers: { Authorization: "Bearer wrong-secret" },
-        })
-      );
-
-      expect(response.status).toBe(404);
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it("rejects a GET on the message endpoint", async () => {
-      const query = await credentialQuery();
-      const response = await fetchWorker(new Request(`https://example.com/mcp/message?${query}`));
-
-      expect(response.status).toBe(404);
-      expect(agentCalls).toHaveLength(0);
-    });
-
-    it("does not apply the query-param credential fallback when sessionId is absent", async () => {
-      const credential = await mintSessionCredential(SECRET);
-      const response = await fetchWorker(
-        messageRequest(`${CREDENTIAL_PARAM}=${encodeURIComponent(credential)}`)
-      );
-
-      expect(response.status).toBe(404);
-      expect(agentCalls).toHaveLength(0);
-    });
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("Not found");
   });
 });

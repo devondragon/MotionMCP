@@ -14,10 +14,10 @@ export default defineConfig({
         }
       },
       {
-        // Worker auth tests run inside workerd, the same runtime as production,
+        // Worker tests run inside workerd, the same runtime as production,
         // so they exercise the real crypto.subtle.timingSafeEqual, the real
-        // Request/URL semantics behind the path rewrites, and the Durable
-        // Object bindings the agent is mounted on.
+        // Request/URL semantics behind the path rewrites, and the real
+        // stateless MCP handler end to end.
         plugins: [
           cloudflareTest({
             wrangler: { configPath: './wrangler.toml' },
