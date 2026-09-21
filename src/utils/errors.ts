@@ -6,7 +6,7 @@
  */
 
 import { isAxiosError } from 'axios';
-import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { ERROR_CODES, MCP_RESPONSE_TYPES, ErrorCode, LOG_LEVELS, LogLevel } from './constants';
 import { mcpLog } from './logger';
 

@@ -7,7 +7,7 @@
  */
 
 import { formatMcpSuccess } from './errors';
-import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { MotionProject, MotionTask, MotionWorkspace, MotionComment, MotionCustomField, MotionCustomFieldValue, MotionRecurringTask, MotionSchedule, MotionScheduleDetails, MotionStatus } from '../types/motion';
 import { TruncationInfo } from '../types/mcp';
 import { LIMITS } from './constants';
