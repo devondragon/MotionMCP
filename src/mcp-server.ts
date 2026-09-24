@@ -17,6 +17,12 @@ import { HandlerFactory } from './handlers/HandlerFactory';
 import { ToolRegistry, ToolConfigurator } from './tools';
 import * as dotenv from 'dotenv';
 
+// Read at runtime from the package the server ships in, so a release bump of
+// package.json is the only version bump. (A TS import of package.json is not
+// possible here: it sits outside rootDir.)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const SERVER_VERSION: string = require("../package.json").version;
+
 dotenv.config({ quiet: true });
 
 class MotionMCPServer {
@@ -30,7 +36,7 @@ class MotionMCPServer {
     this.server = new Server(
       {
         name: "motion-mcp-server",
-        version: "2.9.0",
+        version: SERVER_VERSION,
       },
       {
         capabilities: {
