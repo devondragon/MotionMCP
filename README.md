@@ -71,7 +71,9 @@ Your MCP URL will be:
 https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp/YOUR_SECRET
 ```
 
-Use exactly that address. The secret goes at the end of the path and nothing follows it: the server advertises its own sub-paths (such as the message endpoint) during a session, so do not append `/sse` or any other sub-path to the secret.
+Use exactly that address. The secret goes at the end of the path and nothing follows it. The server speaks MCP Streamable HTTP on that single endpoint; do not append `/sse` or any other sub-path.
+
+Clients that can send headers can keep the secret out of the URL instead: point them at `https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp` and send `Authorization: Bearer YOUR_SECRET`.
 
 #### Connecting from Claude
 
@@ -79,12 +81,22 @@ Use exactly that address. The secret goes at the end of the path and nothing fol
 2. Add your MCP URL
 3. The server syncs automatically to the Claude mobile app
 
+For Claude Code, use the Streamable HTTP transport:
+
+```bash
+claude mcp add --transport http motion https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/mcp --header "Authorization: Bearer YOUR_SECRET"
+```
+
+In Claude Desktop, add the same URL as a remote server of type `http` (not `sse`).
+
 #### Connecting from ChatGPT
 
 1. Go to ChatGPT Settings > Connectors
 2. Add your MCP URL
 
 > **Security:** The secret in the URL prevents casual discovery. Treat the full URL like a password — don't share it publicly.
+
+> **Transport:** Only Streamable HTTP is served. The older HTTP+SSE transport (a `GET` stream plus a `/message` endpoint) was retired in the move to a stateless server; a client configured with transport type `sse` must be switched to `http`.
 
 Tool configuration works the same as the local server. Set `MOTION_MCP_TOOLS` in `wrangler.toml` under `[vars]`, or override via `wrangler secret put MOTION_MCP_TOOLS`.
 

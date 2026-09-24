@@ -3,14 +3,17 @@ main = "src/worker.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-[durable_objects]
-bindings = [
-  { name = "MCP_OBJECT", class_name = "MotionMCPAgent" }
-]
-
+# The MCP transport is stateless (createMcpHandler): no Durable Object is
+# bound. The v1 migration created the MotionMCPAgent class for the retired
+# McpAgent transport; v2 retires it. Both tags must stay in place so Wrangler
+# can replay the history on a fresh deploy.
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["MotionMCPAgent"]
+
+[[migrations]]
+tag = "v2"
+deleted_classes = ["MotionMCPAgent"]
 
 [vars]
 MOTION_MCP_TOOLS = "essential"
