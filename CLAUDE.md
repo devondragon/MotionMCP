@@ -34,6 +34,8 @@ npm run build && npm run worker:type-check
 timeout 3s npm run mcp
 ```
 
+Releasing (version bump, tag, GitHub release, npm publish, Worker deploy) is documented step by step in `DEVELOPER.md` under "Releasing".
+
 ## Testing
 
 Uses **vitest**. `vitest.config.mts` defines two projects that both run under `npm test`:
