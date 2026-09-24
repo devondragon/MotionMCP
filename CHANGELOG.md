@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-24
+
 ### 🔄 Changed
 
 - **Cloudflare Worker moved from `McpAgent` to the stateless `createMcpHandler`**: Cloudflare deprecated and feature-froze `McpAgent`. The Worker now serves MCP through the Agents SDK's `createMcpHandler` with an MCP SDK v2 `McpServer` (`@modelcontextprotocol/server` 2.0.0, pinned) built fresh per request. The Durable Object binding is gone (`wrangler.toml` carries a `deleted_classes` migration for `MotionMCPAgent`), and the Motion API client, handler factory, and converted tool schemas are shared per isolate so name-resolution caches stay warm across requests. Connector URLs are unchanged: `/mcp/SECRET` and `/mcp` with `Authorization: Bearer` both work as before. (#158)

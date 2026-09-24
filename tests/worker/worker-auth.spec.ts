@@ -23,6 +23,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import worker, { mcpTransport, secretsMatch } from "../../src/worker";
 import { HandlerFactory } from "../../src/handlers/HandlerFactory";
 import type { BaseHandler } from "../../src/handlers/base/BaseHandler";
+import packageJson from "../../package.json";
 
 const SECRET = "test-worker-secret";
 
@@ -476,7 +477,7 @@ describe("stateless MCP handler (issue #158)", () => {
     expect(message?.id).toBe(1);
     expect(message?.error).toBeUndefined();
     expect(message?.result).toMatchObject({
-      serverInfo: { name: "motion-mcp-server" },
+      serverInfo: { name: "motion-mcp-server", version: packageJson.version },
       capabilities: { tools: expect.any(Object) },
     });
     expect((message?.result as { instructions?: string }).instructions).toEqual(expect.any(String));

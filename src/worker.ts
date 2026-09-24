@@ -10,6 +10,7 @@ import { jsonSchemaToZodObject } from "./utils/jsonSchemaToZod";
 import { SERVER_INSTRUCTIONS } from "./utils/serverInstructions";
 import { mcpLog } from "./utils/logger";
 import { LOG_LEVELS } from "./utils/constants";
+import packageJson from "../package.json";
 
 interface Env {
   MOTION_API_KEY: string;
@@ -17,7 +18,7 @@ interface Env {
   MOTION_MCP_TOOLS?: string;
 }
 
-const SERVER_INFO = { name: "motion-mcp-server", version: "2.9.0" };
+const SERVER_INFO = { name: "motion-mcp-server", version: packageJson.version };
 
 /** The single route the MCP handler serves. Everything under /mcp is rewritten to it. */
 const MCP_ROUTE = "/mcp";
