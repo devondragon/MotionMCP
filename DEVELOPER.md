@@ -186,6 +186,53 @@ This is separate from the main `npm run type-check` / `npm run build` which comp
 - Access is controlled by a secret, sent as `Authorization: Bearer` or as the final URL path segment. The Worker authenticates before the handler ever sees the request, and hands it a URL carrying only `/mcp` (no secret segment, no caller query params). Because that gate is the trust boundary, the handler's browser `Origin` allow-list is set to `*`; the SDK's default would reject browser-origin clients on custom domains.
 - The stdio entry point (`src/mcp-server.ts`) still uses MCP SDK v1 (`@modelcontextprotocol/sdk`), pinned to the version `agents` requires as a peer. Both SDK packages are therefore direct dependencies.
 
+## Releasing
+
+A release is a version-bump PR, a git tag, a GitHub release, an npm publish, and a Worker redeploy. Nothing automates the last three; CI only builds and tests. Both entry points read `serverInfo.version` from `package.json` at runtime (`src/worker.ts` via a JSON import, `src/mcp-server.ts` via `require`), and a workerd test asserts the advertised version matches, so no source file needs a version edit.
+
+Version scheme: minor bumps so far, including for Worker-only breaking changes (2.9.0 changed the SSE credential, 2.10.0 dropped the SSE transport). Bump the major only for a change that breaks the npm stdio server's tool contract.
+
+1. Branch from an up-to-date `main`:
+
+   ```bash
+   git checkout main && git pull
+   git checkout -b chore/release-X.Y.Z
+   npm version X.Y.Z --no-git-tag-version   # bumps package.json and package-lock.json only
+   ```
+
+2. In `CHANGELOG.md`, insert `## [X.Y.Z] - YYYY-MM-DD` directly under `## [Unreleased]`, so the unreleased entries move under the new heading and `[Unreleased]` is left empty. Add nothing else; the release notes are copied from this section verbatim.
+
+3. Verify, then commit as `chore(release): X.Y.Z`, push, open the PR, and squash-merge once `build-and-test` is green:
+
+   ```bash
+   npm test && npm run build && npm run worker:type-check && npm run test:types
+   ```
+
+4. Tag the merge commit and publish the GitHub release from the changelog section:
+
+   ```bash
+   git checkout main && git pull
+   git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
+   awk '/^## \[X.Y.Z\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > /tmp/notes.md
+   gh release create vX.Y.Z --title "vX.Y.Z" --notes-file /tmp/notes.md --latest
+   ```
+
+5. Publish to npm from the `main` checkout (`prepublishOnly` runs the type-check and build). This needs an npm login and prints "Your package is being processed and may take a few minutes to become available"; the registry can keep reporting the previous version for a few minutes, so poll `https://registry.npmjs.org/motionmcp` before treating it as failed:
+
+   ```bash
+   npm publish
+   ```
+
+6. Redeploy the Worker and verify it:
+
+   ```bash
+   npm run worker:deploy
+   curl https://motion-mcp-server.YOUR_SUBDOMAIN.workers.dev/health   # {"status":"ok",...}
+   npx wrangler tail motion-mcp-server --format json                  # then make a call from a connector
+   ```
+
+   The tail entry for that call should show `"executionModel": "stateless"`, a 200, no exceptions, and the `scriptVersion.id` printed by the deploy. An unauthenticated `POST /mcp` should return 404.
+
 ## Troubleshooting
 
 - Missing or invalid API key: verify MOTION_API_KEY is set (in your shell or .env).
