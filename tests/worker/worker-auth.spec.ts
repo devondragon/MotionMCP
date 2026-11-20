@@ -1,7 +1,7 @@
 /**
  * Authentication and transport coverage for src/worker.ts (issues #133, #158).
  *
- * These run inside workerd via @cloudflare/vitest-pool-workers rather than
+ * These run inside workerd via @cloudflare/vitest-plugin rather than
  * Node, because the code under test depends on runtime behaviour Node does
  * not provide: crypto.subtle.timingSafeEqual is a Workers extension, and the
  * path rewrites go through Workers Request/URL semantics.

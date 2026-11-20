@@ -41,14 +41,14 @@ Releasing (version bump, tag, GitHub release, npm publish, Worker deploy) is doc
 Uses **vitest**. `vitest.config.mts` defines two projects that both run under `npm test`:
 
 - **node** — unit tests in `tests/**/*.spec.ts`, 10s timeout, mocked services, `tests/setup.ts` silences console.error
-- **worker** — `tests/worker/**/*.spec.ts`, run inside workerd via `@cloudflare/vitest-pool-workers`
+- **worker** — `tests/worker/**/*.spec.ts`, run inside workerd via `@cloudflare/vitest-plugin`
 
 Integration tests live in `tests/integration/**/*.integration.test.ts` and use their own config.
 
 - Integration tests: 60s timeout, sequential execution (rate limits), requires `MOTION_API_KEY` env var
 - Handler tests mock `MotionApiService` and `WorkspaceResolver`; service returns use `ListResult<T>` shape (`{ items, truncation }`)
 - Worker tests cover `src/worker.ts` authentication. They must run in workerd, not Node: `crypto.subtle.timingSafeEqual` is a Workers extension Node does not implement, and the path rewrites depend on Workers `Request`/`URL` semantics. Bindings come from `wrangler.toml` with fake `MOTION_API_KEY`/`MOTION_MCP_SECRET` values injected in the config. The auth tests stub `mcpTransport.handle` so authorized requests are observable; a second block runs unstubbed through the real `createMcpHandler` (initialize, tools/list, schema rejection, 405 on GET/DELETE) and stops short of any tool call that would reach Motion.
-- The config is `.mts` because `@cloudflare/vitest-pool-workers` is ESM-only and the package is CommonJS.
+- The config is `.mts` because `@cloudflare/vitest-plugin` is ESM-only and the package is CommonJS.
 
 ## Architecture
 

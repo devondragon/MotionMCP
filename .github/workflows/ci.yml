@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       # Node 24 matches the mise.toml dev pin. The full test suite boots workerd
-      # via @cloudflare/vitest-pool-workers, whose engines require Node >= 22, so
+      # via @cloudflare/vitest-plugin, whose engines require Node >= 22, so
       # CI cannot run on the published Node 20 floor.
       - name: Set up Node.js
         uses: actions/setup-node@v4
