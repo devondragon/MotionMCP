@@ -24,13 +24,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Node 24 matches the mise.toml dev pin. The full test suite boots workerd
-      # via @cloudflare/vitest-plugin; the supported floor is Node 22.18 / 24.11 (see
-      # engines in package.json).
+      # via @cloudflare/vitest-plugin, whose miniflare dependency requires Node >= 22.12, so
+      # CI cannot run on the published Node 20 floor.
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
