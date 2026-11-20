@@ -10,7 +10,10 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Changed
 
-- **Minimum Node.js is now 22.18 (or 24.11+)**, and `engines` says so. The README still said 20+, but since 2.10.0 the `agents` dependency has pulled in Babel 8 (`engines.node ^22.18.0 || >=24.11.0`), so installs on older versions emit `EBADENGINE` warnings, and CI never tested below Node 24.
+- **Smaller install for `npx motionmcp`**: `agents` and `@modelcontextprotocol/server` moved to `devDependencies`. Only the Worker imports them, and Wrangler bundles it at deploy time. A production install of the package drops from about 114 MB (184 packages) to about 30 MB, and the Babel 8 / rolldown / vite tree that `agents` pulled in (which declared Node `^22.18.0 || >=24.11.0`) is gone, so the published server's Node 20+ floor is accurate again. Development still needs Node 22.12+.
+- **dotenv 17 → 18**: its status output now goes to stderr; `config({ quiet: true })` is unchanged, and the removed `.env.vault` and preload features were not used.
+- **Worker `compatibility_date` 2025-04-01 → 2026-11-19**: opts the Worker into runtime changes since April 2025, including `node:http`/`node:https`, Node.js-compatible timers, and `nodejs_compat_v2` by default.
+- **CI actions**: `actions/checkout` and `actions/setup-node` v4 → v7, which run on Node 24 natively instead of the deprecated Node 20 runtime.
 - **Worker tests use `@cloudflare/vitest-plugin`**: `@cloudflare/vitest-pool-workers` was renamed and no longer receives updates; its exact pins held an unpatched `undici`, `sharp`, and `zod`. The `cloudflareTest` import and the `/types` entry are unchanged apart from the package name.
 
 ## [2.10.0] - 2026-09-24
