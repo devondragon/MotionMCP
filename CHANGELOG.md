@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-11-20
+
 ### 🔒 Security
 
 - **Dependency updates clear all 23 `npm audit` advisories**: `@modelcontextprotocol/server` 2.0.0 → 2.4.0 and `@modelcontextprotocol/sdk` 1.30.0 → 1.32.2 (both still pinned), `agents` 0.21 → 0.34, `axios` 1.18 → 1.21, `zod` 4.4 → 4.6, `wrangler` 4.125 → 4.165, `vitest` 4.1.0 → 4.1.12, plus transitive fixes for `proxy-addr`, `undici`, `vite`, `hono`, `qs`, and others.
