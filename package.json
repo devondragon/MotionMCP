@@ -33,25 +33,25 @@
   },
   "type": "commonjs",
   "engines": {
-    "node": ">=22"
+    "node": "^22.18.0 || >=24.11.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
-    "@modelcontextprotocol/server": "2.0.0",
-    "agents": "^0.21.0",
-    "ajv": "^8.17.1",
-    "axios": "^1.9.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "agents": "0.34.0",
+    "ajv": "^8.20.0",
+    "axios": "^1.21.1",
     "dotenv": "^17.2.3",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.22.0",
-    "@cloudflare/workers-types": "^5.20260821.1",
-    "@types/node": "^24.2.1",
+    "@cloudflare/vitest-plugin": "^1.8.5",
+    "@cloudflare/workers-types": "^5.20261120.1",
+    "@types/node": "^24.19.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
-    "vitest": "^4.0.18",
-    "wrangler": "^4.0.0"
+    "vitest": "^4.1.12",
+    "wrangler": "^4.165.0"
   },
   "scripts": {
     "generate:types": "npx tsx scripts/generate-types.ts",
