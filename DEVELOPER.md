@@ -4,10 +4,10 @@ This guide is for contributors and anyone running Motion MCP locally from source
 
 ## Prerequisites
 
-- Node.js 22.12 or newer for development (Node 24 recommended; the repo pins 24 via `mise.toml`).
-  The published server runs on Node 20+, but the dev toolchain does not: `wrangler` and
-  `miniflare` (which `@cloudflare/vitest-plugin` depends on) declare `engines.node >= 22.12`,
-  and `npm test` now boots workerd for the Worker test project.
+- Node.js 22.18+ or 24.11+ (Node 24 recommended; the repo pins 24 via `mise.toml`). This is
+  the floor for both the published server and development: `agents` depends on Babel 8, which
+  declares `engines.node ^22.18.0 || >=24.11.0`, and `wrangler` and `miniflare` need 22.12+.
+  `npm test` boots workerd for the Worker test project.
 - npm (comes with Node)
 - A Motion API key: https://app.usemotion.com/settings/api
 

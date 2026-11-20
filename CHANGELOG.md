@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Changed
 
+- **Minimum Node.js is now 22.18 (or 24.11+)**, and `engines` says so. The README still said 20+, but since 2.10.0 the `agents` dependency has pulled in Babel 8 (`engines.node ^22.18.0 || >=24.11.0`), so installs on older versions emit `EBADENGINE` warnings, and CI never tested below Node 24.
 - **Worker tests use `@cloudflare/vitest-plugin`**: `@cloudflare/vitest-pool-workers` was renamed and no longer receives updates; its exact pins held an unpatched `undici`, `sharp`, and `zod`. The `cloudflareTest` import and the `/types` entry are unchanged apart from the package name.
 
 ## [2.10.0] - 2026-09-24

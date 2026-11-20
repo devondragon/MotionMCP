@@ -33,7 +33,7 @@
   },
   "type": "commonjs",
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.18.0 || >=24.11.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
