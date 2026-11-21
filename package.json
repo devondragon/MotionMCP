@@ -69,5 +69,9 @@
     "worker:deploy": "wrangler deploy",
     "worker:type-check": "tsc --noEmit -p tsconfig.worker.json",
     "prepublishOnly": "npm run type-check && npm run build"
+  },
+  "allowScripts": {
+    "workerd@1.20261119.1": true,
+    "esbuild@0.28.2": true
   }
 }
